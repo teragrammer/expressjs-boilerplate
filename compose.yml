@@ -1,0 +1,11 @@
+services:
+  web:
+    build: .
+    image: express-boilerplate/backend:latest
+    container_name: express-boilerplate-backend
+    stdin_open: true # docker run -i
+    tty: true        # docker run -t
+    volumes:
+      - ./:/app
+    ports:
+      - "${PORT_EXPOSE}:${PORT}"
