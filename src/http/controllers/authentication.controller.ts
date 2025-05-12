@@ -79,19 +79,11 @@ export default (app: Express) => {
                 })
             }
 
-            await AuthenticationTokenModel(app.knex).clean(user.id);
-            const authentication = await AuthenticationTokenModel(app.knex).token(user.id);
-
-            // remove private data
-            delete user.password;
-            delete user.failed_login_expired_at;
-            delete user.login_tries;
-
-            user.role = await RoleModel(app.knex).table().where('id', user.role_id).first();
+            const authentication = await AuthenticationTokenModel(app.knex).generate(user);
 
             res.status(200).json({
-                user: user,
-                credential: authentication,
+                user: authentication.user,
+                credential: authentication.token,
             })
         },
 

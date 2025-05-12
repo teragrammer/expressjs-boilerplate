@@ -4,12 +4,31 @@ import {SettingKeyValueInterface} from "../interfaces/setting-key-value.interfac
 import {SecurityUtil} from "../utilities/security.util";
 import {DateUtil} from "../utilities/date.util";
 import {AuthenticationTokenInterface} from "../interfaces/authentication-token.interface";
+import {UserInterface} from "../interfaces/user.interface";
+import {RoleModel} from "./role.model";
 
 const TABLE_NAME = 'authentication_tokens';
 
 export function AuthenticationTokenModel(knex: Knex) {
     return {
         table: () => knex.table(TABLE_NAME),
+
+        async generate(user: UserInterface) {
+            await this.clean(user.id)
+            const token = await this.token(user.id);
+
+            // remove private data
+            delete user.password;
+            delete user.failed_login_expired_at;
+            delete user.login_tries;
+
+            user.role = await RoleModel(knex).table().where('id', user.role_id).first();
+
+            return {
+                user,
+                token,
+            }
+        },
 
         async token(userId: number): Promise<any> {
             const settings: SettingKeyValueInterface = await SettingModel(knex).value(['tkn_lth', 'tkn_exp', 'tta_req']);

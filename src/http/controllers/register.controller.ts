@@ -7,7 +7,6 @@ import {RoleInterface} from "../../interfaces/role.interface";
 import {SecurityUtil} from "../../utilities/security.util";
 import {DateUtil} from "../../utilities/date.util";
 import {UserInterface} from "../../interfaces/user.interface";
-import {RoleModel} from "../../models/role.model";
 import {AuthenticationTokenModel} from "../../models/authentication-token.model";
 import {logger} from "../../configurations/logger";
 
@@ -73,20 +72,11 @@ export default (app: Express) => {
                     message: errors.e3.message,
                 });
 
-                // remove sensitive data
-                delete customer.password;
-                delete customer.login_tries;
-                delete customer.failed_login_expired_at;
-
-                // set the role details
-                customer.role = await RoleModel(app.knex).table().where('id', customer.role_id).first();
-
-                // generate authentication token
-                const authentication = await AuthenticationTokenModel(app.knex).token(customer.id);
+                const authentication = await AuthenticationTokenModel(app.knex).generate(customer);
 
                 res.status(200).json({
-                    user: customer,
-                    credential: authentication,
+                    user: authentication.user,
+                    credential: authentication.token,
                 })
             } catch (e: any) {
                 logger.error(e);
