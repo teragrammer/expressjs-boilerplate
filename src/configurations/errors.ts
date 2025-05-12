@@ -23,4 +23,7 @@ export default {
     e22: {code: "022", message: "The data is no longer valid due to expiration"},
     e23: {code: "023", message: "The OTP provided does not match our records"},
     e24: {code: "024", message: "The system has detected too many incorrect attempts"},
+    e25: {code: "025", message: "Please try to resend again later"},
+    e26: {code: "026", message: "Recovery tries exceeded maximum limit"},
+    e27: {code: "027", message: "The provided recovery code is invalid"},
 }

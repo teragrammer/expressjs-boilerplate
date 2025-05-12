@@ -9,6 +9,7 @@ import AccountController from "../controllers/account.controller";
 import SettingController from "../controllers/setting.controller";
 import UserController from "../controllers/user.controller";
 import RoleController from "../controllers/role.controller";
+import PasswordRecoveryController from "../controllers/password-recovery.controller";
 
 const router = Router();
 
@@ -19,6 +20,9 @@ export default (app: Express) => {
 
     router.get("/tfa/send", [AuthenticationMiddleware(app)], TwoFactorAuthenticationController(app).send);
     router.post("/tfa/validate", [AuthenticationMiddleware(app)], TwoFactorAuthenticationController(app).validate);
+
+    router.post("/password-recovery/send", PasswordRecoveryController(app).send);
+    router.post("/password-recovery/validate", PasswordRecoveryController(app).validate);
 
     router.put("/account/information", [AuthenticationMiddleware(app), TwoFactorAuthenticationMiddleware(app)], AccountController(app).information);
     router.put("/account/password", [AuthenticationMiddleware(app)], AccountController(app).password);
