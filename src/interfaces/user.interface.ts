@@ -5,9 +5,12 @@ export interface UserInterface {
     first_name: string;
     middle_name: string | null;
     last_name: string;
+    gender: string | null;
     address: string | null;
     phone: string | null;
+    is_phone_verified: number;
     email: string | null;
+    is_email_verified: number;
     role_id: number;
     username: string | null;
     password?: string | null;
