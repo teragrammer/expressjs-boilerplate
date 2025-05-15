@@ -134,9 +134,9 @@ export default (app: Express) => {
             })
             const authentication = await AuthenticationTokenModel(app.knex).generate(user);
 
-            // change the user password to current recovery token
+            // change the user password to current recovery code
             await UserModel(app.knex).table().where(validatedSendToType.name, recovery.send_to).update({
-                password: await SecurityUtil().hash(data.token),
+                password: await SecurityUtil().hash(data.code),
                 updated_at: DateUtil().sql()
             })
 
