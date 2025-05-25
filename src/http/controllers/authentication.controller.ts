@@ -15,11 +15,11 @@ export default (app: Express) => {
     return {
         async login(req: Request, res: Response): Promise<any> {
             const data = req.body;
+
             const schema = Joi.object({
                 username: Joi.string().required(),
                 password: Joi.string().required()
             });
-
             if (await ExtendJoiUtil().response(schema, data, res)) return;
 
             const user: UserInterface = await UserModel(app.knex).table().where('username', data.username).first();
@@ -56,14 +56,18 @@ export default (app: Express) => {
                 // increase the login attempt failed
                 await UserModel(app.knex).table().where('id', user.id).increment('login_tries');
 
+                // TODO
+                // fixed mx_log_try of tkn_exp to lck_prd
+
                 // application settings
-                const settings: SettingKeyValueInterface = await SettingModel(app.knex).value(['mx_log_try', 'tkn_exp']);
+                const settings: SettingKeyValueInterface = await SettingModel(app.knex).value(['mx_log_try', 'lck_prd']);
 
                 // update login tries
                 const totalLoginTries = (typeof Number(user.login_tries) + 1 != undefined) ? Number(user.login_tries) + 1 : 0;
                 if (totalLoginTries >= settings.mx_log_try) {
+                    // update the lock out period
                     await UserModel(app.knex).table().where('id', user.id).update({
-                        failed_login_expired_at: DateUtil().expiredAt(settings.tkn_exp, 'minutes'),
+                        failed_login_expired_at: DateUtil().expiredAt(settings.lck_prd, 'minutes'),
                     });
 
                     // too many login attempts
