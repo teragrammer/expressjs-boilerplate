@@ -11,10 +11,10 @@ import {AuthenticationTokenModel} from "../../models/authentication-token.model"
 import {logger} from "../../configurations/logger";
 
 const SCHEMA = Joi.object({
-    first_name: Joi.string().min(1).max(100).required(),
-    middle_name: Joi.string().min(1).max(100),
+    first_name: Joi.string().min(2).max(100).required(),
+    middle_name: Joi.string().min(2).max(100),
     last_name: Joi.string().min(1).max(100).required(),
-    username: Joi.string().min(2).max(16).required(),
+    username: Joi.string().min(3).max(16).required(),
     password: Joi.string().min(6).max(32).required(),
     email: Joi.string().email().max(180).required(),
 });
