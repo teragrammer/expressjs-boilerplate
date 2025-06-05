@@ -20,7 +20,7 @@ export default (app: Express) => {
             const nextTry = DateUtil().expiredAt(2, 'minutes');
             const code = SecurityUtil().randomNumber()
 
-            // check if tfa it required
+            // check if tfa is required
             // to save resources
             if (!credentials.authentication.is_tfa_required) return res.status(403).json({
                 code: errors.e20.code,
@@ -33,9 +33,13 @@ export default (app: Express) => {
                 message: errors.e18.message,
             });
 
+            // TODO
+            // check other application for fixed
+            // ".where('token_id', credentials.authentication.id)"
+
             // find for existing tfa
             const tfa: TwoFactorAuthenticationInterface = await TwoFactorAuthenticationModel(app.knex).table()
-                .where('id', credentials.authentication.id)
+                .where('token_id', credentials.authentication.id)
                 .first();
 
             try {
