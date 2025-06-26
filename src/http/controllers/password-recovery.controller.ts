@@ -35,7 +35,7 @@ export default (app: Express) => {
                 code: errors.e3.code,
                 message: errors.e3.message,
                 errors: [{
-                    field: 'email',
+                    field: validatedSendToType.name,
                     message: `Unable to find ${validatedSendToType.name}`
                 }]
             })
@@ -86,7 +86,7 @@ export default (app: Express) => {
                 code: errors.e3.code,
                 message: errors.e3.message,
                 errors: [{
-                    field: 'email',
+                    field: validatedSendToType.name,
                     message: `Unable to find ${validatedSendToType.name}`
                 }]
             })
@@ -107,7 +107,7 @@ export default (app: Express) => {
                 }
 
                 if (isExceedTries) {
-                    return res.status(404).json({
+                    return res.status(422).json({
                         code: errors.e26.code,
                         message: errors.e26.message,
                     })
