@@ -56,9 +56,6 @@ export default (app: Express) => {
                 // increase the login attempt failed
                 await UserModel(app.knex).table().where('id', user.id).increment('login_tries');
 
-                // TODO
-                // fixed mx_log_try of tkn_exp to lck_prd
-
                 // application settings
                 const settings: SettingKeyValueInterface = await SettingModel(app.knex).value(['mx_log_try', 'lck_prd']);
 
