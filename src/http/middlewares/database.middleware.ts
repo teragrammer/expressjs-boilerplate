@@ -1,9 +1,10 @@
 import {Express} from 'express';
+import fs from 'fs';
 import Knex from 'knex';
 import {__ENV} from "../../configurations/env";
 
 export function DatabaseMiddleware(app: Express) {
-    app.knex = Knex({
+    const config: any = {
         client: __ENV.DB_CLIENT,
         connection: {
             host: __ENV.DB_HOST,
@@ -15,7 +16,18 @@ export function DatabaseMiddleware(app: Express) {
             dateStrings: __ENV.DB_DATE_STRING,
         },
         pool: {min: __ENV.DB_POOL_MIN, max: __ENV.DB_POOL_MAX},
-    });
+    };
+
+    // set SSL connection support
+    if (__ENV.DB_SSL) {
+        config.connection.ssl = {
+            ca: fs.readFileSync(__ENV.DB_SSL_CA).toString(),
+            cert: fs.readFileSync(__ENV.DB_SSL_CERT).toString(),
+            key: fs.readFileSync(__ENV.DB_SSL_KEY).toString(),
+        }
+    }
+
+    app.knex = Knex(config);
 
     app.paginate = (req: any) => {
         let perPage = req.query.per_page || 10;
