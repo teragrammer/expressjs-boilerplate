@@ -1,5 +1,6 @@
 .idea/
 .dist/
+.ssl/
 node_modules/
 
 .env
