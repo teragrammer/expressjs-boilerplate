@@ -19,6 +19,10 @@ export const __ENV = {
     DB_DATE_STRING: getBol('DB_DATE_STRING'),
     DB_POOL_MIN: getInt('DB_POOL_MIN'),
     DB_POOL_MAX: getInt('DB_POOL_MAX'),
+    DB_SSL: getBol('DB_SSL'),
+    DB_SSL_CA: getStr('DB_SSL_CA'),
+    DB_SSL_CERT: getStr('DB_SSL_CERT'),
+    DB_SSL_KEY: getStr('DB_SSL_KEY'),
 
     SENDGRID_API_KEY: getStr('SENDGRID_API_KEY'),
 
