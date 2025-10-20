@@ -67,7 +67,7 @@ if (clusterWorkerSize > 1 && __ENV.CLUSTER) {
             cluster.fork();
         }
 
-        cluster.on('exit', function (worker) {
+        cluster.on('exit', function (worker: any) {
             logger.info('Worker', worker.id, ' has exited.');
         });
     } else {
