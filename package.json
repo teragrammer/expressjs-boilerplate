@@ -45,6 +45,7 @@
     "@types/express-useragent": "^1.0.5",
     "@types/google-libphonenumber": "^7.4.30",
     "@types/hpp": "^0.2.6",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/luxon": "^3.7.1",
     "@types/mocha": "^10.0.10",
     "@types/node": "^24.8.1",
