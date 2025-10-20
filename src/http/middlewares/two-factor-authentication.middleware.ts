@@ -10,7 +10,7 @@ export function TwoFactorAuthenticationMiddleware(app: Express, isHalt = true): 
             message: errors.e6.message,
         })
 
-        if (credentials.authentication.is_tfa_required && !credentials.authentication.is_tfa_verified) return res.status(403).json({
+        if (credentials.jwt.tfa === 'hol') return res.status(403).json({
             code: errors.e16.code,
             message: errors.e16.message,
         })

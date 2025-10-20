@@ -25,7 +25,7 @@ export default (app: Express) => {
     router.post("/password-recovery/validate", PasswordRecoveryController(app).validate);
 
     router.put("/account/information", [AuthenticationMiddleware(app), TwoFactorAuthenticationMiddleware(app)], AccountController(app).information);
-    router.put("/account/password", [AuthenticationMiddleware(app)], AccountController(app).password);
+    router.put("/account/password", [AuthenticationMiddleware(app), TwoFactorAuthenticationMiddleware(app)], AccountController(app).password);
 
     router.get("/settings", [AuthenticationMiddleware(app), PermissionMiddleware(['admin'])], SettingController(app).browse);
     router.get("/settings/values", [AuthenticationMiddleware(app)], SettingController(app).values);

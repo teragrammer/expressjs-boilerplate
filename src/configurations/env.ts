@@ -26,6 +26,10 @@ export const __ENV = {
 
     SENDGRID_API_KEY: getStr('SENDGRID_API_KEY'),
 
+    JWT_TFA: getBol('JWT_TFA'),
+    JWT_SECRET: getStr('JWT_SECRET'),
+    JWT_EXPIRATION_DAYS: getInt('JWT_EXPIRATION_DAYS') * 86400, // 1 day = 86400 seconds
+
     BCRYPT_SALT_ROUND: getInt('BCRYPT_SALT_ROUND'),
     BCRYPT_SECRET: getStr('BCRYPT_SECRET'),
 

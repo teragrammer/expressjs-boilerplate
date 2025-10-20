@@ -1,28 +1,38 @@
 import {Knex} from "knex";
-import {SettingModel} from "./setting.model";
-import {SettingKeyValueInterface} from "../interfaces/setting-key-value.interface";
-import {SecurityUtil} from "../utilities/security.util";
+import jwt, {JwtPayload} from 'jsonwebtoken';
 import {DateUtil} from "../utilities/date.util";
-import {AuthenticationTokenInterface} from "../interfaces/authentication-token.interface";
 import {UserInterface} from "../interfaces/user.interface";
 import {RoleModel} from "./role.model";
+import {__ENV} from "../configurations/env";
 
 const TABLE_NAME = 'authentication_tokens';
+
+const JWT_TFA = __ENV.JWT_TFA;
+const JWT_SECRET = __ENV.JWT_SECRET;
+const JWT_EXPIRATION_DAYS = __ENV.JWT_EXPIRATION_DAYS;
 
 export function AuthenticationTokenModel(knex: Knex) {
     return {
         table: () => knex.table(TABLE_NAME),
 
-        async generate(user: UserInterface) {
-            await this.clean(user.id)
-            const token = await this.token(user.id);
-
-            // remove private data
+        hidden(user: UserInterface) {
             delete user.password;
             delete user.failed_login_expired_at;
             delete user.login_tries;
+        },
 
+        async generate(user: UserInterface) {
+            // add role details
             user.role = await RoleModel(knex).table().where('id', user.role_id).first();
+
+            // remove private data
+            this.hidden(user);
+
+            // delete expired tokens
+            await this.clean(user.id);
+
+            // generate a new token
+            const token = await this.token(user);
 
             return {
                 user,
@@ -30,46 +40,44 @@ export function AuthenticationTokenModel(knex: Knex) {
             }
         },
 
-        async token(userId: number): Promise<any> {
-            const settings: SettingKeyValueInterface = await SettingModel(knex).value(['tkn_lth', 'tkn_exp', 'tta_req']);
-            const key = SecurityUtil().randomString(settings.tkn_lth);
-            const expiredAt = DateUtil().expiredAt(settings.tkn_exp, 'days');
-
+        async token(user: UserInterface, tfa?: string): Promise<string> {
+            const expiredAt = DateUtil().expiredAt(JWT_EXPIRATION_DAYS / 86400, 'days');
             const data: any = {
-                user_id: userId,
-                token: key,
-                is_tfa_required: settings.tta_req || 0,
+                user_id: user.id,
                 created_at: DateUtil().sql(),
                 expired_at: DateUtil().sql(expiredAt),
             };
             let id: any = await knex.table(TABLE_NAME).returning('id').insert(data);
-            if (!id.length) throw new Error('Unable to create a new token')
+            if (!id.length) throw new Error('Unable to create a new token');
 
-            // encode with base64 url
-            data.id = id[0]
-            data.token = SecurityUtil().encodeUrlBase64(`${userId}.${id[0]}.${key}.${DateUtil().unix(new Date(expiredAt))}`)
-            return data;
+            const payload = {
+                uid: user.id,
+                rol: user.role?.slug,
+                unm: user.username,
+                eml: user.email,
+                phn: user.phone,
+                tid: id[0],
+                tfa: tfa !== undefined ? tfa : (JWT_TFA ? 'hol' : 'con'),
+            };
+
+            return jwt.sign(payload, JWT_SECRET, {expiresIn: JWT_EXPIRATION_DAYS});
         },
 
-        async validate(token: string): Promise<AuthenticationTokenInterface | boolean> {
+        async validate(token: string): Promise<JwtPayload | boolean> {
             if (!token) return false;
 
-            const decoded = SecurityUtil().decodeUrlBase64(token);
+            try {
+                const decoded = jwt.verify(token, JWT_SECRET);
 
-            const parts: any[] = decoded.split('.');
-            if (!parts.length || parts.length < 4) return false;
+                // Ensure it's a JwtPayload (not just a string)
+                if (typeof decoded === 'object') {
+                    return decoded as JwtPayload;
+                }
 
-            const auth: AuthenticationTokenInterface = await knex.table(TABLE_NAME).where('id', parts[1]).first();
-            if (!auth) return false;
-
-            if (auth.token !== parts[2]) return false;
-
-            if (isNaN(parts[0]) || auth.user_id !== parseInt(parts[0])) return false;
-
-            const expiration: any = parts[3];
-            if (isNaN(expiration) || parseInt(expiration) < DateUtil().unix()) return false;
-
-            return auth;
+                return false;
+            } catch (error: any) {
+                return false;
+            }
         },
 
         async clean(userId: number, expiredOnly = true) {

@@ -20,7 +20,7 @@ export default (app: Express) => {
 
             try {
                 const updates = await UserModel(app.knex).table()
-                    .where('id', req.credentials.user.id)
+                    .where('id', req.credentials.jwt.uid)
                     .where('status', 'Activated')
                     .update({
                         first_name: data.first_name,
@@ -53,7 +53,7 @@ export default (app: Express) => {
             if (await ExtendJoiUtil().response(schema, data, res)) return;
 
             // verify the current password
-            const account = req.credentials.user;
+            const account = await req.credentials.user();
             if (!account.password || !await SecurityUtil().compare(account.password, data.current_password)) {
                 return res.status(403).json({
                     code: errors.e11.code,

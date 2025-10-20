@@ -14,6 +14,8 @@ import {AuthenticationTokenModel} from "../../models/authentication-token.model"
 import {ExtendJoiUtil} from "../../utilities/extend-joi.util";
 
 export default (app: Express) => {
+    const isEmailEmpty = (email: string | null | undefined) => email === undefined || email === null || email === '';
+
     return {
         async send(req: Request, res: Response): Promise<any> {
             const credentials = req.credentials;
@@ -22,24 +24,20 @@ export default (app: Express) => {
 
             // check if tfa is required
             // to save resources
-            if (!credentials.authentication.is_tfa_required) return res.status(403).json({
+            if (credentials.jwt.tfa === 'con') return res.status(403).json({
                 code: errors.e20.code,
                 message: errors.e20.message,
             });
 
             // check for valid email
-            if (credentials.user.email === null) return res.status(403).json({
+            if (isEmailEmpty(credentials.jwt.eml)) return res.status(403).json({
                 code: errors.e18.code,
                 message: errors.e18.message,
             });
 
-            // TODO
-            // check other application for fixed
-            // ".where('token_id', credentials.authentication.id)"
-
             // find for existing tfa
             const tfa: TwoFactorAuthenticationInterface = await TwoFactorAuthenticationModel(app.knex).table()
-                .where('token_id', credentials.authentication.id)
+                .where('token_id', credentials.jwt.tid)
                 .first();
 
             try {
@@ -48,7 +46,7 @@ export default (app: Express) => {
                 if (!tfa) {
                     id = await TwoFactorAuthenticationModel(app.knex).table().returning('id')
                         .insert({
-                            token_id: credentials.authentication.id,
+                            token_id: credentials.jwt.tid,
                             code: await SecurityUtil().hash(code),
                             expired_at: DateUtil().expiredAt(5, 'minutes'),
                             next_send_at: nextTry,
@@ -80,7 +78,7 @@ export default (app: Express) => {
 
                     try {
                         await sgMail.send({
-                            to: credentials.user.email,
+                            to: credentials.jwt.eml,
                             from: settings.tta_eml_snd,
                             subject: settings.tta_eml_sbj,
                             text: `OTP Code: ${code}`,
@@ -108,35 +106,33 @@ export default (app: Express) => {
 
         async validate(req: Request, res: Response): Promise<any> {
             const data = req.body;
-            const schema = Joi.object({
+            if (await ExtendJoiUtil().response(Joi.object({
                 code: Joi.number().integer().required(),
-            });
-
-            if (await ExtendJoiUtil().response(schema, data, res)) return;
+            }), data, res)) return;
 
             const credentials = req.credentials;
 
             // check if tfa it required
             // to save resources
-            if (!credentials.authentication.is_tfa_required) return res.status(403).json({
+            if (credentials.jwt.tfa === 'con') return res.status(403).json({
                 code: errors.e20.code,
                 message: errors.e20.message,
             });
 
             // find for existing tfa
             const tfa: TwoFactorAuthenticationInterface = await TwoFactorAuthenticationModel(app.knex).table()
-                .where('token_id', credentials.authentication.id)
+                .where('token_id', credentials.jwt.tid)
                 .first();
             if (!tfa) return res.status(404).json({
                 code: errors.e3.code,
                 message: errors.e3.message,
-            })
+            });
 
             // check for expiration
             if (!tfa.expired_at) return res.status(404).json({
                 code: errors.e21.code,
                 message: errors.e21.message,
-            })
+            });
 
             const currentTime = DateUtil().unix();
 
@@ -145,7 +141,7 @@ export default (app: Express) => {
             if (currentTime > expiredAt) return res.status(419).json({
                 code: errors.e22.code,
                 message: errors.e22.message,
-            })
+            });
 
             // multiple pending tries
             if (tfa.expired_tries_at) {
@@ -154,7 +150,7 @@ export default (app: Express) => {
                 if (expiredTriesAt > currentTime) return res.status(403).json({
                     code: errors.e24.code,
                     message: errors.e24.message,
-                })
+                });
 
                 // reset the tries
                 await TwoFactorAuthenticationModel(app.knex).table()
@@ -162,39 +158,35 @@ export default (app: Express) => {
                     .update({
                         tries: 0,
                         expired_tries_at: null,
-                    })
+                    });
             }
 
             // too many failed tries
             if (tfa.tries > 5) return res.status(403).json({
                 code: errors.e24.code,
                 message: errors.e24.message,
-            })
+            });
 
+            // verify if code is valid
             if (!await SecurityUtil().compare(tfa.code, data.code)) {
                 // record number of tries
                 await TwoFactorAuthenticationModel(app.knex).table()
                     .where('id', tfa.id)
-                    .increment('tries')
+                    .increment('tries');
 
                 return res.status(400).json({
                     code: errors.e23.code,
                     message: errors.e23.message,
-                })
+                });
             }
-
-            // update the authentication
-            await AuthenticationTokenModel(app.knex).table()
-                .where('id', credentials.authentication.id)
-                .update({
-                    is_tfa_verified: 1,
-                    updated_at: DateUtil().sql()
-                })
 
             // delete the tfa
             await TwoFactorAuthenticationModel(app.knex).table().where('id', tfa.id).delete();
 
-            res.status(200).json({result: true})
+            // regenerate new token
+            const token: string = await AuthenticationTokenModel(app.knex).token(await credentials.user(), 'con');
+
+            res.status(200).json({token: token});
         }
     }
 }

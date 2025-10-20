@@ -12,8 +12,8 @@ export function PermissionMiddleware(roles: string[], isHalt = true) {
         })
 
         if (credentials) {
-            const user: UserInterface = credentials.user
-            if ((!user.role || !roles.includes(user.role?.slug)) && isHalt) return res.status(403).json({
+            const role: string = credentials.jwt.rol
+            if ((!role || !roles.includes(role)) && isHalt) return res.status(403).json({
                 code: errors.e6.code,
                 message: errors.e6.message,
             })
