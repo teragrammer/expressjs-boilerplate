@@ -1,87 +1,87 @@
-import 'mocha';
-import request from 'supertest';
-import {assert} from 'chai';
+import "mocha";
+import request from "supertest";
+import {assert} from "chai";
 import app from "../../src";
-import {mockCredential} from "../utils";
+import {Credentials, mockCredential} from "../utils";
 import {UserInterface} from "../../src/interfaces/user.interface";
 
-describe('HTTP Account', async () => {
-    let credential: any;
-    let username = 'test_customer';
+describe("HTTP Account", async () => {
+    let credential: Credentials;
+    let username = "test_customer";
 
-    const new_email = 'test@gmail.com'
-    const new_username = "test_123"
-    const new_password = "abc.123"
+    const new_email = "test@gmail.com";
+    const new_username = "test_123";
+    const new_password = "abc.123";
 
-    it('generate credential', async () => {
-        await app.knex.table('users').where('username', new_username).delete()
+    it("generate credential", async () => {
+        await app.knex.table("users").where("username", new_username).delete();
 
-        credential = await mockCredential(app, 'customer', username)
+        credential = await mockCredential(app, {role: "customer", username});
     });
 
-    it('PUT /api/v1/account/information', async () => {
+    it("PUT /api/v1/account/information", async () => {
         return request(app)
-            .put('/api/v1/account/information')
+            .put("/api/v1/account/information")
             .send({
                 first_name: "User",
                 last_name: "One",
             })
-            .set('Content-Type', 'application/json')
-            .set('Authorization', `Bearer ${credential.authentication.token}`)
+            .set("Content-Type", "application/json")
+            .set("Authorization", `Bearer ${credential.token}`)
             .then(async (response: any) => {
-                const user: UserInterface = await app.knex.table('users').where('username', username).first();
+                const user: UserInterface = await app.knex.table("users").where("username", username).first();
 
                 assert.equal(response.status, 200);
-                assert.equal(user.first_name, "User")
-                assert.equal(user.last_name, "One")
+                assert.equal(user.first_name, "User");
+                assert.equal(user.last_name, "One");
             });
     });
 
-    it('PUT /api/v1/account/password', async () => {
+    it("PUT /api/v1/account/password", async () => {
         return request(app)
-            .put('/api/v1/account/password')
+            .put("/api/v1/account/password")
             .send({
                 current_password: "123456",
                 username: new_username,
                 email: new_email,
             })
-            .set('Content-Type', 'application/json')
-            .set('Authorization', `Bearer ${credential.authentication.token}`)
+            .set("Content-Type", "application/json")
+            .set("Authorization", `Bearer ${credential.token}`)
             .then(async (response: any) => {
-                const user: UserInterface = await app.knex.table('users').where('username', new_username).first();
+                const user: UserInterface = await app.knex.table("users").where("username", new_username).first();
 
                 assert.equal(response.status, 200);
-                assert.equal(user.username, new_username)
-                assert.equal(user.email, new_email)
+                assert.equal(user.username, new_username);
+                assert.equal(user.email, new_email);
             });
     });
 
-    it('PUT /api/v1/account/password (new password)', async () => {
+    it("PUT /api/v1/account/password (new password)", async () => {
         return request(app)
-            .put('/api/v1/account/password')
+            .put("/api/v1/account/password")
             .send({
                 current_password: "123456",
                 new_password: new_password,
             })
-            .set('Content-Type', 'application/json')
-            .set('Authorization', `Bearer ${credential.authentication.token}`)
+            .set("Content-Type", "application/json")
+            .set("Authorization", `Bearer ${credential.token}`)
             .then(async (response: any) => {
-                const user: UserInterface = await app.knex.table('users').where('username', new_username).first();
+                const user: UserInterface = await app.knex.table("users").where("username", new_username).first();
 
                 assert.equal(response.status, 200);
-                assert.equal(user.username, new_username)
-                assert.equal(user.email, new_email)
+                assert.equal(user.username, new_username);
+                assert.equal(user.email, new_email);
             });
     });
 
-    it('POST /api/v1/login (test the new password)', async () => {
+    it("POST /api/v1/login (test the new password)", async () => {
         return request(app)
-            .post('/api/v1/login')
+            .post("/api/v1/login")
             .send({
                 username: new_username,
-                password: new_password
+                password: new_password,
             })
-            .set('Content-Type', 'application/json')
+            .set("Content-Type", "application/json")
             .then((response: any) => {
                 assert.equal(response.status, 200);
             });

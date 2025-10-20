@@ -1,82 +1,80 @@
-import 'mocha';
-import request from 'supertest';
-import {assert} from 'chai';
+import "mocha";
+import request from "supertest";
+import {assert} from "chai";
 import app from "../../src";
-import {mockCredential} from "../utils";
+import {Credentials, mockCredential} from "../utils";
 import {RoleInterface} from "../../src/interfaces/role.interface";
 
-describe('HTTP Account', async () => {
-    let credential: any;
+describe("HTTP Account", async () => {
+    let credential: Credentials;
     let id: any;
 
-    it('generate credential', async () => {
-        credential = await mockCredential(app, 'admin', 'test_admin')
-    });
+    it("generate credential", async () => credential = await mockCredential(app, {role: "admin", username: "test_admin"}));
 
-    it('POST /api/v1/roles', async () => {
+    it("POST /api/v1/roles", async () => {
         return request(app)
-            .post('/api/v1/roles')
+            .post("/api/v1/roles")
             .send({
-                name: 'Test',
-                slug: 'test',
-                is_public: '1'
+                name: "Test",
+                slug: "test",
+                is_public: "1",
             })
-            .set('Content-Type', 'application/json')
-            .set('Authorization', `Bearer ${credential.authentication.token}`)
+            .set("Content-Type", "application/json")
+            .set("Authorization", `Bearer ${credential.token}`)
             .then(async (response: any) => {
                 id = response.body.id;
                 assert.equal(response.status, 200);
             });
     });
 
-    it('PUT /api/v1/roles/:id', async () => {
-        const newName = 'New Test'
+    it("PUT /api/v1/roles/:id", async () => {
+        const newName = "New Test";
         return request(app)
             .put(`/api/v1/roles/${id}`)
             .send({
                 name: newName,
-                slug: 'test',
-                is_public: '1'
+                slug: "test",
+                is_public: "1",
             })
-            .set('Content-Type', 'application/json')
-            .set('Authorization', `Bearer ${credential.authentication.token}`)
+            .set("Content-Type", "application/json")
+            .set("Authorization", `Bearer ${credential.token}`)
             .then(async (response: any) => {
-                const role: RoleInterface = await app.knex.table('roles').where('id', id).first();
+                const role: RoleInterface = await app.knex.table("roles").where("id", id).first();
 
                 assert.equal(response.status, 200);
-                assert.equal(role.name, newName)
+                assert.equal(role.name, newName);
             });
     });
 
-    it('GET /api/v1/roles', async () => {
+    it("GET /api/v1/roles", async () => {
         return request(app)
-            .get('/api/v1/roles')
+            .get("/api/v1/roles")
             .query({
-                search: 'test'
+                search: "test",
             })
-            .set('Content-Type', 'application/json')
-            .set('Authorization', `Bearer ${credential.authentication.token}`)
+            .set("Content-Type", "application/json")
+            .set("Authorization", `Bearer ${credential.token}`)
             .then(async (response: any) => {
                 assert.equal(response.status, 200);
             });
     });
 
-    it('GET /api/v1/roles/:id', async () => {
+    it("GET /api/v1/roles/:id", async () => {
         return request(app)
             .get(`/api/v1/roles/${id}`)
-            .set('Content-Type', 'application/json')
-            .set('Authorization', `Bearer ${credential.authentication.token}`)
+            .set("Content-Type", "application/json")
+            .set("Authorization", `Bearer ${credential.token}`)
             .then(async (response: any) => {
                 assert.equal(response.status, 200);
-                assert.equal(response.body.slug, 'test')
+                assert.equal(response.body.slug, "test");
             });
     });
 
-    it('DELETE /api/v1/roles/:id', async () => {
+    it("DELETE /api/v1/roles/:id", async () => {
         return request(app)
             .delete(`/api/v1/roles/${id}`)
-            .set('Content-Type', 'application/json')
-            .set('Authorization', `Bearer ${credential.authentication.token}`)
+            .set("Content-Type", "application/json")
+            .set("Authorization", `Bearer ${credential.token}`)
             .then(async (response: any) => {
                 assert.equal(response.status, 200);
             });

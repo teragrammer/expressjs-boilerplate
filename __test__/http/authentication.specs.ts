@@ -20,7 +20,7 @@ describe('HTTP Authentication', () => {
             })
             .set('Content-Type', 'application/json')
             .then((response: any) => {
-                token = response.body.credential.token;
+                token = response.body.token;
                 assert.equal(response.status, 200);
             });
     });
@@ -34,7 +34,7 @@ describe('HTTP Authentication', () => {
             })
             .set('Content-Type', 'application/json')
             .then((response: any) => {
-                token = response.body.credential.token;
+                token = response.body.token;
                 assert.equal(response.status, 200);
             });
     });
