@@ -46,15 +46,15 @@ app.use((req: any, res: any, next: any) => {
 DatabaseMiddleware(app);
 
 // routes with versioning
-app.use("/api/v1", v1(app));
+app.use("/api/v1", v1());
 
 // handle 404 - Not Found
-app.use((req: express.Request, res: express.Response) => {
+app.use((_req: express.Request, res: express.Response) => {
     res.status(404).json({code: errors.e14.code, message: errors.e14.message});
 });
 
 // error handling
-app.use((err: any, req: any, res: any, next: any) => {
+app.use((err: any, _req: any, res: any) => {
     logger.error(err.message);
     res.status(500).json({code: errors.e4.code, message: errors.e4.message});
 });
