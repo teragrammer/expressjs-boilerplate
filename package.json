@@ -34,7 +34,8 @@
     "mysql2": "^3.15.2",
     "pino": "^10.1.0",
     "pino-pretty": "^13.1.2",
-    "supertest": "^7.1.4"
+    "supertest": "^7.1.4",
+    "xss": "^1.0.15"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
