@@ -1,16 +1,17 @@
 import express from "express";
+import os from "os";
 import cors from "cors";
 import helmet from "helmet";
 import hpp from "hpp";
+import v1 from "./http/routes/v1";
 import useragent from 'express-useragent';
 import compression from "compression";
 import {logger} from "./configurations/logger";
-import v1 from "./http/routes/v1";
 import {__ENV} from "./configurations/env";
-import {DatabaseMiddleware} from "./http/middlewares/database.middleware";
-import os from "os";
 import cluster from "node:cluster";
 import errors from "./configurations/errors";
+import {DBKnex} from "./connectors/databases/knex";
+import requestMiddleware from "./http/middlewares/request.middleware";
 
 const app = express();
 
@@ -42,8 +43,9 @@ app.use((req: any, res: any, next: any) => {
     next();
 });
 
-// custom middleware
-DatabaseMiddleware(app);
+// set database connections
+app.set('knex', DBKnex);
+app.use(requestMiddleware);
 
 // routes with versioning
 app.use("/api/v1", v1());

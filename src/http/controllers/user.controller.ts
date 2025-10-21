@@ -32,7 +32,7 @@ class Controller {
             });
         }
 
-        const PAGINATE = res.app.get("paginate")(req);
+        const PAGINATE = res.app.get("paginate");
         const USERS: UserInterface[] = await Q.offset(PAGINATE.offset).limit(PAGINATE.perPage);
 
         // remove sensitive data

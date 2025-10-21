@@ -42,7 +42,7 @@ class Controller {
             });
         }
 
-        const PAGINATE = req.app.get("paginate")(req);
+        const PAGINATE = req.app.get("paginate");
         const SETTINGS: SettingInterface[] = await Q.offset(PAGINATE.offset).limit(PAGINATE.perPage);
 
         res.status(200).json(SETTINGS);
