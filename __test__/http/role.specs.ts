@@ -4,12 +4,13 @@ import {assert} from "chai";
 import app from "../../src";
 import {Credentials, mockCredential} from "../utils";
 import {RoleInterface} from "../../src/interfaces/role.interface";
+import {DatabaseMiddleware} from "../../src/http/middlewares/database.middleware";
 
 describe("HTTP Account", async () => {
     let credential: Credentials;
     let id: any;
 
-    it("generate credential", async () => credential = await mockCredential(app, {role: "admin", username: "test_admin"}));
+    it("generate credential", async () => credential = await mockCredential({role: "admin", username: "test_admin"}));
 
     it("POST /api/v1/roles", async () => {
         return request(app)
@@ -39,7 +40,7 @@ describe("HTTP Account", async () => {
             .set("Content-Type", "application/json")
             .set("Authorization", `Bearer ${credential.token}`)
             .then(async (response: any) => {
-                const role: RoleInterface = await app.knex.table("roles").where("id", id).first();
+                const role: RoleInterface = await DatabaseMiddleware().table("roles").where("id", id).first();
 
                 assert.equal(response.status, 200);
                 assert.equal(role.name, newName);

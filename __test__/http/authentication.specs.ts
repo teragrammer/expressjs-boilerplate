@@ -2,12 +2,13 @@ import 'mocha';
 import request from 'supertest';
 import {assert} from 'chai';
 import app from "../../src";
+import {DatabaseMiddleware} from "../../src/http/middlewares/database.middleware";
 
 describe('HTTP Authentication', () => {
     let token: string;
 
     it('POST /api/v1/register', async () => {
-        await app.knex.table('users').where('username', 'test').delete();
+        await DatabaseMiddleware().table('users').where('username', 'test').delete();
 
         return request(app)
             .post('/api/v1/register')

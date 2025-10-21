@@ -5,6 +5,7 @@ import app from "../../src";
 import {Credentials, mockCredential} from "../utils";
 import {UserInterface} from "../../src/interfaces/user.interface";
 import {RoleInterface} from "../../src/interfaces/role.interface";
+import {DatabaseMiddleware} from "../../src/http/middlewares/database.middleware";
 
 describe("HTTP Account", async () => {
     let credential: Credentials;
@@ -13,10 +14,10 @@ describe("HTTP Account", async () => {
     const phone = "+639281214573";
 
     it("generate credential", async () => {
-        credential = await mockCredential(app, {role: "admin", username: "test_admin"});
-        role = await app.knex.table("roles").where("slug", "customer").first();
+        credential = await mockCredential({role: "admin", username: "test_admin"});
+        role = await DatabaseMiddleware().table("roles").where("slug", "customer").first();
 
-        await app.knex.table("users").where("phone", phone).delete();
+        await DatabaseMiddleware().table("users").where("phone", phone).delete();
     });
 
     it("POST /api/v1/users", async () => {
@@ -64,7 +65,7 @@ describe("HTTP Account", async () => {
             .set("Content-Type", "application/json")
             .set("Authorization", `Bearer ${credential.token}`)
             .then(async (response: any) => {
-                const user: UserInterface = await app.knex.table("users").where("id", id).first();
+                const user: UserInterface = await DatabaseMiddleware().table("users").where("id", id).first();
 
                 assert.equal(response.status, 200);
                 assert.equal(user.first_name, newName);
