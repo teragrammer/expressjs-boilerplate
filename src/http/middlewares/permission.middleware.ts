@@ -4,16 +4,16 @@ import {UserInterface} from "../../interfaces/user.interface";
 
 export function PermissionMiddleware(roles: string[], isHalt = true) {
     return async function (req: Request, res: Response, next: NextFunction) {
-        const credentials = req.credentials;
+        const CREDENTIALS = req.credentials;
 
-        if (!credentials && isHalt) return res.status(401).json({
+        if (!CREDENTIALS && isHalt) return res.status(401).json({
             code: errors.e6.code,
             message: errors.e6.message,
         })
 
-        if (credentials) {
-            const role: string = credentials.jwt.rol
-            if ((!role || !roles.includes(role)) && isHalt) return res.status(403).json({
+        if (CREDENTIALS) {
+            const ROLE: string = CREDENTIALS.jwt.rol
+            if ((!ROLE || !roles.includes(ROLE)) && isHalt) return res.status(403).json({
                 code: errors.e6.code,
                 message: errors.e6.message,
             })

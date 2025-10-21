@@ -2,8 +2,9 @@ import {Express} from 'express';
 import fs from 'fs';
 import Knex from 'knex';
 import {__ENV} from "../../configurations/env";
+import knex from "knex";
 
-export function DatabaseMiddleware(app: Express) {
+export function DatabaseMiddleware(app?: Express) {
     const config: any = {
         client: __ENV.DB_CLIENT,
         connection: {
@@ -27,21 +28,26 @@ export function DatabaseMiddleware(app: Express) {
         }
     }
 
-    app.knex = Knex(config);
+    const initiate = Knex(config);
 
-    app.paginate = (req: any) => {
-        let perPage = req.query.per_page || 10;
-        let page = req.query.page || 1;
+    if (app !== undefined) {
+        app.set('knex', initiate);
+        app.set('paginate', (req: any) => {
+            let perPage = req.query.per_page || 10;
+            let page = req.query.page || 1;
 
-        if (isNaN(perPage)) perPage = 10;
-        if (isNaN(page)) page = 1;
+            if (isNaN(perPage)) perPage = 10;
+            if (isNaN(page)) page = 1;
 
-        if (page < 1) page = 1;
-        let offset = (page - 1) * perPage;
+            if (page < 1) page = 1;
+            let offset = (page - 1) * perPage;
 
-        return {
-            offset,
-            perPage,
-        };
-    };
+            return {
+                offset,
+                perPage,
+            };
+        });
+    }
+
+    return initiate;
 }

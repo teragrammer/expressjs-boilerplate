@@ -1,14 +1,15 @@
-import {Express, Request, Response} from "express";
+import {Request, Response} from "express";
 import Joi from "joi";
 import {ExtendJoiUtil} from "../../utilities/extend-joi.util";
 import {UserModel} from "../../models/user.model";
 import errors from "../../configurations/errors";
-import {RoleInterface} from "../../interfaces/role.interface";
+import {logger} from "../../configurations/logger";
 import {SecurityUtil} from "../../utilities/security.util";
 import {DateUtil} from "../../utilities/date.util";
-import {UserInterface} from "../../interfaces/user.interface";
 import {AuthenticationTokenModel} from "../../models/authentication-token.model";
-import {logger} from "../../configurations/logger";
+import {UserInterface} from "../../interfaces/user.interface";
+import {RoleInterface} from "../../interfaces/role.interface";
+import {Knex} from "knex";
 
 const SCHEMA = Joi.object({
     first_name: Joi.string().min(2).max(100).required(),
@@ -19,73 +20,76 @@ const SCHEMA = Joi.object({
     email: Joi.string().email().max(180).required(),
 });
 
-export default (app: Express) => {
-    return {
-        async create(req: Request, res: Response): Promise<any> {
-            const data = req.body;
-            if (await ExtendJoiUtil().response(SCHEMA, data, res)) return;
+class Controller {
+    create = async (req: Request, res: Response): Promise<any> => {
+        const DATA = req.body;
+        if (await ExtendJoiUtil().response(SCHEMA, DATA, res)) return;
 
-            // check for duplicate username
-            const username = await UserModel(app.knex).table().where('username', data.username).first();
-            if (username) return res.status(400).json({
+        const KNEX: Knex = req.app.get("knex");
+
+        // check for duplicate username
+        const USERNAME = await UserModel(KNEX).table().where("username", DATA.username).first();
+        if (USERNAME) return res.status(400).json({
+            code: errors.e2.code,
+            message: errors.e2.message,
+        });
+
+        // check for duplicate email
+        if (DATA.email) {
+            const EMAIL = await UserModel(KNEX).table().where("email", DATA.email).first();
+            if (EMAIL) return res.status(400).json({
                 code: errors.e2.code,
                 message: errors.e2.message,
             });
+        }
 
-            // check for duplicate email
-            if (data.email) {
-                const email = await UserModel(app.knex).table().where('email', data.email).first();
-                if (email) return res.status(400).json({
-                    code: errors.e2.code,
-                    message: errors.e2.message,
-                });
-            }
+        // check if role is valid
+        const ROLE: RoleInterface = await KNEX.table("roles").where("slug", "customer").first();
+        if (!ROLE) return res.status(404).json({
+            code: errors.e3.code,
+            message: errors.e3.message,
+        });
 
-            // check if role is valid
-            const role: RoleInterface = await app.knex.table('roles').where('slug', 'customer').first();
-            if (!role) return res.status(404).json({
+        try {
+            // create the new user
+            const CUSTOMER_ID: any = await UserModel(KNEX).table().returning("id").insert({
+                first_name: DATA.first_name || null,
+                middle_name: DATA.middle_name || null,
+                last_name: DATA.last_name || null,
+                role_id: ROLE.id,
+                username: DATA.username,
+                email: DATA.email || null,
+                password: await SecurityUtil().hash(DATA.password),
+                created_at: DateUtil().sql(),
+            });
+            if (!CUSTOMER_ID.length) return res.status(500).json({
+                code: errors.e4.code,
+                message: errors.e4.message,
+            });
+
+            // get the full details
+            const CUSTOMER: UserInterface = await UserModel(KNEX).table().where("id", CUSTOMER_ID[0]).first();
+            if (!CUSTOMER) return res.status(404).json({
                 code: errors.e3.code,
                 message: errors.e3.message,
             });
 
-            try {
-                // create the new user
-                const customerId: any = await UserModel(app.knex).table().returning('id').insert({
-                    first_name: data.first_name || null,
-                    middle_name: data.middle_name || null,
-                    last_name: data.last_name || null,
-                    role_id: role.id,
-                    username: data.username,
-                    email: data.email || null,
-                    password: await SecurityUtil().hash(data.password),
-                    created_at: DateUtil().sql(),
-                });
-                if (!customerId.length) return res.status(500).json({
-                    code: errors.e4.code,
-                    message: errors.e4.message,
-                });
+            const AUTHENTICATION = await AuthenticationTokenModel(KNEX).generate(CUSTOMER);
 
-                // get the full details
-                const customer: UserInterface = await UserModel(app.knex).table().where('id', customerId[0]).first();
-                if (!customer) return res.status(404).json({
-                    code: errors.e3.code,
-                    message: errors.e3.message,
-                });
+            res.status(200).json({
+                user: AUTHENTICATION.user,
+                credential: AUTHENTICATION.token,
+            });
+        } catch (e: any) {
+            logger.error(e);
 
-                const authentication = await AuthenticationTokenModel(app.knex).generate(customer);
-
-                res.status(200).json({
-                    user: authentication.user,
-                    credential: authentication.token,
-                })
-            } catch (e: any) {
-                logger.error(e);
-
-                res.status(500).json({
-                    code: errors.e4.code,
-                    message: errors.e4.message,
-                });
-            }
+            res.status(500).json({
+                code: errors.e4.code,
+                message: errors.e4.message,
+            });
         }
-    }
+    };
 }
+
+const RegisterController = new Controller();
+export default RegisterController;

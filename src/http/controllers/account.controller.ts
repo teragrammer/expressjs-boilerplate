@@ -1,133 +1,132 @@
-import {Express, Request, Response} from "express";
+import {Request, Response} from "express";
 import Joi from "joi";
 import errors from "../../configurations/errors";
-import {UserModel} from "../../models/user.model";
 import {logger} from "../../configurations/logger";
+import {UserModel} from "../../models/user.model";
 import {SecurityUtil} from "../../utilities/security.util";
 import {ExtendJoiUtil} from "../../utilities/extend-joi.util";
+import {Knex} from "knex";
 
-export default (app: Express) => {
-    return {
-        async information(req: Request, res: Response): Promise<any> {
-            const data = req.body;
-            const schema = Joi.object({
-                first_name: Joi.string().min(1).max(100).required(),
-                middle_name: Joi.string().min(1).max(100),
-                last_name: Joi.string().min(1).max(100).required(),
+class Controller {
+    information = async (req: Request, res: Response): Promise<any> => {
+        const DATA = req.body;
+        if (await ExtendJoiUtil().response(Joi.object({
+            first_name: Joi.string().min(1).max(100).required(),
+            middle_name: Joi.string().min(1).max(100).allow(null, ""),
+            last_name: Joi.string().min(1).max(100).required(),
+        }), DATA, res)) return;
+
+        try {
+            const RESULT = await UserModel(req.app.get("knex")).table()
+                .where("id", req.credentials.jwt.uid)
+                .where("status", "Activated")
+                .update({
+                    first_name: DATA.first_name,
+                    middle_name: typeof DATA.middle_name !== undefined ? DATA.middle_name : null,
+                    last_name: DATA.last_name,
+                    address: typeof DATA.address !== undefined ? DATA.address : null,
+                });
+
+            res.status(200).json({result: RESULT === 1});
+        } catch (e) {
+            logger.error(e);
+
+            res.status(500).json({
+                code: errors.e4.code,
+                message: errors.e4.message,
+            });
+        }
+    };
+
+    password = async (req: Request, res: Response): Promise<any> => {
+        const DATA = req.body;
+        if (await ExtendJoiUtil().response(Joi.object({
+            current_password: Joi.string().required(),
+            new_password: Joi.string().min(6).max(32),
+            username: Joi.string().min(2).max(16),
+            email: Joi.string().email().max(180),
+            phone: Joi.string().min(10).max(16).custom(ExtendJoiUtil().phone, "Phone Number Validation"),
+        }), DATA, res)) return;
+
+        // verify the current password
+        const ACCOUNT = await req.credentials.user();
+        if (!ACCOUNT.password || !await SecurityUtil().compare(ACCOUNT.password, DATA.current_password)) {
+            return res.status(403).json({
+                code: errors.e11.code,
+                message: errors.e11.message,
+            });
+        }
+
+        const KNEX: Knex = req.app.get("knex");
+        const FORMATED_DATA: any = {};
+
+        // hashed if new password
+        if (typeof DATA.new_password !== "undefined" && DATA.new_password !== "") {
+            FORMATED_DATA.password = await SecurityUtil().hash(DATA.new_password);
+        }
+
+        // check if username has no duplicate
+        if (typeof DATA.username !== "undefined" && DATA.username !== "") {
+            const USERNAME = await UserModel(KNEX).table()
+                .where("id", "<>", ACCOUNT.id)
+                .where("username", DATA.username)
+                .first();
+
+            if (USERNAME) return res.status(400).json({
+                code: errors.e2.code,
+                message: errors.e2.message,
             });
 
-            if (await ExtendJoiUtil().response(schema, data, res)) return;
+            FORMATED_DATA.username = DATA.username;
+        }
 
-            try {
-                const updates = await UserModel(app.knex).table()
-                    .where('id', req.credentials.jwt.uid)
-                    .where('status', 'Activated')
-                    .update({
-                        first_name: data.first_name,
-                        middle_name: data.middle_name || null,
-                        last_name: data.last_name,
-                        address: data.address || null,
-                    })
+        // check if email has no duplicate
+        if (typeof DATA.email !== "undefined" && DATA.email !== "") {
+            const EMAIL = await UserModel(KNEX).table()
+                .where("id", "<>", ACCOUNT.id)
+                .where("email", DATA.email)
+                .first();
 
-                res.status(200).json({result: updates === 1});
-            } catch (e) {
-                logger.error(e);
-
-                res.status(500).json({
-                    code: errors.e4.code,
-                    message: errors.e4.message,
-                });
-            }
-        },
-
-        async password(req: Request, res: Response): Promise<any> {
-            const data = req.body;
-            const schema = Joi.object({
-                current_password: Joi.string().required(),
-                new_password: Joi.string().min(6).max(32),
-                username: Joi.string().min(2).max(16),
-                email: Joi.string().email().max(180),
-                phone: Joi.string().min(10).max(16).custom(ExtendJoiUtil().phone, 'Phone Number Validation'),
+            if (EMAIL) return res.status(400).json({
+                code: errors.e2.code,
+                message: errors.e2.message,
             });
 
-            if (await ExtendJoiUtil().response(schema, data, res)) return;
+            FORMATED_DATA.email = DATA.email;
+        }
 
-            // verify the current password
-            const account = await req.credentials.user();
-            if (!account.password || !await SecurityUtil().compare(account.password, data.current_password)) {
-                return res.status(403).json({
-                    code: errors.e11.code,
-                    message: errors.e11.message,
-                });
-            }
+        // check if phone has no duplicate
+        if (typeof DATA.phone !== "undefined" && DATA.phone !== "") {
+            const PHONE = await UserModel(KNEX).table()
+                .where("id", "<>", ACCOUNT.id)
+                .where("phone", DATA.phone)
+                .first();
 
-            const _data: any = {}
+            if (PHONE) return res.status(400).json({
+                code: errors.e2.code,
+                message: errors.e2.message,
+            });
 
-            // hashed if new password
-            if (typeof data.new_password !== 'undefined' && data.new_password !== '') {
-                _data.password = await SecurityUtil().hash(data.new_password)
-            }
+            FORMATED_DATA.phone = DATA.phone;
+        }
 
-            // check if username has no duplicate
-            if (typeof data.username !== 'undefined' && data.username !== '') {
-                const username = await UserModel(app.knex).table()
-                    .where('id', '<>', account.id)
-                    .where('username', data.username)
-                    .first();
+        try {
+            const RESULT = await UserModel(KNEX).table()
+                .where("id", ACCOUNT.id)
+                .where("status", "Activated")
+                .update(FORMATED_DATA);
 
-                if (username) return res.status(400).json({
-                    code: errors.e2.code,
-                    message: errors.e2.message,
-                });
+            res.status(200).json({result: RESULT === 1});
+        } catch (e) {
+            logger.error(e);
 
-                _data.username = data.username;
-            }
-
-            // check if email has no duplicate
-            if (typeof data.email !== 'undefined' && data.email !== '') {
-                const email = await UserModel(app.knex).table()
-                    .where('id', '<>', account.id)
-                    .where('email', data.email)
-                    .first();
-
-                if (email) return res.status(400).json({
-                    code: errors.e2.code,
-                    message: errors.e2.message,
-                });
-
-                _data.email = data.email;
-            }
-
-            // check if phone has no duplicate
-            if (typeof data.phone !== 'undefined' && data.phone !== '') {
-                const phone = await UserModel(app.knex).table()
-                    .where('id', '<>', account.id)
-                    .where('phone', data.phone)
-                    .first();
-
-                if (phone) return res.status(400).json({
-                    code: errors.e2.code,
-                    message: errors.e2.message,
-                });
-
-                _data.phone = data.phone;
-            }
-
-            try {
-                const updates = await UserModel(app.knex).table()
-                    .where('id', account.id)
-                    .where('status', 'Activated')
-                    .update(_data)
-
-                res.status(200).json({result: updates === 1});
-            } catch (e) {
-                logger.error(e);
-
-                res.status(500).json({
-                    code: errors.e4.code,
-                    message: errors.e4.message,
-                });
-            }
-        },
-    }
+            res.status(500).json({
+                code: errors.e4.code,
+                message: errors.e4.message,
+            });
+        }
+    };
 }
+
+const AccountController = new Controller();
+export default AccountController;
