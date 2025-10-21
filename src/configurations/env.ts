@@ -2,7 +2,7 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-export const __ENV = {
+export const __ENV = Object.freeze({
     NODE_ENV: process.env.NODE_ENV || "development",
 
     PORT: getInt("PORT", 4000),
@@ -36,7 +36,7 @@ export const __ENV = {
     CRYPT0_SECRET: getStr('CRYPT0_SECRET'),
     CRYPT0_CIPHER: getStr('CRYPT0_CIPHER'),
     CRYPTO_IV: getInt('CRYPTO_IV'),
-};
+});
 
 function getStr(key: string, fixed: string = ''): string {
     return typeof process.env[key] !== 'undefined' ? process.env[key]! : fixed;
