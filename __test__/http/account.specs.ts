@@ -4,7 +4,7 @@ import {assert} from "chai";
 import app from "../../src";
 import {Credentials, mockCredential} from "../utils";
 import {UserInterface} from "../../src/interfaces/user.interface";
-import {DatabaseMiddleware} from "../../src/http/middlewares/database.middleware";
+import {DBKnex} from "../../src/connectors/databases/knex";
 
 describe("HTTP Account", async () => {
     let credential: Credentials;
@@ -15,7 +15,7 @@ describe("HTTP Account", async () => {
     const new_password = "abc.123";
 
     it("generate credential", async () => {
-        await DatabaseMiddleware().table("users").where("username", new_username).delete();
+        await DBKnex.table("users").where("username", new_username).delete();
 
         credential = await mockCredential({role: "customer", username});
     });
@@ -30,7 +30,7 @@ describe("HTTP Account", async () => {
             .set("Content-Type", "application/json")
             .set("Authorization", `Bearer ${credential.token}`)
             .then(async (response: any) => {
-                const user: UserInterface = await DatabaseMiddleware().table("users").where("username", username).first();
+                const user: UserInterface = await DBKnex.table("users").where("username", username).first();
 
                 assert.equal(response.status, 200);
                 assert.equal(user.first_name, "User");
@@ -49,7 +49,7 @@ describe("HTTP Account", async () => {
             .set("Content-Type", "application/json")
             .set("Authorization", `Bearer ${credential.token}`)
             .then(async (response: any) => {
-                const user: UserInterface = await DatabaseMiddleware().table("users").where("username", new_username).first();
+                const user: UserInterface = await DBKnex.table("users").where("username", new_username).first();
 
                 assert.equal(response.status, 200);
                 assert.equal(user.username, new_username);
@@ -67,7 +67,7 @@ describe("HTTP Account", async () => {
             .set("Content-Type", "application/json")
             .set("Authorization", `Bearer ${credential.token}`)
             .then(async (response: any) => {
-                const user: UserInterface = await DatabaseMiddleware().table("users").where("username", new_username).first();
+                const user: UserInterface = await DBKnex.table("users").where("username", new_username).first();
 
                 assert.equal(response.status, 200);
                 assert.equal(user.username, new_username);

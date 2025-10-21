@@ -4,7 +4,7 @@ import {assert} from "chai";
 import app from "../../src";
 import {Credentials, mockCredential} from "../utils";
 import {RoleInterface} from "../../src/interfaces/role.interface";
-import {DatabaseMiddleware} from "../../src/http/middlewares/database.middleware";
+import {DBKnex} from "../../src/connectors/databases/knex";
 
 describe("HTTP Account", async () => {
     let credential: Credentials;
@@ -40,7 +40,7 @@ describe("HTTP Account", async () => {
             .set("Content-Type", "application/json")
             .set("Authorization", `Bearer ${credential.token}`)
             .then(async (response: any) => {
-                const role: RoleInterface = await DatabaseMiddleware().table("roles").where("id", id).first();
+                const role: RoleInterface = await DBKnex.table("roles").where("id", id).first();
 
                 assert.equal(response.status, 200);
                 assert.equal(role.name, newName);

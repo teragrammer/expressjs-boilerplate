@@ -5,7 +5,7 @@ import app from "../../src";
 import {Credentials, mockCredential} from "../utils";
 import {UserInterface} from "../../src/interfaces/user.interface";
 import {SecurityUtil} from "../../src/utilities/security.util";
-import {DatabaseMiddleware} from "../../src/http/middlewares/database.middleware";
+import {DBKnex} from "../../src/connectors/databases/knex";
 
 describe("HTTP Password Recovery", async () => {
     let credential: Credentials;
@@ -13,7 +13,7 @@ describe("HTTP Password Recovery", async () => {
 
     it("generate credential", async () => {
         credential = await mockCredential({role: "admin", username: "test_admin"});
-        user = await DatabaseMiddleware().table("users").where("id", credential.user.id).first();
+        user = await DBKnex.table("users").where("id", credential.user.id).first();
     });
 
     it("POST /api/v1/password-recovery/send", async () => {
@@ -57,7 +57,7 @@ describe("HTTP Password Recovery", async () => {
     });
 
     it("POST /api/v1/password-recovery/validate", async () => {
-        await DatabaseMiddleware().table("password_recoveries")
+        await DBKnex.table("password_recoveries")
             .where("send_to", user.email)
             .update({
                 code: await SecurityUtil().hash("123456"),

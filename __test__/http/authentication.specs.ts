@@ -1,17 +1,17 @@
-import 'mocha';
-import request from 'supertest';
-import {assert} from 'chai';
+import "mocha";
+import request from "supertest";
+import {assert} from "chai";
 import app from "../../src";
-import {DatabaseMiddleware} from "../../src/http/middlewares/database.middleware";
+import {DBKnex} from "../../src/connectors/databases/knex";
 
-describe('HTTP Authentication', () => {
+describe("HTTP Authentication", () => {
     let token: string;
 
-    it('POST /api/v1/register', async () => {
-        await DatabaseMiddleware().table('users').where('username', 'test').delete();
+    it("POST /api/v1/register", async () => {
+        await DBKnex.table("users").where("username", "test").delete();
 
         return request(app)
-            .post('/api/v1/register')
+            .post("/api/v1/register")
             .send({
                 first_name: "Test First Name",
                 last_name: "Test Last Name",
@@ -19,47 +19,47 @@ describe('HTTP Authentication', () => {
                 password: "123456",
                 email: "test@test.com",
             })
-            .set('Content-Type', 'application/json')
+            .set("Content-Type", "application/json")
             .then((response: any) => {
                 token = response.body.token;
                 assert.equal(response.status, 200);
             });
     });
 
-    it('POST /api/v1/login', async () => {
+    it("POST /api/v1/login", async () => {
         return request(app)
-            .post('/api/v1/login')
+            .post("/api/v1/login")
             .send({
                 username: "test",
-                password: "123456"
+                password: "123456",
             })
-            .set('Content-Type', 'application/json')
+            .set("Content-Type", "application/json")
             .then((response: any) => {
                 token = response.body.token;
                 assert.equal(response.status, 200);
             });
     });
 
-    it('POST /api/v1/login (error)', async () => {
+    it("POST /api/v1/login (error)", async () => {
         return request(app)
-            .post('/api/v1/login')
+            .post("/api/v1/login")
             .send({
                 username: "test",
-                password: "abc"
+                password: "abc",
             })
-            .set('Content-Type', 'application/json')
+            .set("Content-Type", "application/json")
             .then((response: any) => {
                 assert.equal(response.status, 403);
             });
     });
 
-    it('GET /api/v1/logout', async () => {
+    it("GET /api/v1/logout", async () => {
         return request(app)
-            .get('/api/v1/logout')
-            .set('Content-Type', 'application/json')
-            .set('Authorization', `Bearer ${token}`)
+            .get("/api/v1/logout")
+            .set("Content-Type", "application/json")
+            .set("Authorization", `Bearer ${token}`)
             .then((response: any) => {
                 assert.equal(response.status, 200);
             });
     });
-})
+});

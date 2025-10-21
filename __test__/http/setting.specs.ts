@@ -4,14 +4,14 @@ import {assert} from "chai";
 import app from "../../src";
 import {Credentials, mockCredential} from "../utils";
 import {SettingInterface} from "../../src/interfaces/setting.interface";
-import {DatabaseMiddleware} from "../../src/http/middlewares/database.middleware";
+import {DBKnex} from "../../src/connectors/databases/knex";
 
 describe("HTTP Account", async () => {
     let credential: Credentials;
     let id: any;
 
     it("generate credential", async () => {
-        await DatabaseMiddleware().table("settings").where("slug", "test").delete();
+        await DBKnex.table("settings").where("slug", "test").delete();
 
         credential = await mockCredential({role: "admin", username: "test_admin"});
     });
@@ -50,7 +50,7 @@ describe("HTTP Account", async () => {
             .set("Content-Type", "application/json")
             .set("Authorization", `Bearer ${credential.token}`)
             .then(async (response: any) => {
-                const setting: SettingInterface = await DatabaseMiddleware().table("settings").where("id", id).first();
+                const setting: SettingInterface = await DBKnex.table("settings").where("id", id).first();
 
                 assert.equal(response.status, 200);
                 assert.equal(setting.name, newName);
