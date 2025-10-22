@@ -5,6 +5,15 @@ This starter template includes essential features like routing, middleware setup
 environment configuration to help you kickstart your API development with best practices.
 ```
 
+### Features
+- Database Connection (MySQL and CockroachDB compatible)
+- Registration and Login (JWT Token)
+- User Roles (Can be manage by admin)
+- Two-Factor Authentication Setup (Using Email)
+- Password Recovery
+- Profile Information and Password Change
+- Application Settings (Can be manage by admin)
+
 ### Getting Started
 - Clone the repository
 ```
