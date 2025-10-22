@@ -6,6 +6,7 @@ import {DBKnex} from "../../src/connectors/databases/knex";
 
 describe("HTTP Authentication", () => {
     let token: string;
+    const PASSWORD = "ABC-abc-123";
 
     it("POST /api/v1/register", async () => {
         await DBKnex.table("users").where("username", "test").delete();
@@ -16,7 +17,7 @@ describe("HTTP Authentication", () => {
                 first_name: "Test First Name",
                 last_name: "Test Last Name",
                 username: "test",
-                password: "123456",
+                password: PASSWORD,
                 email: "test@test.com",
             })
             .set("Content-Type", "application/json")
@@ -31,7 +32,7 @@ describe("HTTP Authentication", () => {
             .post("/api/v1/login")
             .send({
                 username: "test",
-                password: "123456",
+                password: PASSWORD,
             })
             .set("Content-Type", "application/json")
             .then((response: any) => {

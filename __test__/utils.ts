@@ -3,6 +3,7 @@ import {AuthenticationTokenModel} from "../src/models/authentication-token.model
 import {SecurityUtil} from "../src/utilities/security.util";
 import {UserInterface} from "../src/interfaces/user.interface";
 import {DBKnex} from "../src/connectors/databases/knex";
+import {UserModel} from "../src/models/user.model";
 
 export interface Options {
     role: string;
@@ -23,17 +24,17 @@ export async function mockCredential(options: Options): Promise<Credentials> {
 
     const role: RoleInterface = await DBKnex.table("roles").where("slug", options.role).first();
 
-    const data = {
+    // create a new mock user
+    const userId = await DBKnex.table("users").returning("id").insert({
         role_id: role.id,
         username: options.username,
         password: await SecurityUtil().hash("123456"),
         email: SecurityUtil().randomString(8) + "@gmail.com",
-    };
+    });
 
-    const userId = await DBKnex.table("users").returning("id").insert(data);
-    const user: UserInterface = await DBKnex.table("users").where("id", userId[0]).first();
-    user.role = await DBKnex.table("roles").where("id", user.role_id).first();
+    const user: UserInterface = await UserModel(DBKnex).profile(userId[0]);
 
+    // generate a new token
     const token: string = await AuthenticationTokenModel(DBKnex).token(user, tfa);
 
     return {
