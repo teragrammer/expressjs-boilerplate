@@ -1,6 +1,6 @@
 import Joi, {ObjectSchema} from "joi";
 import {Response} from "express";
-import {PhoneNumberUtil} from 'google-libphonenumber';
+import {PhoneNumberUtil} from "google-libphonenumber";
 import errors from "../configurations/errors";
 import {Knex} from "knex";
 
@@ -12,50 +12,50 @@ export function ExtendJoiUtil() {
             try {
                 await schema.validateAsync(data, {abortEarly: false});
 
-                return false
+                return false;
             } catch (error: any) {
                 // Format error response
                 const e = error.details.map((err: any) => {
-                    const field = err.message.replace(/^"|"$|"/g, '');
+                    const field = err.message.replace(/^"|"$|"/g, "");
 
                     return {
                         field: err.path[0],
                         message: field
-                            .split('_')
+                            .split("_")
                             .map((word: any) => (word.toLowerCase() === "id" ? "ID" : word.charAt(0).toUpperCase() + word.slice(1)))
-                            .join(' ')
+                            .join(" "),
                     };
                 });
 
                 res.status(400).json({
-                    code: errors.e1.code,
-                    message: errors.e1.message,
-                    errors: e
-                })
+                    code: errors.VALIDATION_FAILED.code,
+                    message: errors.VALIDATION_FAILED.message,
+                    errors: e,
+                });
 
-                return true
+                return true;
             }
         },
 
         phone(value: any, helpers: any) {
-            if (typeof value === 'undefined' || value === null) return value
+            if (typeof value === "undefined" || value === null) return value;
 
             try {
                 const number = phoneUtil.parse(value); // .parseAndKeepRawInput(value, 'PH'), Change region if needed
                 if (!phoneUtil.isValidNumber(number)) {
-                    return helpers.error('any.invalid');
+                    return helpers.error("any.invalid");
                 }
                 return value; // Valid number
             } catch (error) {
-                return helpers.error('any.invalid');
+                return helpers.error("any.invalid");
             }
         },
 
-        exists(db: Knex, table: string, column: string = 'id') {
+        exists(db: Knex, table: string, column: string = "id") {
             return async (value: any, helpers: any) => {
-                if (typeof value === 'undefined' || value === null) return value
+                if (typeof value === "undefined" || value === null) return value;
 
-                const fieldName = helpers.state.path[0]
+                const fieldName = helpers.state.path[0];
                 const message = `${fieldName} does not exist`;
 
                 const query = await db.table(table).where(column, value).first();
@@ -63,31 +63,31 @@ export function ExtendJoiUtil() {
                     {
                         message: message,
                         path: [fieldName],
-                        type: 'any.external',
+                        type: "any.external",
                     },
                 ], undefined);
 
                 return value;
-            }
+            };
         },
 
         unique(db: Knex, table: string, column: string, ignore: any = null) {
             return async (value: any, helpers: any) => {
-                if (typeof value === 'undefined' || value === null) return value
+                if (typeof value === "undefined" || value === null) return value;
 
-                const fieldName = helpers.state.path[0]
+                const fieldName = helpers.state.path[0];
                 const message = `${fieldName} is already exists`;
 
                 if (ignore !== null) {
                     const query = await db.table(table)
                         .where(column, value)
-                        .where('id', '<>', ignore)
+                        .where("id", "<>", ignore)
                         .first();
                     if (query) throw new Joi.ValidationError(message, [
                         {
                             message: message,
                             path: [fieldName],
-                            type: 'any.external',
+                            type: "any.external",
                         },
                     ], undefined);
                 } else {
@@ -98,13 +98,13 @@ export function ExtendJoiUtil() {
                         {
                             message: message,
                             path: [fieldName],
-                            type: 'any.external',
+                            type: "any.external",
                         },
                     ], undefined);
                 }
 
                 return value;
-            }
+            };
         },
-    }
+    };
 }

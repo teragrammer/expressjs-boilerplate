@@ -22,4 +22,6 @@ export interface UserInterface {
     updated_at: string | null;
 
     role?: RoleInterface | null;
+    role_slug?: string;
+    role_is_public?: number;
 }
