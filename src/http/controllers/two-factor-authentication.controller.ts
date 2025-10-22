@@ -1,4 +1,4 @@
-import express, {Express, Request, Response} from "express";
+import {Request, Response} from "express";
 import sgMail from "@sendgrid/mail";
 import Joi from "joi";
 import errors from "../../configurations/errors";
@@ -25,14 +25,14 @@ class Controller {
         // check if tfa is required
         // to save resources
         if (CREDENTIALS.jwt.tfa === "con") return res.status(403).json({
-            code: errors.e20.code,
-            message: errors.e20.message,
+            code: errors.OTP_NOT_NEEDED.code,
+            message: errors.OTP_NOT_NEEDED.message,
         });
 
         // check for valid email
         if (IS_EMAIL_EMPTY(CREDENTIALS.jwt.eml)) return res.status(403).json({
-            code: errors.e18.code,
-            message: errors.e18.message,
+            code: errors.UN_CONFIGURED_EMAIL.code,
+            message: errors.UN_CONFIGURED_EMAIL.message,
         });
 
         // find for existing tfa
@@ -60,8 +60,8 @@ class Controller {
                 const NEXT_SEND_AT = DateUtil().unix(new Date(TFA.next_send_at));
 
                 if (CURRENT_TIME < NEXT_SEND_AT) return res.status(403).json({
-                    code: errors.e17.code,
-                    message: errors.e17.message,
+                    code: errors.RESEND_OTP_NOT_POSSIBLE.code,
+                    message: errors.RESEND_OTP_NOT_POSSIBLE.message,
                 });
 
                 await TwoFactorAuthenticationModel(KNEX).table().where("id", TFA.id).update({
@@ -87,8 +87,8 @@ class Controller {
                     logger.error(e);
 
                     return res.status(500).json({
-                        code: errors.e19.code,
-                        message: errors.e19.message,
+                        code: errors.UNABLE_TO_SEND_EMAIL.code,
+                        message: errors.UNABLE_TO_SEND_EMAIL.message,
                     });
                 }
             }
@@ -98,14 +98,14 @@ class Controller {
             logger.error(e);
 
             res.status(500).json({
-                code: errors.e4.code,
-                message: errors.e4.message,
+                code: errors.SERVER_ERROR.code,
+                message: errors.SERVER_ERROR.message,
             });
         }
     };
 
     validate = async (req: Request, res: Response): Promise<any> => {
-        const DATA = req.body;
+        const DATA = req.sanitize.body.only(["code"]);
         if (await ExtendJoiUtil().response(Joi.object({
             code: Joi.number().integer().required(),
         }), DATA, res)) return;
@@ -116,8 +116,8 @@ class Controller {
         // check if tfa it required
         // to save resources
         if (CREDENTIALS.jwt.tfa === "con") return res.status(403).json({
-            code: errors.e20.code,
-            message: errors.e20.message,
+            code: errors.OTP_NOT_NEEDED.code,
+            message: errors.OTP_NOT_NEEDED.message,
         });
 
         // find for existing tfa
@@ -125,14 +125,14 @@ class Controller {
             .where("token_id", CREDENTIALS.jwt.tid)
             .first();
         if (!TFA) return res.status(404).json({
-            code: errors.e3.code,
-            message: errors.e3.message,
+            code: errors.DATA_NOT_FOUND.code,
+            message: errors.DATA_NOT_FOUND.message,
         });
 
         // check for expiration
         if (!TFA.expired_at) return res.status(404).json({
-            code: errors.e21.code,
-            message: errors.e21.message,
+            code: errors.UN_CONFIGURED_EXPIRATION.code,
+            message: errors.UN_CONFIGURED_EXPIRATION.message,
         });
 
         const CURRENT_TIME = DateUtil().unix();
@@ -140,8 +140,8 @@ class Controller {
         // if code is expired
         const EXPIRED_AT = DateUtil().unix(new Date(TFA.expired_at));
         if (CURRENT_TIME > EXPIRED_AT) return res.status(419).json({
-            code: errors.e22.code,
-            message: errors.e22.message,
+            code: errors.RESOURCE_EXPIRED.code,
+            message: errors.RESOURCE_EXPIRED.message,
         });
 
         // multiple pending tries
@@ -149,8 +149,8 @@ class Controller {
             const EXPIRED_TRIES_AT = DateUtil().unix(new Date(TFA.expired_tries_at));
 
             if (EXPIRED_TRIES_AT > CURRENT_TIME) return res.status(403).json({
-                code: errors.e24.code,
-                message: errors.e24.message,
+                code: errors.TOO_MANY_ATTEMPT.code,
+                message: errors.TOO_MANY_ATTEMPT.message,
             });
 
             // reset the tries
@@ -164,8 +164,8 @@ class Controller {
 
         // too many failed tries
         if (TFA.tries > 5) return res.status(403).json({
-            code: errors.e24.code,
-            message: errors.e24.message,
+            code: errors.TOO_MANY_ATTEMPT.code,
+            message: errors.TOO_MANY_ATTEMPT.message,
         });
 
         // verify if code is valid
@@ -176,8 +176,8 @@ class Controller {
                 .increment("tries");
 
             return res.status(400).json({
-                code: errors.e23.code,
-                message: errors.e23.message,
+                code: errors.OTP_NO_MATCH.code,
+                message: errors.OTP_NO_MATCH.message,
             });
         }
 

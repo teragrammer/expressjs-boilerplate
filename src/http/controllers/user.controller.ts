@@ -1,27 +1,26 @@
-import {Request, Response, Router} from "express";
+import {Request, Response} from "express";
 import Joi from "joi";
 import errors from "../../configurations/errors";
-import {UserModel, STATUSES} from "../../models/user.model";
+import {STATUSES, UserModel} from "../../models/user.model";
 import {logger} from "../../configurations/logger";
 import {SecurityUtil} from "../../utilities/security.util";
 import {UserInterface} from "../../interfaces/user.interface";
 import {DateUtil} from "../../utilities/date.util";
 import {ExtendJoiUtil} from "../../utilities/extend-joi.util";
-import {ValidationUtil} from "../../utilities/validation.util";
 import {Knex} from "knex";
 
 class Controller {
     browse = async (req: Request, res: Response): Promise<any> => {
         const Q = UserModel(req.app.get("knex")).table();
 
-        const ROLE_ID: any = req.query.role_id;
-        if (typeof ROLE_ID !== "undefined" && !isNaN(ROLE_ID)) Q.where("role_id", ROLE_ID);
+        const ROLE_ID: any = req.sanitize.query.numeric("role_id");
+        if (ROLE_ID !== null) Q.where("role_id", ROLE_ID);
 
-        const STATUS: any = req.query.status;
-        if (typeof STATUS !== "undefined") Q.where("status", STATUS);
+        const STATUS: any = req.sanitize.query.get("status");
+        if (STATUS !== null) Q.where("status", STATUS);
 
-        const KEYWORD: any = req.query.search;
-        if (typeof KEYWORD !== "undefined") {
+        const KEYWORD: any = req.sanitize.query.get("search");
+        if (KEYWORD !== null) {
             Q.where((queryBuilder: any) => {
                 queryBuilder.where("first_name", "LIKE", `%${KEYWORD}%`)
                     .orWhere("middle_name", "LIKE", `%${KEYWORD}%`)
@@ -43,18 +42,13 @@ class Controller {
 
     view = async (req: Request, res: Response): Promise<any> => {
         const ID = req.params.id;
-        if (ValidationUtil().isInteger(ID)) return res.status(400).send({
-            code: errors.e15.code,
-            message: errors.e15.message,
-        });
-
         const USER: UserInterface = await UserModel(req.app.get("knex")).table()
             .where("id", ID)
             .first();
 
         if (!USER) return res.status(404).send({
-            code: errors.e3.code,
-            message: errors.e3.message,
+            code: errors.DATA_NOT_FOUND.code,
+            message: errors.DATA_NOT_FOUND.message,
         });
 
         // remove sensitive data
@@ -66,150 +60,116 @@ class Controller {
     create = async (req: Request, res: Response): Promise<any> => {
         const KNEX: Knex = req.app.get("knex");
 
-        const DATA = req.body;
+        const DATA = req.sanitize.body.only([
+            "first_name", "middle_name", "last_name",
+            "role_id", "phone", "email", "username", "password",
+            "address", "comments", "status",
+        ]);
         if (await ExtendJoiUtil().response(Joi.object({
             first_name: Joi.string().min(1).max(100).required(),
-            middle_name: Joi.string().min(1).max(100),
+            middle_name: Joi.string().min(1).max(100).allow(null, ""),
             last_name: Joi.string().min(1).max(100).required(),
 
             role_id: Joi.number().integer().required().external(ExtendJoiUtil().exists(KNEX, "users")),
-            phone: Joi.string().min(10).max(16).external(ExtendJoiUtil().phone).external(ExtendJoiUtil().unique(KNEX, "users", "phone")),
-            email: Joi.string().email().max(180).external(ExtendJoiUtil().unique(KNEX, "users", "email")),
-            username: Joi.string().min(2).max(16).external(ExtendJoiUtil().unique(KNEX, "users", "username")),
-            password: Joi.string().min(6).max(32),
+            phone: Joi.string().min(10).max(16).allow(null, "").external(ExtendJoiUtil().phone).external(ExtendJoiUtil().unique(KNEX, "users", "phone")),
+            email: Joi.string().email().max(180).allow(null, "").external(ExtendJoiUtil().unique(KNEX, "users", "email")),
+            username: Joi.string().min(2).max(16).allow(null, "").external(ExtendJoiUtil().unique(KNEX, "users", "username")),
+            password: Joi.string().min(8).max(32)
+                .pattern(/[A-Z]/)           // At least one uppercase letter
+                .pattern(/[a-z]/)           // At least one lowercase letter
+                .pattern(/[0-9]/)           // At least one number
+                .pattern(/[^A-Za-z0-9]/)    // At least one special character (e.g., !, @, #)
+                .messages({
+                    "string.min": "Password should be at least 8 characters long.",
+                    "string.max": "Password should be no longer than 32 characters.",
+                    "string.pattern.base": "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character.",
+                    "any.required": "Password is required.",
+                })
+                .allow(null, ""),
 
-            address: Joi.string().max(100),
-            comments: Joi.string().max(100),
-            status: Joi.string().valid(...STATUSES),
+            address: Joi.string().max(100).allow(null, ""),
+            comments: Joi.string().max(100).allow(null, ""),
+            status: Joi.string().valid(...STATUSES).allow(null, ""),
         }), DATA, res)) return;
 
         try {
-            let password = null;
-            if (DATA.password) password = await SecurityUtil().hash(DATA.password);
+            const PASSWORD = req.sanitize.body.get("password");
+            if (PASSWORD !== null) DATA.password = await SecurityUtil().hash(PASSWORD);
+            DATA.created_at = DateUtil().sql();
 
             const RESULT = await UserModel(KNEX).table()
                 .returning("id")
-                .insert({
-                    first_name: DATA.first_name,
-                    middle_name: typeof DATA.middle_name ? DATA.middle_name : null,
-                    last_name: DATA.last_name,
-                    address: typeof DATA.address ? DATA.address : null,
-                    comments: typeof DATA.comments ? DATA.comments : null,
-                    role_id: DATA.role_id,
-                    username: typeof DATA.username ? DATA.username : null,
-                    phone: typeof DATA.phone ? DATA.phone : null,
-                    email: typeof DATA.email ? DATA.email : null,
-                    password: password,
-                    created_at: DateUtil().sql(),
-                });
+                .insert(DATA);
 
             res.status(200).json({id: RESULT[0]});
         } catch (e) {
             logger.error(e);
 
             res.status(500).json({
-                code: errors.e4.code,
-                message: errors.e4.message,
+                code: errors.SERVER_ERROR.code,
+                message: errors.SERVER_ERROR.message,
             });
         }
     };
 
     update = async (req: Request, res: Response): Promise<any> => {
         const ID = req.params.id;
-        if (ValidationUtil().isInteger(ID)) return res.status(400).send({
-            code: errors.e15.code,
-            message: errors.e15.message,
-        });
 
         const KNEX: Knex = req.app.get("knex");
-        const DATA = req.body;
+        const DATA = req.sanitize.body.only([
+            "first_name", "middle_name", "last_name",
+            "role_id", "phone", "email", "username", "password",
+            "address", "comments", "status",
+        ]);
         if (await ExtendJoiUtil().response(Joi.object({
             first_name: Joi.string().min(1).max(100).required(),
-            middle_name: Joi.string().min(1).max(100),
+            middle_name: Joi.string().min(1).max(100).allow(null, ""),
             last_name: Joi.string().min(1).max(100).required(),
 
             role_id: Joi.number().integer().required().external(ExtendJoiUtil().exists(KNEX, "users")),
-            phone: Joi.string().min(10).max(16).external(ExtendJoiUtil().phone).external(ExtendJoiUtil().unique(KNEX, "users", "phone", ID)),
-            email: Joi.string().email().max(180).external(ExtendJoiUtil().unique(KNEX, "users", "email", ID)),
-            username: Joi.string().min(2).max(16).external(ExtendJoiUtil().unique(KNEX, "users", "username", ID)),
-            password: Joi.string().min(6).max(32),
+            phone: Joi.string().min(10).max(16).allow(null, "").external(ExtendJoiUtil().phone).external(ExtendJoiUtil().unique(KNEX, "users", "phone", ID)),
+            email: Joi.string().email().max(180).allow(null, "").external(ExtendJoiUtil().unique(KNEX, "users", "email", ID)),
+            username: Joi.string().min(2).max(16).allow(null, "").external(ExtendJoiUtil().unique(KNEX, "users", "username", ID)),
+            password: Joi.string().min(8).max(32)
+                .pattern(/[A-Z]/)           // At least one uppercase letter
+                .pattern(/[a-z]/)           // At least one lowercase letter
+                .pattern(/[0-9]/)           // At least one number
+                .pattern(/[^A-Za-z0-9]/)    // At least one special character (e.g., !, @, #)
+                .messages({
+                    "string.min": "Password should be at least 8 characters long.",
+                    "string.max": "Password should be no longer than 32 characters.",
+                    "string.pattern.base": "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character.",
+                    "any.required": "Password is required.",
+                })
+                .allow(null, ""),
 
-            address: Joi.string().max(100),
-            comments: Joi.string().max(100),
-            status: Joi.string().valid(...STATUSES),
+            address: Joi.string().max(100).allow(null, ""),
+            comments: Joi.string().max(100).allow(null, ""),
+            status: Joi.string().valid(...STATUSES).allow(null, ""),
         }), DATA, res)) return;
 
-        // validate for unique username
-        if (typeof DATA.username !== "undefined") {
-            const USERNAME: UserInterface = await UserModel(KNEX).table().where("slug", DATA.username)
-                .where("id", "<>", ID)
-                .first();
-            if (USERNAME) return res.status(400).json({
-                code: errors.e2.code,
-                message: errors.e2.message,
-            });
-        }
-
-        // validate for unique phone
-        if (typeof DATA.phone !== "undefined") {
-            const PHONE: UserInterface = await UserModel(KNEX).table().where("phone", DATA.phone)
-                .where("id", "<>", ID)
-                .first();
-            if (PHONE) return res.status(400).json({
-                code: errors.e2.code,
-                message: errors.e2.message,
-            });
-        }
-
-        // validate for unique email
-        if (typeof DATA.email !== "undefined") {
-            const EMAIL: UserInterface = await UserModel(KNEX).table().where("email", DATA.email)
-                .where("id", "<>", ID)
-                .first();
-            if (EMAIL) return res.status(400).json({
-                code: errors.e2.code,
-                message: errors.e2.message,
-            });
-        }
-
         try {
-            let password = null;
-            if (DATA.password) password = await SecurityUtil().hash(DATA.password);
+            const PASSWORD = req.sanitize.body.get("password");
+            if (PASSWORD !== null) DATA.password = await SecurityUtil().hash(PASSWORD);
+            DATA.updated_at = DateUtil().sql();
 
             const RESULT = await UserModel(KNEX).table()
                 .where("id", ID)
-                .update({
-                    first_name: DATA.first_name,
-                    middle_name: DATA.middle_name ? DATA.middle_name : null,
-                    last_name: DATA.last_name,
-                    address: DATA.address ? DATA.address : null,
-                    comments: DATA.comments ? DATA.comments : null,
-                    role_id: DATA.role_id,
-                    username: DATA.username ? DATA.username : null,
-                    phone: DATA.phone ? DATA.phone : null,
-                    email: DATA.email ? DATA.email : null,
-                    password: password,
-                    updated_at: DateUtil().sql(),
-                });
+                .update(DATA);
 
             res.status(200).json({result: RESULT === 1});
         } catch (e) {
             logger.error(e);
 
             res.status(500).json({
-                code: errors.e4.code,
-                message: errors.e4.message,
+                code: errors.SERVER_ERROR.code,
+                message: errors.SERVER_ERROR.message,
             });
         }
     };
 
     delete = async (req: Request, res: Response): Promise<any> => {
         const ID = req.params.id;
-        if (ValidationUtil().isInteger(ID)) return res.status(400).send({
-            code: errors.e15.code,
-            message: errors.e15.message,
-        });
-
         const RESULT = await UserModel(req.app.get("knex")).table()
             .where("id", ID)
             .delete();

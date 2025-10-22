@@ -1,4 +1,4 @@
-import {Express, Request, Response, NextFunction} from "express";
+import {NextFunction, Request, Response} from "express";
 import errors from "../../configurations/errors";
 
 export function TwoFactorAuthenticationMiddleware(isHalt = true): any {
@@ -6,13 +6,13 @@ export function TwoFactorAuthenticationMiddleware(isHalt = true): any {
         const credentials = req.credentials;
 
         if (!credentials && isHalt) return res.status(401).json({
-            code: errors.e6.code,
-            message: errors.e6.message,
+            code: "AUTH_OTP_EXPIRED",
+            message: errors.EXPIRED_AUTH_TOKEN.message,
         });
 
         if (credentials.jwt.tfa === "hol") return res.status(403).json({
-            code: errors.e16.code,
-            message: errors.e16.message,
+            code: "AUTH_OTP_INCOMPLETE",
+            message: errors.INCOMPLETE_OTP.message,
         });
 
         next();

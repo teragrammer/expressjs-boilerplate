@@ -4,7 +4,6 @@ import errors from "../../configurations/errors";
 import {logger} from "../../configurations/logger";
 import {DateUtil} from "../../utilities/date.util";
 import {RoleModel} from "../../models/role.model";
-import {ValidationUtil} from "../../utilities/validation.util";
 import {ExtendJoiUtil} from "../../utilities/extend-joi.util";
 import {RoleInterface} from "../../interfaces/role.interface";
 import {Knex} from "knex";
@@ -13,11 +12,11 @@ class Controller {
     browse = async (req: Request, res: Response): Promise<any> => {
         const Q = RoleModel(req.app.get("knex")).table();
 
-        const IS_PUBLIC: any = req.query.is_public;
-        if (typeof IS_PUBLIC !== "undefined" && !isNaN(IS_PUBLIC)) Q.where("is_public", IS_PUBLIC);
+        const IS_PUBLIC: any = req.sanitize.query.numeric("is_public", null);
+        if (IS_PUBLIC !== null) Q.where("is_public", IS_PUBLIC);
 
-        const KEYWORD: any = req.query.search;
-        if (typeof KEYWORD !== "undefined") {
+        const KEYWORD: any = req.sanitize.query.get("search");
+        if (KEYWORD !== null) {
             Q.where((queryBuilder: any) => {
                 queryBuilder.where("name", "LIKE", `%${KEYWORD}%`)
                     .orWhere("slug", "LIKE", `%${KEYWORD}%`)
@@ -33,18 +32,13 @@ class Controller {
 
     view = async (req: Request, res: Response): Promise<any> => {
         const ID = req.params.id;
-        if (ValidationUtil().isInteger(ID)) return res.status(400).send({
-            code: errors.e15.code,
-            message: errors.e15.message,
-        });
-
         const ROLE: RoleInterface = await RoleModel(req.app.get("knex")).table()
             .where("id", ID)
             .first();
 
         if (!ROLE) return res.status(404).send({
-            code: errors.e3.code,
-            message: errors.e3.message,
+            code: errors.DATA_NOT_FOUND.code,
+            message: errors.DATA_NOT_FOUND.message,
         });
 
         return res.status(200).json(ROLE);
@@ -53,79 +47,62 @@ class Controller {
     create = async (req: Request, res: Response): Promise<any> => {
         const KNEX: Knex = req.app.get("knex");
 
-        const DATA = req.body;
+        const DATA = req.sanitize.body.only(["name", "slug", "description", "is_public"]);
         if (await ExtendJoiUtil().response(Joi.object({
             name: Joi.string().min(1).max(50).required(),
             slug: Joi.string().min(1).max(50).required().external(ExtendJoiUtil().unique(KNEX, "roles", "slug")),
+            description: Joi.string().max(100).allow(null, ""),
             is_public: Joi.number().valid(0, 1).required(),
         }), DATA, res)) return;
 
         try {
+            DATA.created_at = DateUtil().sql();
             const RESULT = await RoleModel(KNEX).table()
                 .returning("id")
-                .insert({
-                    name: DATA.name,
-                    slug: DATA.slug,
-                    description: typeof DATA.description ? DATA.description : null,
-                    is_public: DATA.is_public,
-                    created_at: DateUtil().sql(),
-                });
+                .insert(DATA);
 
             res.status(200).json({id: RESULT[0]});
         } catch (e) {
             logger.error(e);
 
             res.status(500).json({
-                code: errors.e4.code,
-                message: errors.e4.message,
+                code: errors.SERVER_ERROR.code,
+                message: errors.SERVER_ERROR.message,
             });
         }
     };
 
     update = async (req: Request, res: Response): Promise<any> => {
-        const ID = req.params.id;
-        if (ValidationUtil().isInteger(ID)) return res.status(400).send({
-            code: errors.e15.code,
-            message: errors.e15.message,
-        });
-
         const KNEX: Knex = req.app.get("knex");
-        const DATA = req.body;
+
+        const ID = req.params.id;
+        const DATA = req.sanitize.body.only(["name", "slug", "description", "is_public"]);
         if (await ExtendJoiUtil().response(Joi.object({
             name: Joi.string().min(1).max(50).required(),
             slug: Joi.string().min(1).max(50).required().external(ExtendJoiUtil().unique(KNEX, "roles", "slug", ID)),
+            description: Joi.string().max(100).allow(null, ""),
             is_public: Joi.number().valid(0, 1).required(),
         }), DATA, res)) return;
 
         try {
+            DATA.updated_at = DateUtil().sql();
             const RESULT = await RoleModel(KNEX).table()
                 .where("id", ID)
-                .update({
-                    name: DATA.name,
-                    slug: DATA.slug,
-                    description: typeof DATA.description ? DATA.description : null,
-                    is_public: DATA.is_public,
-                    updated_at: DateUtil().sql(),
-                });
+                .update(DATA);
 
             res.status(200).json({result: RESULT === 1});
         } catch (e) {
             logger.error(e);
 
             res.status(500).json({
-                code: errors.e4.code,
-                message: errors.e4.message,
+                code: errors.SERVER_ERROR.code,
+                message: errors.SERVER_ERROR.message,
             });
         }
     };
 
     delete = async (req: Request, res: Response): Promise<any> => {
         const ID = req.params.id;
-        if (ValidationUtil().isInteger(ID)) return res.status(400).send({
-            code: errors.e15.code,
-            message: errors.e15.message,
-        });
-
         const RESULT = await RoleModel(req.app.get("knex")).table()
             .where("id", ID)
             .delete();

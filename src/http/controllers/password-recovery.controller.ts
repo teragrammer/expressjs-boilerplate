@@ -1,4 +1,4 @@
-import {Application, Express, Request, Response} from "express";
+import {Request, Response} from "express";
 import Joi from "joi";
 import {ExtendJoiUtil} from "../../utilities/extend-joi.util";
 import {PasswordRecoveryModel, TYPES} from "../../models/password-recovery.model";
@@ -21,12 +21,12 @@ const NEXT_TRY_MINUTES = 3;
 
 class Controller {
     send = async (req: Request, res: Response): Promise<any> => {
-        const DATA = req.body;
+        const DATA = req.sanitize.body.only(["to", "email", "phone"]);
         if (await ExtendJoiUtil().response(Joi.object({
             to: Joi.string().required().valid(...TYPES),
         }), {to: DATA.to}, res)) return;
 
-        const KNEX: Knex = res.app.get('knex');
+        const KNEX: Knex = res.app.get("knex");
 
         // validate where to send the code
         const VALIDATED_SEND_TO_TYPE = await VALIDATE_SEND_TO_TYPE(DATA, res);
@@ -34,8 +34,8 @@ class Controller {
 
         const USER: UserInterface = await UserModel(KNEX).table().where(VALIDATED_SEND_TO_TYPE.name, VALIDATED_SEND_TO_TYPE.value).first();
         if (!USER) return res.status(404).json({
-            code: errors.e3.code,
-            message: errors.e3.message,
+            code: errors.DATA_NOT_FOUND.code,
+            message: errors.DATA_NOT_FOUND.message,
             errors: [{
                 field: VALIDATED_SEND_TO_TYPE.name,
                 message: `Unable to find ${VALIDATED_SEND_TO_TYPE.name}`,
@@ -45,8 +45,8 @@ class Controller {
         const RECOVERY: PasswordRecoveryInterface = await PasswordRecoveryModel(KNEX).table().where("send_to", VALIDATED_SEND_TO_TYPE.value).first();
         if (RECOVERY && RECOVERY.next_resend_at && DateUtil().unix(new Date(RECOVERY.next_resend_at)) > DateUtil().unix()) {
             return res.status(400).json({
-                code: errors.e25.code,
-                message: errors.e25.message,
+                code: errors.TRY_RESEND.code,
+                message: errors.TRY_RESEND.message,
             });
         }
 
@@ -70,25 +70,22 @@ class Controller {
     };
 
     validate = async (req: Request, res: Response): Promise<any> => {
-        const DATA = req.body;
+        const DATA = req.sanitize.body.only(["to", "code", "email", "phone"]);
         if (await ExtendJoiUtil().response(Joi.object({
             to: Joi.string().required().valid(...TYPES),
             code: Joi.string().min(6).max(6).required(),
-        }), {
-            to: DATA.to,
-            code: DATA.code,
-        }, res)) return;
+        }), {to: DATA.to, code: DATA.code}, res)) return;
 
         // validate where to send the code
         const VALIDATED_SEND_TO_TYPE = await VALIDATE_SEND_TO_TYPE(DATA, res);
         if (!VALIDATED_SEND_TO_TYPE.status || !VALIDATED_SEND_TO_TYPE.name || !VALIDATED_SEND_TO_TYPE.value) return;
 
-        const KNEX: Knex = res.app.get('knex');
+        const KNEX: Knex = res.app.get("knex");
 
         const RECOVERY: PasswordRecoveryInterface = await PasswordRecoveryModel(KNEX).table().where("send_to", VALIDATED_SEND_TO_TYPE.value).first();
         if (!RECOVERY) return res.status(404).json({
-            code: errors.e3.code,
-            message: errors.e3.message,
+            code: errors.DATA_NOT_FOUND.code,
+            message: errors.DATA_NOT_FOUND.message,
             errors: [{
                 field: VALIDATED_SEND_TO_TYPE.name,
                 message: `Unable to find ${VALIDATED_SEND_TO_TYPE.name}`,
@@ -113,8 +110,8 @@ class Controller {
 
             if (isExceedTries) {
                 return res.status(422).json({
-                    code: errors.e26.code,
-                    message: errors.e26.message,
+                    code: errors.EXCEED_RECOVERY.code,
+                    message: errors.EXCEED_RECOVERY.message,
                 });
             }
         }
@@ -123,8 +120,8 @@ class Controller {
             await PasswordRecoveryModel(KNEX).table().increment("tries");
 
             return res.status(400).json({
-                code: errors.e27.code,
-                message: errors.e27.message,
+                code: errors.RECOVERY_CODE_INVALID.code,
+                message: errors.RECOVERY_CODE_INVALID.message,
             });
         }
 
@@ -134,8 +131,8 @@ class Controller {
         // set user authentication token
         const USER: UserInterface = await UserModel(KNEX).table().where(VALIDATED_SEND_TO_TYPE.name, RECOVERY.send_to).first();
         if (!USER) return res.status(404).json({
-            code: errors.e3.code,
-            message: errors.e3.message,
+            code: errors.DATA_NOT_FOUND.code,
+            message: errors.DATA_NOT_FOUND.message,
         });
         const AUTHENTICATION = await AuthenticationTokenModel(KNEX).generate(USER);
 
@@ -146,10 +143,9 @@ class Controller {
         });
 
         res.status(200).json({
-            user: AUTHENTICATION.user,
             credential: AUTHENTICATION.token,
         });
-    }
+    };
 }
 
 const VALIDATE_SEND_TO_TYPE = async (data: any, res: Response) => {

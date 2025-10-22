@@ -13,7 +13,7 @@ import {Knex} from "knex";
 
 class Controller {
     login = async (req: Request, res: Response) => {
-        const DATA = req.body;
+        const DATA = req.sanitize.body.only(["username", "password"]);
         if (await ExtendJoiUtil().response(Joi.object({
             username: Joi.string().required(),
             password: Joi.string().required(),
@@ -23,14 +23,14 @@ class Controller {
 
         const USER: UserInterface = await UserModel(KNEX).table().where("username", DATA.username).first();
         if (!USER) return res.status(404).json({
-            code: errors.e3.code,
-            message: errors.e3.message,
+            code: errors.DATA_NOT_FOUND.code,
+            message: errors.DATA_NOT_FOUND.message,
         });
 
         // do not allow login if password is not set
         if (typeof USER.password === "undefined" || USER.password === null) res.status(400).json({
-            code: errors.e8.code,
-            message: errors.e8.message,
+            code: errors.INCORRECT_PASS_SETUP.code,
+            message: errors.INCORRECT_PASS_SETUP.message,
         });
 
         // check if failed login tries exceed
@@ -42,8 +42,8 @@ class Controller {
             if (LOGIN_EXPIRED_AT >= CURRENT_TIME) {
                 // too many login attempts
                 return res.status(403).json({
-                    code: errors.e9.code,
-                    message: errors.e9.message,
+                    code: errors.TOO_MANY_ATTEMPT.code,
+                    message: errors.TOO_MANY_ATTEMPT.message,
                 });
             } else {
                 // reset failed login expiration
@@ -68,21 +68,21 @@ class Controller {
 
                 // too many login attempts
                 return res.status(403).json({
-                    code: errors.e10.code,
-                    message: errors.e10.message,
+                    code: errors.LOCKED_ACCOUNT.code,
+                    message: errors.LOCKED_ACCOUNT.message,
                 });
             }
 
             return res.status(403).json({
-                code: errors.e11.code,
-                message: errors.e11.message,
+                code: errors.CREDENTIAL_DO_NOT_MATCH.code,
+                message: errors.CREDENTIAL_DO_NOT_MATCH.message,
             });
         }
 
+        // generate token
         const AUTHENTICATION = await AuthenticationTokenModel(KNEX).generate(USER);
 
         res.status(200).json({
-            user: AUTHENTICATION.user,
             token: AUTHENTICATION.token,
         });
     };
