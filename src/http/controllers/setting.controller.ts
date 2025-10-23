@@ -2,11 +2,13 @@ import {Request, Response} from "express";
 import Joi from "joi";
 import errors from "../../configurations/errors";
 import {logger} from "../../configurations/logger";
-import {DATA_TYPES, SettingModel} from "../../models/setting.model";
+import {CACHE_SETT_NAME, DATA_TYPES, InitializerSettingInterface, SettingModel} from "../../models/setting.model";
 import {DateUtil} from "../../utilities/date.util";
 import {ExtendJoiUtil} from "../../utilities/extend-joi.util";
 import {SettingInterface} from "../../interfaces/setting.interface";
 import {Knex} from "knex";
+import {DBRedisInterface} from "../../configurations/redis";
+import {SecurityUtil} from "../../utilities/security.util";
 
 class Controller {
     browse = async (req: Request, res: Response): Promise<any> => {
@@ -38,7 +40,7 @@ class Controller {
     };
 
     values = async (req: Request, res: Response): Promise<any> => {
-        res.status(200).json(await SettingModel(req.app.get("knex")).value([], 1));
+        res.status(200).json(req.app.get(CACHE_SETT_NAME)().pub);
     };
 
     view = async (req: Request, res: Response): Promise<any> => {
@@ -75,6 +77,9 @@ class Controller {
                 .returning("id")
                 .insert(DATA);
 
+            // update the local cache and publish newly created setting
+            if (RESULT.length) await PUBLISHING_CACHE(req, KNEX, req.app.get("redis"));
+
             res.status(200).json({id: RESULT[0]});
         } catch (e) {
             logger.error(e);
@@ -107,6 +112,9 @@ class Controller {
                 .where("id", ID)
                 .update(DATA);
 
+            // update the local cache and publish newly updated setting
+            if (RESULT === 1) await PUBLISHING_CACHE(req, KNEX, req.app.get("redis"));
+
             res.status(200).json({result: RESULT === 1});
         } catch (e) {
             logger.error(e);
@@ -119,14 +127,43 @@ class Controller {
     };
 
     delete = async (req: Request, res: Response): Promise<any> => {
+        const KNEX: Knex = req.app.get("knex");
+
         const ID = req.params.id;
-        const RESULT = await SettingModel(res.app.get("knex")).table()
+        const RESULT = await SettingModel(KNEX).table()
             .where("id", ID)
             .delete();
+
+        // update the local cache and publish newly updated setting
+        if (RESULT === 1) await PUBLISHING_CACHE(req, KNEX, req.app.get("redis"));
 
         res.status(200).json({result: RESULT === 1});
     };
 }
+
+const PUBLISHING_CACHE = async (req: Request, knex: Knex, redis: DBRedisInterface) => {
+    try {
+        const initializer: InitializerSettingInterface = await SettingModel(knex).initializer();
+
+        // set local copy of setting
+        req.app.set(CACHE_SETT_NAME, (): Readonly<InitializerSettingInterface> => Object.freeze(initializer));
+
+        // publish the newly updated settings
+        if (redis.publisher) {
+            const DATA = JSON.stringify(req.app.get(CACHE_SETT_NAME)());
+            const HASHED_DATA = await SecurityUtil().hash(DATA);
+            const PAYLOAD = JSON.stringify({
+                data: await SecurityUtil().encrypt(DATA),
+                hashed: HASHED_DATA,
+            });
+
+            await redis.publisher.publish(CACHE_SETT_NAME, SecurityUtil().encodeUrlBase64(PAYLOAD));
+            logger.info(`Redis new setting cache publish`);
+        }
+    } catch (err: any) {
+        logger.error(`Reinitializing redis failed: ${err}`);
+    }
+};
 
 const SettingController = new Controller();
 export default SettingController;
