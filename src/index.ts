@@ -7,11 +7,15 @@ import v1 from "./http/routes/v1";
 import useragent from "express-useragent";
 import compression from "compression";
 import {logger} from "./configurations/logger";
-import {__ENV} from "./configurations/env";
+import {__ENV} from "./configurations/environment";
 import cluster from "node:cluster";
 import errors from "./configurations/errors";
-import {DBKnex} from "./connectors/databases/knex";
+import {DBKnex} from "./configurations/knex";
 import requestMiddleware from "./http/middlewares/request.middleware";
+import {DBRedis} from "./configurations/redis";
+import {CACHE_SETT_NAME, InitializerSettingInterface, SettingModel} from "./models/setting.model";
+import {SubscribeRedisTo} from "./services/redis/redis-subscriber.service";
+import {MessageOnRedis} from "./services/redis/redis-event.service";
 
 const app = express();
 
@@ -43,9 +47,17 @@ app.use((req: any, res: any, next: any) => {
     next();
 });
 
-// set database connections
+// set database connection
 app.set("knex", DBKnex);
+app.set("redis", DBRedis);
 app.use(requestMiddleware);
+
+// cache application settings
+SettingModel(DBKnex).initializer().then((keyValues: InitializerSettingInterface) => app.set(CACHE_SETT_NAME, (): Readonly<InitializerSettingInterface> => Object.freeze(keyValues)));
+
+// subscribe to redis events
+SubscribeRedisTo(CACHE_SETT_NAME);
+MessageOnRedis(CACHE_SETT_NAME);
 
 // routes with versioning
 app.use("/api/v1", v1());
@@ -74,16 +86,39 @@ if (clusterWorkerSize > 1 && __ENV.CLUSTER) {
         });
     } else {
         app.listen(__ENV.PORT, () => {
-            logger.info(`⚡️[server local]: Server is running at http://localhost:${__ENV.PORT}`);
-            logger.info(`⚡️[server expose]: Server is running at http://localhost:${__ENV.PORT_EXPOSE}`);
+            logger.info(`⚡️ [server local]: Server is running at http://localhost:${__ENV.PORT}`);
+            logger.info(`⚡️ [server expose]: Server is running at http://localhost:${__ENV.PORT_EXPOSE}`);
         });
     }
 } else {
     app.listen(__ENV.PORT, () => {
-        logger.info(`⚡️No cluster is enabled: ${clusterWorkerSize}`);
-        logger.info(`⚡️[server local]: Server is running at http://localhost:${__ENV.PORT}`);
-        logger.info(`⚡️[server expose]: Server is running at http://localhost:${__ENV.PORT_EXPOSE}`);
+        logger.info(`⚡️ No cluster is enabled: ${clusterWorkerSize}`);
+        logger.info(`⚡️ [server local]: Server is running at http://localhost:${__ENV.PORT}`);
+        logger.info(`⚡️ [server expose]: Server is running at http://localhost:${__ENV.PORT_EXPOSE}`);
     });
 }
+
+// Gracefully handle SIGINT (Ctrl+C) to close DB connections
+process.on("SIGINT", async () => {
+    logger.info("Received SIGINT, closing DB connections...");
+
+    try {
+        if (DBKnex) {
+            await DBKnex.destroy();
+            logger.info("Knex connection closed");
+        }
+
+        if (DBRedis) {
+            if (DBRedis.publisher) await DBRedis.publisher.quit();
+            if (DBRedis.subscriber) await DBRedis.subscriber.quit();
+            logger.info("Redis connection closed");
+        }
+    } catch (err: any) {
+        logger.error(`Error while closing connections: ${err.message}`);
+    } finally {
+        // Exit the process
+        process.exit(0);
+    }
+});
 
 export default app;
