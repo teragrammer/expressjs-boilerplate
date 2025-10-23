@@ -5,7 +5,7 @@ import app from "../../src";
 import {Credentials, mockCredential} from "../utils";
 import {UserInterface} from "../../src/interfaces/user.interface";
 import {RoleInterface} from "../../src/interfaces/role.interface";
-import {DBKnex} from "../../src/connectors/databases/knex";
+import {DBKnex} from "../../src/configurations/knex";
 
 describe("HTTP Account", async () => {
     let credential: Credentials;

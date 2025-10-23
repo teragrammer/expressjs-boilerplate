@@ -4,7 +4,7 @@ import {assert} from "chai";
 import app from "../../src";
 import {Credentials, mockCredential} from "../utils";
 import {SettingInterface} from "../../src/interfaces/setting.interface";
-import {DBKnex} from "../../src/connectors/databases/knex";
+import {DBKnex} from "../../src/configurations/knex";
 
 describe("HTTP Account", async () => {
     let credential: Credentials;

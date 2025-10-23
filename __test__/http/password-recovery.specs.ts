@@ -5,7 +5,7 @@ import app from "../../src";
 import {Credentials, mockCredential} from "../utils";
 import {UserInterface} from "../../src/interfaces/user.interface";
 import {SecurityUtil} from "../../src/utilities/security.util";
-import {DBKnex} from "../../src/connectors/databases/knex";
+import {DBKnex} from "../../src/configurations/knex";
 
 describe("HTTP Password Recovery", async () => {
     let credential: Credentials;

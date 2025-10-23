@@ -2,7 +2,7 @@ import "mocha";
 import request from "supertest";
 import {assert} from "chai";
 import app from "../../src";
-import {DBKnex} from "../../src/connectors/databases/knex";
+import {DBKnex} from "../../src/configurations/knex";
 
 describe("HTTP Authentication", () => {
     let token: string;

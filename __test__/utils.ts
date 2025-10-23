@@ -2,7 +2,7 @@ import {RoleInterface} from "../src/interfaces/role.interface";
 import {AuthenticationTokenModel} from "../src/models/authentication-token.model";
 import {SecurityUtil} from "../src/utilities/security.util";
 import {UserInterface} from "../src/interfaces/user.interface";
-import {DBKnex} from "../src/connectors/databases/knex";
+import {DBKnex} from "../src/configurations/knex";
 import {UserModel} from "../src/models/user.model";
 
 export interface Options {
