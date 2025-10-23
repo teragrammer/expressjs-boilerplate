@@ -1,8 +1,8 @@
 import fs from "fs";
 import Knex from "knex";
-import {__ENV} from "../../configurations/env";
+import {__ENV} from "./environment";
 
-const config: any = {
+const CONFIG: any = {
     client: __ENV.DB_CLIENT,
     connection: {
         host: __ENV.DB_HOST,
@@ -18,11 +18,11 @@ const config: any = {
 
 // set SSL connection support
 if (__ENV.DB_SSL) {
-    config.connection.ssl = {
+    CONFIG.connection.ssl = {
         ca: fs.readFileSync(__ENV.DB_SSL_CA).toString(),
         cert: fs.readFileSync(__ENV.DB_SSL_CERT).toString(),
         key: fs.readFileSync(__ENV.DB_SSL_KEY).toString(),
     };
 }
 
-export const DBKnex = Knex(config);
+export const DBKnex = Knex(CONFIG);

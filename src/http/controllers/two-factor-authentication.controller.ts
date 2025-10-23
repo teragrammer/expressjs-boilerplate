@@ -6,13 +6,13 @@ import {DateUtil} from "../../utilities/date.util";
 import {SecurityUtil} from "../../utilities/security.util";
 import {TwoFactorAuthenticationInterface} from "../../interfaces/two-factor-authentication.interface";
 import {TwoFactorAuthenticationModel} from "../../models/two-factor-authentication.model";
-import {__ENV} from "../../configurations/env";
+import {__ENV} from "../../configurations/environment";
 import {logger} from "../../configurations/logger";
 import {SettingKeyValueInterface} from "../../interfaces/setting-key-value.interface";
-import {SettingModel} from "../../models/setting.model";
 import {AuthenticationTokenModel} from "../../models/authentication-token.model";
 import {ExtendJoiUtil} from "../../utilities/extend-joi.util";
 import {Knex} from "knex";
+import {CACHE_SETT_NAME} from "../../models/setting.model";
 
 class Controller {
     send = async (req: Request, res: Response): Promise<any> => {
@@ -74,7 +74,7 @@ class Controller {
 
             // send the code to email
             if (__ENV.NODE_ENV === "production") {
-                const SETTINGS: SettingKeyValueInterface = await SettingModel(KNEX).value(["tta_eml_snd", "tta_eml_sbj"]);
+                const SETTINGS: SettingKeyValueInterface = req.app.get(CACHE_SETT_NAME)().pri;
 
                 try {
                     await sgMail.send({

@@ -2,7 +2,7 @@ import {Knex} from "knex";
 import jwt, {JwtPayload} from "jsonwebtoken";
 import {DateUtil} from "../utilities/date.util";
 import {UserInterface} from "../interfaces/user.interface";
-import {__ENV} from "../configurations/env";
+import {__ENV} from "../configurations/environment";
 
 const TABLE_NAME = "authentication_tokens";
 

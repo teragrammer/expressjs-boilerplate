@@ -2,7 +2,7 @@ import { Knex } from "knex";
 import fs from "fs";
 import dotenv from "dotenv";
 import * as path from "node:path";
-import { __ENV } from "./src/configurations/env";
+import { __ENV } from "./src/configurations/environment";
 
 dotenv.config();
 
