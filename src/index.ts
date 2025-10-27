@@ -11,11 +11,12 @@ import {__ENV} from "./configurations/environment";
 import cluster from "node:cluster";
 import errors from "./configurations/errors";
 import {DBKnex} from "./configurations/knex";
-import requestMiddleware from "./http/middlewares/request.middleware";
 import {DBRedis} from "./configurations/redis";
+import requestMiddleware from "./http/middlewares/request.middleware";
+import {RedisSubscriberService} from "./services/redis/redis-subscriber.service";
+import {RedisEventService} from "./services/redis/redis-event.service";
 import {CACHE_SETT_NAME, InitializerSettingInterface, SettingModel} from "./models/setting.model";
-import {SubscribeRedisTo} from "./services/redis/redis-subscriber.service";
-import {MessageOnRedis} from "./services/redis/redis-event.service";
+import {CACHE_GUARD_NAME, RouteGuardModel} from "./models/route-guard.model";
 
 const app = express();
 
@@ -50,14 +51,18 @@ app.use((req: any, res: any, next: any) => {
 // set database connection
 app.set("knex", DBKnex);
 app.set("redis", DBRedis);
+
+// custom middlewares
 app.use(requestMiddleware);
 
-// cache application settings
+// cache application settings and route guards
 SettingModel(DBKnex).initializer().then((keyValues: InitializerSettingInterface) => app.set(CACHE_SETT_NAME, (): Readonly<InitializerSettingInterface> => Object.freeze(keyValues)));
+RouteGuardModel(DBKnex).initializer().then((guards: Record<string, string[]>) => app.set(CACHE_GUARD_NAME, (): Readonly<Record<string, string[]>> => Object.freeze(guards)));
 
 // subscribe to redis events
-SubscribeRedisTo(CACHE_SETT_NAME);
-MessageOnRedis(CACHE_SETT_NAME);
+RedisSubscriberService(CACHE_SETT_NAME);
+RedisSubscriberService(CACHE_GUARD_NAME);
+RedisEventService();
 
 // routes with versioning
 app.use("/api/v1", v1());
