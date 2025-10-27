@@ -21,6 +21,7 @@ environment configuration to help you kickstart your API development with best p
 - `req.app.get("cache_settings")()`: Global application settings are cached in a function for efficient access, with optional support for Redis Pub/Sub to dynamically propagate and update values in real-time across the application
   - `.pri`: use internally by the application
   - `.pub`: can be exposed to clients
+- `req.app.get("cache_guards")()`: Centralized cache of route guards for role authorization
 
 ### Request Extensions
 - `req.credentials`: .jwt payload object from verified jwt header, .user() get the current authenticated user information, .authentication() details of token saved from database
