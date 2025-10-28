@@ -1,9 +1,6 @@
 import {Knex} from "knex";
 
 export async function seed(knex: Knex): Promise<void> {
-    // Deletes ALL existing entries
-    await knex("settings").del();
-
     // Inserts seed entries
     await knex("settings").insert([
         {name: 'Max Login Tries', slug: 'mx_log_try', value: '5', type: 'integer', is_public: 0},
