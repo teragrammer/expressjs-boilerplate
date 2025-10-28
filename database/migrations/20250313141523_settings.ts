@@ -6,7 +6,7 @@ export async function up(knex: Knex): Promise<void> {
         table.increments('id').primary();
 
         table.string('name', 100).unique().notNullable();
-        table.string('slug', 100).unique().notNullable();
+        table.string('slug', 100).unique().index().notNullable();
         table.text('value').nullable();
         table.text('description', 'tinytext').nullable();
         table.enum('type', DATA_TYPES).defaultTo('string');
@@ -14,7 +14,7 @@ export async function up(knex: Knex): Promise<void> {
         table.boolean('is_disabled').notNullable().defaultTo(0);
         table.boolean('is_public').notNullable().defaultTo(1);
 
-        table.dateTime('created_at').nullable();
+        table.dateTime('created_at').index().nullable();
         table.dateTime('updated_at').nullable();
     });
 }

@@ -4,7 +4,7 @@ export async function up(knex: Knex): Promise<void> {
     return knex.schema.createTable('two_factor_authentications', table => {
         table.increments('id').primary();
 
-        table.integer('token_id').unsigned().nullable().unique();
+        table.integer('token_id').index().unsigned().nullable().unique();
         table.foreign('token_id')
             .references('authentication_tokens.id')
             .onUpdate('CASCADE')
@@ -13,12 +13,12 @@ export async function up(knex: Knex): Promise<void> {
         table.string('code', 100).notNullable();
         table.integer('tries', 10).defaultTo(0).notNullable();
 
-        table.dateTime('next_send_at').nullable();
-        table.dateTime('expired_tries_at').nullable();
+        table.dateTime('next_send_at').index().nullable();
+        table.dateTime('expired_tries_at').index().nullable();
 
-        table.dateTime('created_at').nullable();
+        table.dateTime('created_at').index().nullable();
         table.dateTime('updated_at').nullable();
-        table.dateTime('expired_at').nullable();
+        table.dateTime('expired_at').index().nullable();
     });
 }
 

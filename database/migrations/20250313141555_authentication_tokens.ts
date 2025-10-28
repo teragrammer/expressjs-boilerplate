@@ -4,15 +4,15 @@ export async function up(knex: Knex): Promise<void> {
     return knex.schema.createTable('authentication_tokens', table => {
         table.increments('id').primary();
 
-        table.integer('user_id').unsigned().nullable();
+        table.integer('user_id').unsigned().index().nullable();
         table.foreign('user_id')
             .references('users.id')
             .onUpdate('CASCADE')
             .onDelete('CASCADE');
 
-        table.dateTime('created_at').nullable();
+        table.dateTime('created_at').index().nullable();
         table.dateTime('updated_at').nullable();
-        table.dateTime('expired_at').nullable();
+        table.dateTime('expired_at').index().nullable();
     });
 }
 

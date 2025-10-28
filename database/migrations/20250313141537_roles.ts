@@ -5,11 +5,11 @@ export async function up(knex: Knex): Promise<void> {
         table.increments('id').primary();
 
         table.string('name', 100).notNullable();
-        table.string('slug', 100).unique().notNullable();
+        table.string('slug', 100).unique().index().notNullable();
         table.text('description', 'tinytext').nullable();
         table.boolean('is_public').notNullable().defaultTo(0);
 
-        table.dateTime('created_at').nullable();
+        table.dateTime('created_at').index().nullable();
         table.dateTime('updated_at').nullable();
     });
 }

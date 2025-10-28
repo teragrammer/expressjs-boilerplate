@@ -11,19 +11,19 @@ export async function up(knex: Knex): Promise<void> {
         table.enum('gender', GENDERS).nullable();
 
         table.text('address', 'tinytext').nullable();
-        table.string('phone', 22).unique().nullable();
+        table.string('phone', 22).unique().index().nullable();
         table.boolean('is_phone_verified').defaultTo(0).notNullable();
-        table.string('email', 180).unique().nullable();
+        table.string('email', 180).unique().index().nullable();
         table.boolean('is_email_verified').defaultTo(0).notNullable();
 
         // user type
-        table.integer('role_id').unsigned().notNullable();
+        table.integer('role_id').unsigned().index().notNullable();
         table.foreign('role_id')
             .references('roles.id')
             .onUpdate('CASCADE')
             .onDelete('CASCADE');
 
-        table.string('username', 16).unique().nullable();
+        table.string('username', 16).unique().index().nullable();
         table.text('password', 'tinytext').nullable();
         table.enum('status', STATUSES).defaultTo('Activated');
 
@@ -32,9 +32,9 @@ export async function up(knex: Knex): Promise<void> {
 
         table.text('comments', 'tinytext').nullable();
 
-        table.dateTime('created_at').nullable();
+        table.dateTime('created_at').index().nullable();
         table.dateTime('updated_at').nullable();
-        table.dateTime('deleted_at').nullable();
+        table.dateTime('deleted_at').index().nullable();
     });
 }
 
