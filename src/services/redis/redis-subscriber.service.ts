@@ -1,7 +1,7 @@
 import {logger} from "../../configurations/logger";
 import {DBRedis} from "../../configurations/redis";
 
-export const SubscribeRedisTo = (name: string) => {
+export const RedisSubscriberService = (name: string) => {
     if (!DBRedis.subscriber) return;
 
     DBRedis.subscriber.subscribe(name, (err: Error | null | undefined, count: number | unknown) => {
