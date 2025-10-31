@@ -2,13 +2,13 @@ import {Request, Response} from "express";
 import Joi from "joi";
 import errors from "../../configurations/errors";
 import {logger} from "../../configurations/logger";
-import {CACHE_SETT_NAME, DATA_TYPES, InitializerSettingInterface, SettingModel} from "../../models/setting.model";
+import {CACHE_SETT_NAME, DATA_TYPES, SettingModel} from "../../models/setting.model";
 import {DateUtil} from "../../utilities/date.util";
 import {ExtendJoiUtil} from "../../utilities/extend-joi.util";
 import {SettingInterface} from "../../interfaces/setting.interface";
 import {Knex} from "knex";
-import {DBRedisInterface} from "../../configurations/redis";
-import {SecurityUtil} from "../../utilities/security.util";
+import {SettingService} from "../../services/data/setting.service";
+import {PUBLISHING_CACHE} from "../../services/redis/redis-publisher.service";
 
 class Controller {
     browse = async (req: Request, res: Response): Promise<any> => {
@@ -24,7 +24,7 @@ class Controller {
         if (TYPE !== null) Q.where("type", TYPE);
 
         const KEYWORD: any = req.sanitize.query.get("search");
-        if (typeof KEYWORD !== "undefined") {
+        if (KEYWORD !== null) {
             Q.where((queryBuilder: any) => {
                 queryBuilder.where("name", "LIKE", `%${KEYWORD}%`)
                     .orWhere("slug", "LIKE", `%${KEYWORD}%`)
@@ -78,7 +78,7 @@ class Controller {
                 .insert(DATA);
 
             // update the local cache and publish newly created setting
-            if (RESULT.length) await PUBLISHING_CACHE(req, KNEX, req.app.get("redis"));
+            if (RESULT.length) await PUBLISHING_CACHE(req, CACHE_SETT_NAME, await SettingService().initializer(req.app.get("knex")));
 
             res.status(200).json({id: RESULT[0]});
         } catch (e) {
@@ -113,7 +113,7 @@ class Controller {
                 .update(DATA);
 
             // update the local cache and publish newly updated setting
-            if (RESULT === 1) await PUBLISHING_CACHE(req, KNEX, req.app.get("redis"));
+            if (RESULT === 1) await PUBLISHING_CACHE(req, CACHE_SETT_NAME, await SettingService().initializer(req.app.get("knex")));
 
             res.status(200).json({result: RESULT === 1});
         } catch (e) {
@@ -135,35 +135,11 @@ class Controller {
             .delete();
 
         // update the local cache and publish newly updated setting
-        if (RESULT === 1) await PUBLISHING_CACHE(req, KNEX, req.app.get("redis"));
+        if (RESULT === 1) await PUBLISHING_CACHE(req, CACHE_SETT_NAME, await SettingService().initializer(req.app.get("knex")));
 
         res.status(200).json({result: RESULT === 1});
     };
 }
-
-const PUBLISHING_CACHE = async (req: Request, knex: Knex, redis: DBRedisInterface) => {
-    try {
-        const initializer: InitializerSettingInterface = await SettingModel(knex).initializer();
-
-        // set local copy of setting
-        req.app.set(CACHE_SETT_NAME, (): Readonly<InitializerSettingInterface> => Object.freeze(initializer));
-
-        // publish the newly updated settings
-        if (redis.publisher) {
-            const DATA = JSON.stringify(req.app.get(CACHE_SETT_NAME)());
-            const HASHED_DATA = await SecurityUtil().hash(DATA);
-            const PAYLOAD = JSON.stringify({
-                data: await SecurityUtil().encrypt(DATA),
-                hashed: HASHED_DATA,
-            });
-
-            await redis.publisher.publish(CACHE_SETT_NAME, SecurityUtil().encodeUrlBase64(PAYLOAD));
-            logger.info(`Redis new setting cache publish`);
-        }
-    } catch (err: any) {
-        logger.error(`Reinitializing redis failed: ${err}`);
-    }
-};
 
 const SettingController = new Controller();
 export default SettingController;

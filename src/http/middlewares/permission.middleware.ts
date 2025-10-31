@@ -1,7 +1,7 @@
 import {NextFunction, Request, Response} from "express";
 import errors from "../../configurations/errors";
 
-export function PermissionMiddleware(roles: string[], isHalt = true) {
+export function PermissionMiddleware(route: string, isHalt = true) {
     return async function (req: Request, res: Response, next: NextFunction) {
         const CREDENTIALS = req.credentials;
 
@@ -10,9 +10,21 @@ export function PermissionMiddleware(roles: string[], isHalt = true) {
             message: errors.EXPIRED_AUTH_TOKEN.message,
         });
 
-        if (CREDENTIALS) {
+        if (CREDENTIALS && isHalt) {
+            const GUARDS: Record<string, string[]> = req.app.get("cache_guards")();
             const ROLE: string | undefined = CREDENTIALS.jwt.rol;
-            if ((!ROLE || !roles.includes(ROLE)) && isHalt) return res.status(403).json({
+
+            if (!GUARDS || !ROLE) return res.status(403).json({
+                code: "AUTH_PERM_CACHE",
+                message: errors.NO_PERMISSION.message,
+            });
+
+            if (typeof GUARDS[ROLE] === "undefined") return res.status(403).json({
+                code: "AUTH_PERM_UNDEFINED",
+                message: errors.NO_PERMISSION.message,
+            });
+
+            if (!GUARDS[ROLE].includes(route)) return res.status(403).json({
                 code: "AUTH_PERM_UNAUTHORIZED",
                 message: errors.NO_PERMISSION.message,
             });
