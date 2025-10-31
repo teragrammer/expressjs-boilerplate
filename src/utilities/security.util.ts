@@ -90,5 +90,27 @@ export function SecurityUtil() {
 
             return Buffer.from(base64, "base64").toString();
         },
+
+        async shield(data: string): Promise<string> {
+            const HASHED_DATA = await SecurityUtil().hash(data);
+            const PAYLOAD = JSON.stringify({
+                data: await SecurityUtil().encrypt(data),
+                hashed: HASHED_DATA,
+            });
+
+            return SecurityUtil().encodeUrlBase64(PAYLOAD);
+        },
+
+        async unshield(message: string): Promise<any> {
+            const DECODED_MESSAGE = SecurityUtil().decodeUrlBase64(message);
+            const PARSE_PAYLOAD = JSON.parse(DECODED_MESSAGE);
+            const DECRYPTED_DATA = await SecurityUtil().decrypt(PARSE_PAYLOAD.data);
+
+            if (await SecurityUtil().compare(PARSE_PAYLOAD.hashed, DECRYPTED_DATA)) {
+                return DECRYPTED_DATA;
+            } else {
+                throw Error("Data integrity check failed");
+            }
+        }
     };
 }
