@@ -1,5 +1,6 @@
 import {NextFunction, Request, Response} from "express";
 import errors from "../../configurations/errors";
+import {GET_CACHE_GUARDS} from "../../models/route-guard.model";
 
 export function PermissionMiddleware(route: string, isHalt = true) {
     return async function (req: Request, res: Response, next: NextFunction) {
@@ -11,7 +12,7 @@ export function PermissionMiddleware(route: string, isHalt = true) {
         });
 
         if (CREDENTIALS && isHalt) {
-            const GUARDS: Record<string, string[]> = req.app.get("cache_guards")();
+            const GUARDS: Record<string, string[]> = await req.app.get(GET_CACHE_GUARDS)();
             const ROLE: string | undefined = CREDENTIALS.jwt.rol;
 
             if (!GUARDS || !ROLE) return res.status(403).json({
