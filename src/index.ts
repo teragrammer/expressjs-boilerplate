@@ -12,8 +12,8 @@ import cluster from "node:cluster";
 import errors from "./configurations/errors";
 import {DBKnex} from "./configurations/knex";
 import {DBRedis} from "./configurations/redis";
-import {CACHE_SETT_NAME, InitializerSettingInterface} from "./models/setting.model";
-import {CACHE_GUARD_NAME} from "./models/route-guard.model";
+import {GET_CACHE_SETTINGS, InitializerSettingInterface, SET_CACHE_SETTINGS} from "./models/setting.model";
+import {GET_CACHE_GUARDS, SET_CACHE_GUARDS} from "./models/route-guard.model";
 import requestMiddleware from "./http/middlewares/request.middleware";
 import {RedisSubscriberService} from "./services/redis/redis-subscriber.service";
 import {RedisEventService} from "./services/redis/redis-event.service";
@@ -58,12 +58,12 @@ app.set("redis", DBRedis);
 app.use(requestMiddleware);
 
 // cache application settings and route guards
-SettingService().initializer(DBKnex).then((keyValues: InitializerSettingInterface) => app.set(CACHE_SETT_NAME, (): Readonly<InitializerSettingInterface> => Object.freeze(keyValues)));
-RouteGuardService().initializer(DBKnex).then((guards: Record<string, string[]>) => app.set(CACHE_GUARD_NAME, (): Readonly<Record<string, string[]>> => Object.freeze(guards)));
+app.set(GET_CACHE_SETTINGS, (): Promise<Readonly<InitializerSettingInterface>> => SettingService().caching(app));
+app.set(GET_CACHE_GUARDS, (): Promise<Readonly<Record<string, string[]>>> => RouteGuardService().caching(app));
 
 // subscribe to redis events
-RedisSubscriberService(CACHE_SETT_NAME);
-RedisSubscriberService(CACHE_GUARD_NAME);
+RedisSubscriberService(SET_CACHE_SETTINGS);
+RedisSubscriberService(SET_CACHE_GUARDS);
 // received redis events
 RedisEventService(app);
 
