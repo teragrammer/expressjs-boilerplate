@@ -1,7 +1,15 @@
 import {SettingKeyValueInterface} from "../../interfaces/setting-key-value.interface";
-import {InitializerSettingInterface, SettingModel} from "../../models/setting.model";
+import {SET_CACHE_SETTINGS, InitializerSettingInterface, SettingModel} from "../../models/setting.model";
 import {Knex} from "knex";
 import {SettingInterface} from "../../interfaces/setting.interface";
+import {__ENV} from "../../configurations/environment";
+import {Application} from "express";
+import {IS_REDIS_CONNECTION_ACTIVE} from "../redis/redis-publisher.service";
+
+export interface SettingValueOptionInterface {
+    slug: string [];
+    is_public?: number;
+}
 
 const INITIALIZER = async (knex: Knex): Promise<InitializerSettingInterface> => {
     const INTERNAL: SettingKeyValueInterface = await SettingModel(knex).value();
@@ -12,11 +20,6 @@ const INITIALIZER = async (knex: Knex): Promise<InitializerSettingInterface> => 
         pub: EXTERNAL,
     };
 };
-
-export interface SettingValueOptionInterface {
-    slug: string [];
-    is_public?: number;
-}
 
 const QUERY_SETTINGS = async (knex: Knex, slug: string [] = [], is_public?: number): Promise<SettingInterface[]> => {
     const PREPARED_QUERY = SettingModel(knex).table().where("is_disabled", 0);
@@ -52,9 +55,26 @@ const VALUE = async (knex: Knex, options: SettingValueOptionInterface): Promise<
     return OBJ_KEY;
 };
 
+const GET_CACHED_SETTINGS = async (app: Application): Promise<Readonly<InitializerSettingInterface>> => {
+    const CACHE = app.get(SET_CACHE_SETTINGS);
+    if (CACHE) return CACHE();
+
+    const SETTINGS: InitializerSettingInterface = await INITIALIZER(app.get("knex"));
+    app.set(SET_CACHE_SETTINGS, (): Readonly<any> => Object.freeze(SETTINGS));
+
+    return Object.freeze(SETTINGS);
+};
+
+const CACHING = async (app: Application): Promise<Readonly<InitializerSettingInterface>> => {
+    if (!IS_REDIS_CONNECTION_ACTIVE(app) && __ENV.CLUSTER) return Object.freeze(INITIALIZER(app.get("knex")));
+
+    return GET_CACHED_SETTINGS(app);
+};
+
 export const SettingService = () => {
     return {
         initializer: INITIALIZER,
         value: VALUE,
+        caching: CACHING,
     };
 };
