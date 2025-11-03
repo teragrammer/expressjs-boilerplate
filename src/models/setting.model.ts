@@ -5,7 +5,9 @@ import {SettingService} from "../services/data/setting.service";
 const TABLE_NAME = "settings";
 
 export const DATA_TYPES = ["string", "integer", "float", "boolean", "array"];
-export const CACHE_SETT_NAME = "cache_settings";
+
+export const SET_CACHE_SETTINGS = "set_cache_settings";
+export const GET_CACHE_SETTINGS = "get_cache_settings";
 
 export interface InitializerSettingInterface {
     pri: SettingKeyValueInterface;
