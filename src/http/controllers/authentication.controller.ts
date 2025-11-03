@@ -5,7 +5,7 @@ import {UserInterface} from "../../interfaces/user.interface";
 import {UserModel} from "../../models/user.model";
 import {DateUtil} from "../../utilities/date.util";
 import {SecurityUtil} from "../../utilities/security.util";
-import {CACHE_SETT_NAME, SettingModel} from "../../models/setting.model";
+import {GET_CACHE_SETTINGS} from "../../models/setting.model";
 import {AuthenticationTokenModel} from "../../models/authentication-token.model";
 import {ExtendJoiUtil} from "../../utilities/extend-joi.util";
 import {SettingKeyValueInterface} from "../../interfaces/setting-key-value.interface";
@@ -56,7 +56,7 @@ class Controller {
             await UserModel(KNEX).table().where("id", USER.id).increment("login_tries");
 
             // application settings
-            const SETTINGS: SettingKeyValueInterface = req.app.get(CACHE_SETT_NAME)().pri;
+            const SETTINGS: SettingKeyValueInterface = (await req.app.get(GET_CACHE_SETTINGS)()).pri;
 
             // update login tries
             const TOTAL_LOGIN_TRIES = (typeof Number(USER.login_tries) + 1 != undefined) ? Number(USER.login_tries) + 1 : 0;

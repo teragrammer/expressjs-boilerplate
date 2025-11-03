@@ -2,7 +2,7 @@ import {Request, Response} from "express";
 import Joi from "joi";
 import errors from "../../configurations/errors";
 import {logger} from "../../configurations/logger";
-import {CACHE_SETT_NAME, DATA_TYPES, SettingModel} from "../../models/setting.model";
+import {SET_CACHE_SETTINGS, GET_CACHE_SETTINGS, DATA_TYPES, SettingModel} from "../../models/setting.model";
 import {DateUtil} from "../../utilities/date.util";
 import {ExtendJoiUtil} from "../../utilities/extend-joi.util";
 import {SettingInterface} from "../../interfaces/setting.interface";
@@ -40,7 +40,7 @@ class Controller {
     };
 
     values = async (req: Request, res: Response): Promise<any> => {
-        res.status(200).json(req.app.get(CACHE_SETT_NAME)().pub);
+        res.status(200).json((await req.app.get(GET_CACHE_SETTINGS)()).pub);
     };
 
     view = async (req: Request, res: Response): Promise<any> => {
@@ -78,7 +78,7 @@ class Controller {
                 .insert(DATA);
 
             // update the local cache and publish newly created setting
-            if (RESULT.length) await PUBLISHING_CACHE(req, CACHE_SETT_NAME, await SettingService().initializer(req.app.get("knex")));
+            if (RESULT.length) await PUBLISHING_CACHE(req, SET_CACHE_SETTINGS, await SettingService().initializer(req.app.get("knex")));
 
             res.status(200).json({id: RESULT[0]});
         } catch (e) {
@@ -113,7 +113,7 @@ class Controller {
                 .update(DATA);
 
             // update the local cache and publish newly updated setting
-            if (RESULT === 1) await PUBLISHING_CACHE(req, CACHE_SETT_NAME, await SettingService().initializer(req.app.get("knex")));
+            if (RESULT === 1) await PUBLISHING_CACHE(req, SET_CACHE_SETTINGS, await SettingService().initializer(req.app.get("knex")));
 
             res.status(200).json({result: RESULT === 1});
         } catch (e) {
@@ -135,7 +135,7 @@ class Controller {
             .delete();
 
         // update the local cache and publish newly updated setting
-        if (RESULT === 1) await PUBLISHING_CACHE(req, CACHE_SETT_NAME, await SettingService().initializer(req.app.get("knex")));
+        if (RESULT === 1) await PUBLISHING_CACHE(req, SET_CACHE_SETTINGS, await SettingService().initializer(req.app.get("knex")));
 
         res.status(200).json({result: RESULT === 1});
     };

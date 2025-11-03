@@ -12,7 +12,7 @@ import {SettingKeyValueInterface} from "../../interfaces/setting-key-value.inter
 import {AuthenticationTokenModel} from "../../models/authentication-token.model";
 import {ExtendJoiUtil} from "../../utilities/extend-joi.util";
 import {Knex} from "knex";
-import {CACHE_SETT_NAME} from "../../models/setting.model";
+import {GET_CACHE_SETTINGS} from "../../models/setting.model";
 
 class Controller {
     send = async (req: Request, res: Response): Promise<any> => {
@@ -74,7 +74,7 @@ class Controller {
 
             // send the code to email
             if (__ENV.NODE_ENV === "production") {
-                const SETTINGS: SettingKeyValueInterface = req.app.get(CACHE_SETT_NAME)().pri;
+                const SETTINGS: SettingKeyValueInterface = (await req.app.get(GET_CACHE_SETTINGS)()).pri;
 
                 try {
                     await sgMail.send({
