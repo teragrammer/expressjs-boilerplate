@@ -6,7 +6,7 @@ import {DateUtil} from "../../utilities/date.util";
 import {ExtendJoiUtil} from "../../utilities/extend-joi.util";
 import {Knex} from "knex";
 import {RouteGuardInterface} from "../../interfaces/route-guard.interface";
-import {CACHE_GUARD_NAME, RouteGuardModel} from "../../models/route-guard.model";
+import {SET_CACHE_GUARDS, RouteGuardModel} from "../../models/route-guard.model";
 import {RouteGuardService} from "../../services/data/route-guard.service";
 import {PUBLISHING_CACHE} from "../../services/redis/redis-publisher.service";
 
@@ -63,7 +63,7 @@ class Controller {
             });
 
             // update the local cache and publish newly updated setting
-            if (RESULT.length) await PUBLISHING_CACHE(req, CACHE_GUARD_NAME, await RouteGuardService().initializer(req.app.get("knex")));
+            if (RESULT.length) await PUBLISHING_CACHE(req, SET_CACHE_GUARDS, await RouteGuardService().initializer(req.app.get("knex")));
 
             res.status(200).json({id: RESULT[0]});
         } catch (e) {
@@ -85,7 +85,7 @@ class Controller {
             .delete();
 
         // update the local cache and publish newly updated setting
-        if (RESULT === 1) await PUBLISHING_CACHE(req, CACHE_GUARD_NAME, await RouteGuardService().initializer(req.app.get("knex")));
+        if (RESULT === 1) await PUBLISHING_CACHE(req, SET_CACHE_GUARDS, await RouteGuardService().initializer(req.app.get("knex")));
 
         res.status(200).json({result: RESULT === 1});
     };
