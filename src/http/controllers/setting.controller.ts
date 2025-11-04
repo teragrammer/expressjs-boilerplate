@@ -78,7 +78,7 @@ class Controller {
                 .insert(DATA);
 
             // update the local cache and publish newly created setting
-            if (RESULT.length) await PUBLISHING_CACHE(req, SET_CACHE_SETTINGS, await SettingService().initializer(req.app.get("knex")));
+            if (RESULT.length) await PUBLISHING_CACHE(req, SET_CACHE_SETTINGS, await SettingService().initializer(KNEX));
 
             res.status(200).json({id: RESULT[0]});
         } catch (e) {
@@ -113,7 +113,7 @@ class Controller {
                 .update(DATA);
 
             // update the local cache and publish newly updated setting
-            if (RESULT === 1) await PUBLISHING_CACHE(req, SET_CACHE_SETTINGS, await SettingService().initializer(req.app.get("knex")));
+            if (RESULT === 1) await PUBLISHING_CACHE(req, SET_CACHE_SETTINGS, await SettingService().initializer(KNEX));
 
             res.status(200).json({result: RESULT === 1});
         } catch (e) {
@@ -135,7 +135,7 @@ class Controller {
             .delete();
 
         // update the local cache and publish newly updated setting
-        if (RESULT === 1) await PUBLISHING_CACHE(req, SET_CACHE_SETTINGS, await SettingService().initializer(req.app.get("knex")));
+        if (RESULT === 1) await PUBLISHING_CACHE(req, SET_CACHE_SETTINGS, await SettingService().initializer(KNEX));
 
         res.status(200).json({result: RESULT === 1});
     };

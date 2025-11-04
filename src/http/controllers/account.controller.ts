@@ -7,6 +7,7 @@ import {SecurityUtil} from "../../utilities/security.util";
 import {ExtendJoiUtil} from "../../utilities/extend-joi.util";
 import {Knex} from "knex";
 import {DateUtil} from "../../utilities/date.util";
+import {UserInterface} from "../../interfaces/user.interface";
 
 class Controller {
     information = async (req: Request, res: Response): Promise<any> => {
@@ -38,7 +39,7 @@ class Controller {
 
     password = async (req: Request, res: Response): Promise<any> => {
         const KNEX: Knex = req.app.get("knex");
-        const ACCOUNT = await req.credentials.user();
+        const ACCOUNT: UserInterface = await req.credentials.user();
 
         const DATA = req.sanitize.body.only(["current_password", "new_password", "username", "email", "phone"]);
         if (await ExtendJoiUtil().response(Joi.object({

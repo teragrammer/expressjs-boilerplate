@@ -64,6 +64,7 @@ app.set(GET_CACHE_GUARDS, (): Promise<Readonly<Record<string, string[]>>> => Rou
 // subscribe to redis events
 RedisSubscriberService(SET_CACHE_SETTINGS);
 RedisSubscriberService(SET_CACHE_GUARDS);
+
 // received redis events
 RedisEventService(app);
 

@@ -10,6 +10,12 @@ export function UserModel(knex: Knex) {
     return {
         table: () => knex.table(TABLE_NAME),
 
+        hidden(user: UserInterface) {
+            delete user.password;
+            delete user.failed_login_expired_at;
+            delete user.login_tries;
+        },
+
         profile: async (id: number): Promise<UserInterface> => {
             return knex.table(TABLE_NAME)
                 .select([

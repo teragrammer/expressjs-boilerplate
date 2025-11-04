@@ -3,6 +3,7 @@ import jwt, {JwtPayload} from "jsonwebtoken";
 import {DateUtil} from "../utilities/date.util";
 import {UserInterface} from "../interfaces/user.interface";
 import {__ENV} from "../configurations/environment";
+import {UserModel} from "./user.model";
 
 const TABLE_NAME = "authentication_tokens";
 
@@ -27,39 +28,33 @@ export function AuthenticationTokenModel(knex: Knex) {
     return {
         table: () => knex.table(TABLE_NAME),
 
-        hidden(user: UserInterface) {
-            delete user.password;
-            delete user.failed_login_expired_at;
-            delete user.login_tries;
-        },
-
         async generate(user: UserInterface) {
             // remove private data
-            this.hidden(user);
+            UserModel(knex).hidden(user);
 
             // delete expired tokens
             await this.clean(user.id);
 
             // generate a new token
-            const token = await this.token(user);
+            const TOKEN = await this.token(user);
 
             return {
                 user,
-                token,
+                token: TOKEN,
             };
         },
 
         async token(user: UserInterface, tfa?: string): Promise<string> {
-            const expiredAt = DateUtil().expiredAt(JWT_EXPIRATION_DAYS / 86400, "days");
-            const data: any = {
+            const EXPIRED_AT = DateUtil().expiredAt(JWT_EXPIRATION_DAYS / 86400, "days");
+            const DATA: any = {
                 user_id: user.id,
                 created_at: DateUtil().sql(),
-                expired_at: DateUtil().sql(expiredAt),
+                expired_at: DateUtil().sql(EXPIRED_AT),
             };
-            let id: any = await knex.table(TABLE_NAME).returning("id").insert(data);
+            let id: any = await knex.table(TABLE_NAME).returning("id").insert(DATA);
             if (!id.length) throw new Error("Unable to create a new token");
 
-            const payload: JwtExtendedPayload = {
+            const PAYLOAD: JwtExtendedPayload = {
                 uid: user.id,
                 fnm: user.first_name,
                 mnm: user.middle_name,
@@ -72,17 +67,17 @@ export function AuthenticationTokenModel(knex: Knex) {
                 tfa: tfa !== undefined ? tfa : (JWT_TFA ? "hol" : "con"),
             };
 
-            return jwt.sign(payload, JWT_SECRET, {expiresIn: JWT_EXPIRATION_DAYS});
+            return jwt.sign(PAYLOAD, JWT_SECRET, {expiresIn: JWT_EXPIRATION_DAYS});
         },
 
         async validate(token: string): Promise<JwtExtendedPayload | boolean> {
             if (!token) return false;
 
             try {
-                const decoded = jwt.verify(token, JWT_SECRET);
+                const DECODED = jwt.verify(token, JWT_SECRET);
 
                 // Ensure it's a JwtExtendedPayload (not just a string)
-                if (typeof decoded === "object") return decoded as JwtExtendedPayload;
+                if (typeof DECODED === "object") return DECODED as JwtExtendedPayload;
 
                 return false;
             } catch (error: any) {
