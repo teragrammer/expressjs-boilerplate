@@ -31,4 +31,12 @@ describe("security.util.ts", () => {
 
         expect(plain).to.equal(decoded);
     });
+
+    it("shield and unshield data", async () => {
+        const plain = "this is a test for shielded data";
+        const encode = await SecurityUtil().shield(plain);
+        const decoded = await SecurityUtil().unshield(encode);
+
+        expect(plain).to.equal(decoded);
+    });
 });
