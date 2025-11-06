@@ -8,6 +8,7 @@ import {ExtendJoiUtil} from "../../utilities/extend-joi.util";
 import {Knex} from "knex";
 import {DateUtil} from "../../utilities/date.util";
 import {UserInterface} from "../../interfaces/user.interface";
+import {AuthenticationTokenModel} from "../../models/authentication-token.model";
 
 class Controller {
     information = async (req: Request, res: Response): Promise<any> => {
@@ -16,17 +17,27 @@ class Controller {
             first_name: Joi.string().min(1).max(100).required(),
             middle_name: Joi.string().min(1).max(100).allow(null, ""),
             last_name: Joi.string().min(1).max(100).required(),
-            address: Joi.string().max(100).allow(null, ""),
+            address: Joi.string().min(10).max(255).allow(null, ""),
         }), DATA, res)) return;
 
         try {
-            DATA.updated_at = DateUtil().sql();
-            const RESULT = await UserModel(req.app.get("knex")).table()
+            const KNEX: Knex = req.app.get("knex");
+            const RESULT = await UserModel(KNEX).table()
                 .where("id", req.credentials.jwt.uid)
                 .where("status", "Activated")
                 .update(DATA);
 
-            res.status(200).json({result: RESULT === 1});
+            if (RESULT !== 1) return res.status(500).json({
+                code: errors.UPDATE_FAILED.code,
+                message: errors.UPDATE_FAILED.message,
+            });
+
+            // generate a token
+            const AUTHENTICATION = await AuthenticationTokenModel(KNEX).generate(await req.credentials.user());
+
+            res.status(200).json({
+                token: AUTHENTICATION.token,
+            });
         } catch (e) {
             logger.error(e);
 
@@ -44,12 +55,28 @@ class Controller {
         const DATA = req.sanitize.body.only(["current_password", "new_password", "username", "email", "phone"]);
         if (await ExtendJoiUtil().response(Joi.object({
             current_password: Joi.string().required(),
-            new_password: Joi.string().min(6).max(32),
-            username: Joi.string().min(2).max(16).custom(ExtendJoiUtil().unique(KNEX, "users", "username", ACCOUNT.id), errors.DUPLICATE_DATA.message),
-            email: Joi.string().email().max(180).custom(ExtendJoiUtil().unique(KNEX, "users", "email", ACCOUNT.id), errors.DUPLICATE_DATA.message),
+            new_password: Joi.string().min(8).max(32)
+                .pattern(/[A-Z]/)           // At least one uppercase letter
+                .pattern(/[a-z]/)           // At least one lowercase letter
+                .pattern(/[0-9]/)           // At least one number
+                .pattern(/[^A-Za-z0-9]/)    // At least one special character (e.g., !, @, #)
+                .messages({
+                    "string.min": "Password should be at least 8 characters long.",
+                    "string.max": "Password should be no longer than 32 characters.",
+                    "string.pattern.base": "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character.",
+                    "any.required": "Password is required.",
+                })
+                .allow(null, ""),
+            username: Joi.string().min(2).max(16)
+                .custom(ExtendJoiUtil().unique(KNEX, "users", "username", ACCOUNT.id), errors.DUPLICATE_DATA.message)
+                .allow(null, ""),
+            email: Joi.string().email().max(180)
+                .custom(ExtendJoiUtil().unique(KNEX, "users", "email", ACCOUNT.id), errors.DUPLICATE_DATA.message)
+                .allow(null, ""),
             phone: Joi.string().min(10).max(16)
                 .custom(ExtendJoiUtil().phone, "Phone Number Validation")
-                .custom(ExtendJoiUtil().unique(KNEX, "users", "phone", ACCOUNT.id), errors.DUPLICATE_DATA.message),
+                .custom(ExtendJoiUtil().unique(KNEX, "users", "phone", ACCOUNT.id), errors.DUPLICATE_DATA.message)
+                .allow(null, ""),
         }), DATA, res)) return;
 
         // verify the current password
@@ -74,7 +101,20 @@ class Controller {
                 .where("status", "Activated")
                 .update(DATA);
 
-            res.status(200).json({result: RESULT === 1});
+            if (RESULT !== 1) return res.status(500).json({
+                code: errors.UPDATE_FAILED.code,
+                message: errors.UPDATE_FAILED.message,
+            });
+
+            // generate a token
+            if (typeof DATA.username !== "undefined") ACCOUNT.username = DATA.username;
+            if (typeof DATA.email !== "undefined") ACCOUNT.email = DATA.email;
+            if (typeof DATA.phone !== "undefined") ACCOUNT.phone = DATA.phone;
+            const AUTHENTICATION = await AuthenticationTokenModel(KNEX).generate(ACCOUNT);
+
+            res.status(200).json({
+                token: AUTHENTICATION.token,
+            });
         } catch (e) {
             logger.error(e);
 
