@@ -42,7 +42,7 @@ const GET = (inputs: any, key: string, defaults: any = null) => {
         result[key] = TRIMMED(INPUT);
         result[key] = EMPTY_TO_NULL(INPUT);
 
-        return result;
+        return result[key];
     }
 
     return defaults;
