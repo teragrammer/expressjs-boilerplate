@@ -18,7 +18,7 @@ class Controller {
         const DATA = req.sanitize.body.only(["first_name", "middle_name", "last_name", "username", "password", "email"]);
         if (await ExtendJoiUtil().response(Joi.object({
             first_name: Joi.string().min(2).max(100).required(),
-            middle_name: Joi.string().min(2).max(100),
+            middle_name: Joi.string().min(2).max(100).allow(null, ""),
             last_name: Joi.string().min(1).max(100).required(),
             username: Joi.string().min(3).max(16).required().custom(ExtendJoiUtil().unique(KNEX, "users", "username"), errors.DUPLICATE_DATA.message),
             email: Joi.string().email().max(180).required().custom(ExtendJoiUtil().unique(KNEX, "users", "email"), errors.DUPLICATE_DATA.message),
