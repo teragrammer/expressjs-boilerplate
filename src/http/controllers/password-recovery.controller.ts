@@ -117,7 +117,7 @@ class Controller {
         }
 
         if (!await SecurityUtil().compare(RECOVERY.code, DATA.code)) {
-            await PasswordRecoveryModel(KNEX).table().increment("tries");
+            await PasswordRecoveryModel(KNEX).table().where("send_to", RECOVERY.send_to).increment("tries");
 
             return res.status(400).json({
                 code: errors.RECOVERY_CODE_INVALID.code,
