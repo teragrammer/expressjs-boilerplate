@@ -1,11 +1,14 @@
 import {Knex} from "knex";
+import {DBKnex} from "../configurations/knex";
 
-const TABLE_NAME = "password_recoveries";
+export const PASSWORD_RECOVERY_TABLE = "password_recoveries";
 
-export const TYPES = ["email", "phone"];
+export const RECOVERY_EMAIL = "email";
+export const RECOVERY_PHONE = "phone";
+export const TYPES: string[] = [RECOVERY_EMAIL, RECOVERY_PHONE];
 
-export function PasswordRecoveryModel(knex: Knex) {
+export function PasswordRecoveryModel(knex?: Knex) {
     return {
-        table: () => knex.table(TABLE_NAME),
+        table: () => (knex ? knex : DBKnex).table(PASSWORD_RECOVERY_TABLE),
     };
 }

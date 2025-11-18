@@ -1,9 +1,10 @@
 import {Knex} from "knex";
+import {DBKnex} from "../configurations/knex";
 
-const TABLE_NAME = "roles";
+export const ROLE_TABLE = "roles";
 
-export function RoleModel(knex: Knex) {
+export function RoleModel(knex?: Knex) {
     return {
-        table: () => knex.table(TABLE_NAME),
+        table: () => (knex ? knex : DBKnex).table(ROLE_TABLE),
     };
 }

@@ -1,9 +1,13 @@
 import {Knex} from "knex";
+import {DBKnex} from "../configurations/knex";
 
-const TABLE_NAME = "two_factor_authentications";
+export const TWO_FACTOR_AUTHENTICATION_TABLE = "two_factor_authentications";
 
-export function TwoFactorAuthenticationModel(knex: Knex) {
+export const TFA_HOLD = "hol";
+export const TFA_CONTINUE = "con";
+
+export function TwoFactorAuthenticationModel(knex?: Knex) {
     return {
-        table: () => knex.table(TABLE_NAME),
+        table: () => (knex ? knex : DBKnex).table(TWO_FACTOR_AUTHENTICATION_TABLE),
     };
 }

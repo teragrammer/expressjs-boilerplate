@@ -1,12 +1,12 @@
 import {Knex} from "knex";
+import {DBKnex} from "../configurations/knex";
 
-const TABLE_NAME = "route_guards";
+export const ROUTE_GUARD_TABLE = "route_guards";
 
 export const SET_CACHE_GUARDS = "set_cache_guards";
-export const GET_CACHE_GUARDS = "get_cache_guards";
 
-export function RouteGuardModel(knex: Knex) {
+export function RouteGuardModel(knex?: Knex) {
     return {
-        table: () => knex.table(TABLE_NAME),
+        table: () => (knex ? knex : DBKnex).table(ROUTE_GUARD_TABLE),
     };
 }
