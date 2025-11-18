@@ -1,6 +1,7 @@
 import fs from "fs";
 import Knex from "knex";
 import {__ENV} from "./environment";
+import {logger} from "./logger";
 
 const CONFIG: any = {
     client: __ENV.DB_CLIENT,
@@ -25,4 +26,30 @@ if (__ENV.DB_SSL) {
     };
 }
 
-export const DBKnex = Knex(CONFIG);
+const CONNECTION = Knex(CONFIG);
+
+async function checkConnection() {
+    try {
+        // Perform a simple query to check connection
+        await CONNECTION.raw("SELECT 1+1 AS result");
+    } catch (error) {
+        logger.error(`Knex failed to connect to the database: ${error}`);
+    }
+}
+
+// Connection checker
+checkConnection().then(() => {
+    logger.info("🤝 Connected to the database (KNEX)");
+});
+
+// Handle global error events
+CONNECTION.on("query-error", (error, obj) => {
+    logger.error(`Knex Query Error: ${error.message}`);
+    logger.error(`Knex Query Details: ${obj.sql}`);
+});
+
+CONNECTION.on("error", (error) => {
+    logger.error(`Knex Global Error: ${error.message}`);
+});
+
+export const DBKnex = CONNECTION;

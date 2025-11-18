@@ -31,7 +31,7 @@ if (__ENV.REDIS_HOST == "") {
     redisSubClient = redis.duplicate();
 
     redis.on("connect", () => {
-        logger.info("Connected to Redis over TLS ✅");
+        logger.info("🤝 Connected to Redis over TLS ✅");
     });
 
     redis.on("ready", () => {
