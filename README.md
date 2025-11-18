@@ -17,18 +17,6 @@ environment configuration to help you kickstart your API development with best p
 - Profile Information and Password Change
 - Application Settings (Can be manage by admin)
 
-### App Extensions
-
-- `req.app.get("knex")`: Registers knex database connection
-- `req.app.get("redis")`: Redis() and redis.duplicate() connection object via .publisher and .subscriber
-- `req.app.set(SET_CACHE_SETTINGS)`: Set the settings cache
-- `req.app.get(GET_CACHE_SETTINGS)`: Global application settings are cached in a async function for efficient access,
-  with optional support for Redis Pub/Sub to dynamically propagate and update values in real-time across the application
-    - `.pri`: use internally by the application
-    - `.pub`: can be exposed to clients
-- `req.app.get(SET_CACHE_GUARDS)`: Set the guards cache
-- `req.app.get(GET_CACHE_GUARDS)`: Centralized cache of route guards for role authorization
-
 ### Request Extensions
 
 - `req.credentials`: .jwt payload object from verified jwt header, .user() get the current authenticated user
