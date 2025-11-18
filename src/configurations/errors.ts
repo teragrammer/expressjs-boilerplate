@@ -24,6 +24,7 @@ const ERRORS = {
     EXCEED_RECOVERY: {code: "EXCEED_RECOVERY", message: "Recovery tries exceeded maximum limit"},
     RECOVERY_CODE_INVALID: {code: "RECOVERY_CODE_INVALID", message: "The provided recovery code is invalid"},
     UPDATE_FAILED: {code: "UPDATE_FAILED", message: "Unable to save changes. Please try again later"},
+    DELETE_FAILED: {code: "DELETE_FAILED", message: "Unable to delete the requested resource at this time. Please try again shortly"},
 }
 
 export default Object.freeze(ERRORS);
