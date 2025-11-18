@@ -9,8 +9,10 @@ export async function up(knex: Knex): Promise<void> {
         table.text('description', 'tinytext').nullable();
         table.boolean('is_public').notNullable().defaultTo(0);
 
-        table.dateTime('created_at').index().nullable();
-        table.dateTime('updated_at').nullable();
+        table.boolean("is_bypass_authorization").defaultTo(0).notNullable();
+
+        table.dateTime('created_at').index().defaultTo(knex.fn.now()).nullable();
+        table.dateTime('updated_at').defaultTo(knex.fn.now()).nullable();
     });
 }
 

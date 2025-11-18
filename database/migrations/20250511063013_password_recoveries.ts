@@ -15,8 +15,8 @@ export async function up(knex: Knex): Promise<void> {
         table.integer('tries').defaultTo(0).notNullable();
         table.dateTime('next_try_at').index().nullable();
 
-        table.dateTime('created_at').index().nullable();
-        table.dateTime('updated_at').nullable();
+        table.dateTime('created_at').index().defaultTo(knex.fn.now()).nullable();
+        table.dateTime('updated_at').defaultTo(knex.fn.now()).nullable();
     });
 }
 

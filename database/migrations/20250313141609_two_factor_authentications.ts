@@ -16,8 +16,8 @@ export async function up(knex: Knex): Promise<void> {
         table.dateTime('next_send_at').index().nullable();
         table.dateTime('expired_tries_at').index().nullable();
 
-        table.dateTime('created_at').index().nullable();
-        table.dateTime('updated_at').nullable();
+        table.dateTime('created_at').index().defaultTo(knex.fn.now()).nullable();
+        table.dateTime('updated_at').defaultTo(knex.fn.now()).nullable();
         table.dateTime('expired_at').index().nullable();
     });
 }

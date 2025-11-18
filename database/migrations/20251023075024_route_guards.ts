@@ -9,10 +9,11 @@ export async function up(knex: Knex): Promise<void> {
             .references("roles.id")
             .onUpdate("CASCADE")
             .onDelete("CASCADE");
+
         table.string("route", 100).notNullable();
 
-        table.dateTime("created_at").index().nullable();
-        table.dateTime("updated_at").nullable();
+        table.dateTime("created_at").index().defaultTo(knex.fn.now()).nullable();
+        table.dateTime("updated_at").defaultTo(knex.fn.now()).nullable();
     });
 }
 

@@ -1,8 +1,8 @@
 import {NextFunction, Request, Response} from "express";
 import errors from "../../configurations/errors";
-import {GET_CACHE_GUARDS} from "../../models/route-guard.model";
+import RouteGuardService from "../../services/data/route-guard.service";
 
-export function PermissionMiddleware(route: string, isHalt = true) {
+export function AuthorizationMiddleware(route: string, isHalt = true) {
     return async function (req: Request, res: Response, next: NextFunction) {
         const CREDENTIALS = req.credentials;
 
@@ -12,7 +12,10 @@ export function PermissionMiddleware(route: string, isHalt = true) {
         });
 
         if (CREDENTIALS && isHalt) {
-            const GUARDS: Record<string, string[]> = await req.app.get(GET_CACHE_GUARDS)();
+            const BYPASS: number | undefined = CREDENTIALS.jwt.bpa;
+            if (BYPASS === 1) return next();
+
+            const GUARDS: Record<string, string[]> = await RouteGuardService.getCache();
             const ROLE: string | undefined = CREDENTIALS.jwt.rol;
 
             if (!GUARDS || !ROLE) return res.status(403).json({

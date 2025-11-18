@@ -14,8 +14,8 @@ export async function up(knex: Knex): Promise<void> {
         table.boolean('is_disabled').notNullable().defaultTo(0);
         table.boolean('is_public').notNullable().defaultTo(1);
 
-        table.dateTime('created_at').index().nullable();
-        table.dateTime('updated_at').nullable();
+        table.dateTime('created_at').index().defaultTo(knex.fn.now()).nullable();
+        table.dateTime('updated_at').defaultTo(knex.fn.now()).nullable();
     });
 }
 
