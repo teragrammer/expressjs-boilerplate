@@ -4,7 +4,7 @@ import cors from "cors";
 import helmet from "helmet";
 import hpp from "hpp";
 import v1 from "./http/routes/v1";
-import useragent from "express-useragent";
+import {express as useragent} from "express-useragent";
 import compression from "compression";
 import {logger} from "./configurations/logger";
 import {__ENV} from "./configurations/environment";
@@ -12,13 +12,13 @@ import cluster from "node:cluster";
 import errors from "./configurations/errors";
 import {DBKnex} from "./configurations/knex";
 import {DBRedis} from "./configurations/redis";
-import {GET_CACHE_SETTINGS, InitializerSettingInterface, SET_CACHE_SETTINGS} from "./models/setting.model";
-import {GET_CACHE_GUARDS, SET_CACHE_GUARDS} from "./models/route-guard.model";
-import requestMiddleware from "./http/middlewares/request.middleware";
-import {RedisSubscriberService} from "./services/redis/redis-subscriber.service";
-import {RedisEventService} from "./services/redis/redis-event.service";
-import {SettingService} from "./services/data/setting.service";
-import {RouteGuardService} from "./services/data/route-guard.service";
+import {SET_CACHE_SETTINGS} from "./models/setting.model";
+import {SET_CACHE_GUARDS} from "./models/route-guard.model";
+import REQUEST_MIDDLEWARE from "./http/middlewares/request.middleware";
+import SettingService from "./services/data/setting.service";
+import RouteGuardService from "./services/data/route-guard.service";
+import RedisSubscriberService from "./services/redis/redis-subscriber.service";
+import RedisEventService from "./services/redis/redis-event.service";
 
 const app = express();
 
@@ -30,8 +30,11 @@ app.use(express.urlencoded({extended: true}));
 app.use(helmet());
 app.use(hpp());
 app.disable("x-powered-by");
-app.use(useragent.express());
+app.use(useragent());
 app.use(cors());
+
+// enable trust proxy to get correct IP when behind a proxy
+if (__ENV.HAS_PROXY) app.set("trust proxy", true);
 
 // compress response
 app.use(compression({
@@ -50,23 +53,19 @@ app.use((req: any, res: any, next: any) => {
     next();
 });
 
-// set database connection
-app.set("knex", DBKnex);
-app.set("redis", DBRedis);
-
 // custom middlewares
-app.use(requestMiddleware);
+app.use(REQUEST_MIDDLEWARE);
 
 // cache application settings and route guards
-app.set(GET_CACHE_SETTINGS, (): Promise<Readonly<InitializerSettingInterface>> => SettingService().caching(app));
-app.set(GET_CACHE_GUARDS, (): Promise<Readonly<Record<string, string[]>>> => RouteGuardService().caching(app));
+SettingService.boot().then(() => logger.info("Setting Cached"));
+RouteGuardService.boot().then(() => logger.info("Route Guard Cached"));
 
 // subscribe to redis events
-RedisSubscriberService(SET_CACHE_SETTINGS);
-RedisSubscriberService(SET_CACHE_GUARDS);
+RedisSubscriberService.subscribe(SET_CACHE_SETTINGS);
+RedisSubscriberService.subscribe(SET_CACHE_GUARDS);
 
 // received redis events
-RedisEventService(app);
+RedisEventService.onReceived();
 
 // routes with versioning
 app.use("/api/v1", v1());
@@ -83,10 +82,10 @@ app.use((err: any, _req: any, res: any) => {
 });
 
 // run the server
-let clusterWorkerSize = os.cpus().length;
-if (clusterWorkerSize > 1 && __ENV.CLUSTER) {
+const CLUSTER_SIZE_WORKER = os.cpus().length;
+if (CLUSTER_SIZE_WORKER > 1 && __ENV.CLUSTER) {
     if (cluster.isPrimary) {
-        for (let i = 0; i < clusterWorkerSize; i++) {
+        for (let i = 0; i < CLUSTER_SIZE_WORKER; i++) {
             cluster.fork();
         }
 
@@ -101,7 +100,7 @@ if (clusterWorkerSize > 1 && __ENV.CLUSTER) {
     }
 } else {
     app.listen(__ENV.PORT, () => {
-        logger.info(`⚡️ No cluster is enabled: ${clusterWorkerSize}`);
+        logger.info(`⚡️ No cluster is enabled: ${CLUSTER_SIZE_WORKER}`);
         logger.info(`⚡️ [server local]: Server is running at http://localhost:${__ENV.PORT}`);
         logger.info(`⚡️ [server expose]: Server is running at http://localhost:${__ENV.PORT_EXPOSE}`);
     });
