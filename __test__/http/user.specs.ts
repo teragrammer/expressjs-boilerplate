@@ -5,7 +5,8 @@ import app from "../../src";
 import {Credentials, mockCredential} from "../utils";
 import {UserInterface} from "../../src/interfaces/user.interface";
 import {RoleInterface} from "../../src/interfaces/role.interface";
-import {DBKnex} from "../../src/configurations/knex";
+import {RoleModel} from "../../src/models/role.model";
+import {UserModel} from "../../src/models/user.model";
 
 describe("HTTP Account", async () => {
     let credential: Credentials;
@@ -15,9 +16,9 @@ describe("HTTP Account", async () => {
 
     it("generate credential", async () => {
         credential = await mockCredential({role: "admin", username: "test_admin"});
-        role = await DBKnex.table("roles").where("slug", "customer").first();
+        role = await RoleModel().table().where("slug", "customer").first();
 
-        await DBKnex.table("users").where("phone", phone).delete();
+        await UserModel().table().where("phone", phone).delete();
     });
 
     it("POST /api/v1/users", async () => {
@@ -65,7 +66,7 @@ describe("HTTP Account", async () => {
             .set("Content-Type", "application/json")
             .set("Authorization", `Bearer ${credential.token}`)
             .then(async (response: any) => {
-                const user: UserInterface = await DBKnex.table("users").where("id", id).first();
+                const user: UserInterface = await UserModel().table().where("id", id).first();
 
                 assert.equal(response.status, 200);
                 assert.equal(user.first_name, newName);

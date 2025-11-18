@@ -5,13 +5,14 @@ import app from "../../src";
 import {Credentials, mockCredential} from "../utils";
 import {SettingInterface} from "../../src/interfaces/setting.interface";
 import {DBKnex} from "../../src/configurations/knex";
+import {SettingModel} from "../../src/models/setting.model";
 
 describe("HTTP Account", async () => {
     let credential: Credentials;
     let id: any;
 
     it("generate credential", async () => {
-        await DBKnex.table("settings").where("slug", "test").delete();
+        await SettingModel().table().where("slug", "test").delete();
 
         credential = await mockCredential({role: "admin", username: "test_admin"});
     });
@@ -50,7 +51,7 @@ describe("HTTP Account", async () => {
             .set("Content-Type", "application/json")
             .set("Authorization", `Bearer ${credential.token}`)
             .then(async (response: any) => {
-                const setting: SettingInterface = await DBKnex.table("settings").where("id", id).first();
+                const setting: SettingInterface = await SettingModel().table().where("id", id).first();
 
                 assert.equal(response.status, 200);
                 assert.equal(setting.name, newName);

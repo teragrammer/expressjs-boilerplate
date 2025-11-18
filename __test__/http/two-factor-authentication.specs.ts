@@ -5,12 +5,14 @@ import app from "../../src";
 import {Credentials, mockCredential} from "../utils";
 import {SecurityUtil} from "../../src/utilities/security.util";
 import {DBKnex} from "../../src/configurations/knex";
+import {SettingModel} from "../../src/models/setting.model";
+import {TwoFactorAuthenticationModel} from "../../src/models/two-factor-authentication.model";
 
 describe("HTTP Authentication", () => {
     let credential: Credentials;
 
     it("generate credential", async () => {
-        await DBKnex.table("settings").where("slug", "tta_req").update({value: "1"});
+        await SettingModel().table().where("slug", "tta_req").update({value: "1"});
 
         credential = await mockCredential({role: "customer", username: "test_customer", tfa: "hol"});
     });
@@ -22,7 +24,7 @@ describe("HTTP Authentication", () => {
             .set("Authorization", `Bearer ${credential.token}`)
             .then(async (response: any) => {
                 const code = await SecurityUtil().hash("123456");
-                await DBKnex.table("two_factor_authentications").where("id", response.body.id).update({code});
+                await TwoFactorAuthenticationModel().table().where("id", response.body.id).update({code});
 
                 assert.equal(response.status, 200);
             });
@@ -37,7 +39,7 @@ describe("HTTP Authentication", () => {
             .set("Content-Type", "application/json")
             .set("Authorization", `Bearer ${credential.token}`)
             .then(async (response: any) => {
-                await DBKnex.table("settings").where("slug", "tta_req").update({value: "0"});
+                await SettingModel().table().where("slug", "tta_req").update({value: "0"});
                 assert.equal(response.status, 200);
             });
     });

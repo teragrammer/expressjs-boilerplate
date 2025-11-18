@@ -6,6 +6,8 @@ import {Credentials, mockCredential} from "../utils";
 import {UserInterface} from "../../src/interfaces/user.interface";
 import {SecurityUtil} from "../../src/utilities/security.util";
 import {DBKnex} from "../../src/configurations/knex";
+import {UserModel} from "../../src/models/user.model";
+import {PasswordRecoveryModel} from "../../src/models/password-recovery.model";
 
 describe("HTTP Password Recovery", async () => {
     let credential: Credentials;
@@ -13,7 +15,7 @@ describe("HTTP Password Recovery", async () => {
 
     it("generate credential", async () => {
         credential = await mockCredential({role: "admin", username: "test_admin"});
-        user = await DBKnex.table("users").where("id", credential.user.id).first();
+        user = await UserModel().table().where("id", credential.user.id).first();
     });
 
     it("POST /api/v1/password-recovery/send", async () => {
@@ -57,7 +59,7 @@ describe("HTTP Password Recovery", async () => {
     });
 
     it("POST /api/v1/password-recovery/validate", async () => {
-        await DBKnex.table("password_recoveries")
+        await PasswordRecoveryModel().table()
             .where("send_to", user.email)
             .update({
                 code: await SecurityUtil().hash("123456"),

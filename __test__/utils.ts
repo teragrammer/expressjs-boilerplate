@@ -1,9 +1,11 @@
 import {RoleInterface} from "../src/interfaces/role.interface";
-import {AuthenticationTokenModel} from "../src/models/authentication-token.model";
-import {SecurityUtil} from "../src/utilities/security.util";
 import {UserInterface} from "../src/interfaces/user.interface";
-import {DBKnex} from "../src/configurations/knex";
+import UserRepository from "../src/repositories/user.repository";
+import AuthenticationTokenService from "../src/services/data/authentication-token.service";
 import {UserModel} from "../src/models/user.model";
+import {RoleModel} from "../src/models/role.model";
+import {SecurityUtil} from "../src/utilities/security.util";
+import {TFA_HOLD} from "../src/models/two-factor-authentication.model";
 
 export interface Options {
     role: string;
@@ -17,25 +19,26 @@ export interface Credentials {
 }
 
 export async function mockCredential(options: Options): Promise<Credentials> {
-    const tfa = options.tfa !== undefined ? options.tfa : "con";
+    const tfa = options.tfa !== undefined ? options.tfa : TFA_HOLD;
 
     // remove previous test user
-    await DBKnex.table("users").where("username", options.username).delete();
+    await UserModel().table().where("username", options.username).delete();
 
-    const role: RoleInterface = await DBKnex.table("roles").where("slug", options.role).first();
+    const ROLE: RoleInterface = await RoleModel().table().where("slug", options.role).first();
 
     // create a new mock user
-    const userId = await DBKnex.table("users").returning("id").insert({
-        role_id: role.id,
+    const [ID] = await UserModel().table().returning("id").insert({
+        role_id: ROLE.id,
         username: options.username,
         password: await SecurityUtil().hash("123456"),
         email: SecurityUtil().randomString(8) + "@gmail.com",
     });
 
-    const user: UserInterface = await UserModel(DBKnex).profile(userId[0]);
+    // get the full details
+    const user: UserInterface = await UserRepository.byId(ID);
 
     // generate a new token
-    const token: string = await AuthenticationTokenModel(DBKnex).token(user, tfa);
+    const token: string = await AuthenticationTokenService.token(user, tfa);
 
     return {
         user,

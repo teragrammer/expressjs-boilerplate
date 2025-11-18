@@ -3,13 +3,14 @@ import request from "supertest";
 import {assert} from "chai";
 import app from "../../src";
 import {DBKnex} from "../../src/configurations/knex";
+import {UserModel} from "../../src/models/user.model";
 
 describe("HTTP Authentication", () => {
     let token: string;
     const PASSWORD = "ABC-abc-123";
 
     it("POST /api/v1/register", async () => {
-        await DBKnex.table("users").where("username", "test").delete();
+        await UserModel().table().where("username", "test").delete();
 
         return request(app)
             .post("/api/v1/register")

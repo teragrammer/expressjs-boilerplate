@@ -4,7 +4,8 @@ import {assert} from "chai";
 import app from "../../src";
 import {Credentials, mockCredential} from "../utils";
 import {UserInterface} from "../../src/interfaces/user.interface";
-import {DBKnex} from "../../src/configurations/knex";
+import {UserModel} from "../../src/models/user.model";
+import {TFA_CONTINUE} from "../../src/models/two-factor-authentication.model";
 
 describe("HTTP Account", async () => {
     let credential: Credentials;
@@ -12,12 +13,12 @@ describe("HTTP Account", async () => {
 
     const new_email = "test@gmail.com";
     const new_username = "test_123";
-    const new_password = "abc.123";
+    const new_password = "abc.123.ABC";
 
     it("generate credential", async () => {
-        await DBKnex.table("users").where("username", new_username).delete();
+        await UserModel().table().where("username", new_username).delete();
 
-        credential = await mockCredential({role: "customer", username});
+        credential = await mockCredential({role: "customer", username, tfa: TFA_CONTINUE});
     });
 
     it("PUT /api/v1/account/information", async () => {
@@ -30,7 +31,7 @@ describe("HTTP Account", async () => {
             .set("Content-Type", "application/json")
             .set("Authorization", `Bearer ${credential.token}`)
             .then(async (response: any) => {
-                const user: UserInterface = await DBKnex.table("users").where("username", username).first();
+                const user: UserInterface = await UserModel().table().where("username", username).first();
 
                 assert.equal(response.status, 200);
                 assert.equal(user.first_name, "User");
@@ -49,7 +50,7 @@ describe("HTTP Account", async () => {
             .set("Content-Type", "application/json")
             .set("Authorization", `Bearer ${credential.token}`)
             .then(async (response: any) => {
-                const user: UserInterface = await DBKnex.table("users").where("username", new_username).first();
+                const user: UserInterface = await UserModel().table().where("username", new_username).first();
 
                 assert.equal(response.status, 200);
                 assert.equal(user.username, new_username);
@@ -67,7 +68,7 @@ describe("HTTP Account", async () => {
             .set("Content-Type", "application/json")
             .set("Authorization", `Bearer ${credential.token}`)
             .then(async (response: any) => {
-                const user: UserInterface = await DBKnex.table("users").where("username", new_username).first();
+                const user: UserInterface = await UserModel().table().where("username", new_username).first();
 
                 assert.equal(response.status, 200);
                 assert.equal(user.username, new_username);
