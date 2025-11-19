@@ -4,6 +4,7 @@ export interface RoleInterface {
     slug: string;
     description: string | null;
     is_public: number;
+    is_bypass_authorization: number;
     created_at: string | null;
     updated_at: string | null;
 }
