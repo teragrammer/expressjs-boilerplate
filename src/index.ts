@@ -15,10 +15,10 @@ import {DBRedis} from "./configurations/redis";
 import {SET_CACHE_SETTINGS} from "./models/setting.model";
 import {SET_CACHE_GUARDS} from "./models/route-guard.model";
 import REQUEST_MIDDLEWARE from "./http/middlewares/request.middleware";
-import SettingService from "./services/data/setting.service";
-import RouteGuardService from "./services/data/route-guard.service";
-import RedisSubscriberService from "./services/redis/redis-subscriber.service";
-import RedisEventService from "./services/redis/redis-event.service";
+import SettingService from "./services/setting.service";
+import RouteGuardService from "./services/route-guard.service";
+import RedisSubscriberService from "./services/redis-subscriber.service";
+import RedisEventService from "./services/redis-event.service";
 
 const app = express();
 
