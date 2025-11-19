@@ -10,6 +10,8 @@ export async function up(knex: Knex): Promise<void> {
             .onUpdate("CASCADE")
             .onDelete("CASCADE");
 
+        table.dateTime("expired_at").index().nullable();
+
         // meta data
         table.string("ip", 100).nullable();
         table.string("browser", 100).nullable();
@@ -17,7 +19,6 @@ export async function up(knex: Knex): Promise<void> {
 
         table.dateTime("created_at").index().defaultTo(knex.fn.now()).nullable();
         table.dateTime("updated_at").defaultTo(knex.fn.now()).nullable();
-        table.dateTime("expired_at").index().nullable();
     });
 }
 
