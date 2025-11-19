@@ -48,7 +48,7 @@ const GET = (inputs: any, key: string, defaults: any = null) => {
     return defaults;
 };
 
-const requestMiddleware = async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
+const REQUEST_MIDDLEWARE = async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
     // sanitize inputs from query or body
     req.sanitize = {
         body: {
@@ -95,4 +95,4 @@ const requestMiddleware = async (req: Request, _res: Response, next: NextFunctio
     next();
 };
 
-export default requestMiddleware;
+export default REQUEST_MIDDLEWARE;
