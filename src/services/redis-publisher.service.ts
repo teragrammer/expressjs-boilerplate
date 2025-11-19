@@ -1,11 +1,11 @@
-import {DBRedis, DBRedisInterface} from "../../configurations/redis";
-import {SecurityUtil} from "../../utilities/security.util";
-import {logger} from "../../configurations/logger";
-import {__ENV} from "../../configurations/environment";
-import {SET_CACHE_SETTINGS} from "../../models/setting.model";
-import SettingService from "../data/setting.service";
-import {SET_CACHE_GUARDS} from "../../models/route-guard.model";
-import RouteGuardService from "../data/route-guard.service";
+import {DBRedis, DBRedisInterface} from "../configurations/redis";
+import {SecurityUtil} from "../utilities/security.util";
+import {logger} from "../configurations/logger";
+import {__ENV} from "../configurations/environment";
+import {SET_CACHE_SETTINGS} from "../models/setting.model";
+import SettingService from "./setting.service";
+import {SET_CACHE_GUARDS} from "../models/route-guard.model";
+import RouteGuardService from "./route-guard.service";
 
 class RedisPublisherService {
     private static instance: RedisPublisherService;

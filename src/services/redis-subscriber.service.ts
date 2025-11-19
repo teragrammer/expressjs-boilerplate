@@ -1,5 +1,5 @@
-import {logger} from "../../configurations/logger";
-import {DBRedis} from "../../configurations/redis";
+import {logger} from "../configurations/logger";
+import {DBRedis} from "../configurations/redis";
 import RedisPublisherService from "./redis-publisher.service";
 
 class RedisSubscriberService {

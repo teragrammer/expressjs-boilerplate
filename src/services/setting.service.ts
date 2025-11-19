@@ -1,9 +1,9 @@
-import {SettingKeyValueInterface} from "../../interfaces/setting-key-value.interface";
-import {InitializerSettingInterface} from "../../models/setting.model";
-import {SettingInterface} from "../../interfaces/setting.interface";
-import {__ENV} from "../../configurations/environment";
-import RedisPublisherService from "../redis/redis-publisher.service";
-import SettingRepository from "../../repositories/setting.repository";
+import {SettingKeyValueInterface} from "../interfaces/setting-key-value.interface";
+import {InitializerSettingInterface} from "../models/setting.model";
+import {SettingInterface} from "../interfaces/setting.interface";
+import {__ENV} from "../configurations/environment";
+import RedisPublisherService from "./redis-publisher.service";
+import SettingRepository from "../repositories/setting.repository";
 
 class SettingService {
     private static instance: SettingService;

@@ -1,11 +1,12 @@
 import {RoleInterface} from "../src/interfaces/role.interface";
 import {UserInterface} from "../src/interfaces/user.interface";
 import UserRepository from "../src/repositories/user.repository";
-import AuthenticationTokenService from "../src/services/data/authentication-token.service";
+import AuthenticationTokenService from "../src/services/authentication-token.service";
 import {UserModel} from "../src/models/user.model";
 import {RoleModel} from "../src/models/role.model";
 import {SecurityUtil} from "../src/utilities/security.util";
 import {TFA_HOLD} from "../src/models/two-factor-authentication.model";
+import {__ENV} from "../src/configurations/environment";
 
 export interface Options {
     role: string;
@@ -19,6 +20,7 @@ export interface Credentials {
 }
 
 export async function mockCredential(options: Options): Promise<Credentials> {
+    if (__ENV.NODE_ENV === "production") throw new Error("ENV is set on production");
     const tfa = options.tfa !== undefined ? options.tfa : TFA_HOLD;
 
     // remove previous test user

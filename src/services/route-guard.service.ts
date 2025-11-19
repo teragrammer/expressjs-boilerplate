@@ -1,9 +1,9 @@
-import {RoleInterface} from "../../interfaces/role.interface";
-import {RoleModel} from "../../models/role.model";
-import {RouteGuardInterface} from "../../interfaces/route-guard.interface";
-import {RouteGuardModel} from "../../models/route-guard.model";
-import RedisPublisherService from "../redis/redis-publisher.service";
-import {__ENV} from "../../configurations/environment";
+import {RoleInterface} from "../interfaces/role.interface";
+import {RoleModel} from "../models/role.model";
+import {RouteGuardInterface} from "../interfaces/route-guard.interface";
+import {RouteGuardModel} from "../models/route-guard.model";
+import RedisPublisherService from "./redis-publisher.service";
+import {__ENV} from "../configurations/environment";
 
 class RouteGuardService {
     private static instance: RouteGuardService;
