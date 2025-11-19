@@ -24,4 +24,5 @@ export interface UserInterface {
     role?: RoleInterface | null;
     role_slug?: string;
     role_is_public?: number;
+    role_is_bypass_authorization?: number;
 }
