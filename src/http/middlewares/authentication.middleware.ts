@@ -3,7 +3,7 @@ import errors from "../../configurations/errors";
 import {AuthenticationTokenInterface} from "../../interfaces/authentication-token.interface";
 import {AuthenticationTokenModel, JwtExtendedPayload} from "../../models/authentication-token.model";
 import {UserInterface} from "../../interfaces/user.interface";
-import AuthenticationTokenService from "../../services/data/authentication-token.service";
+import AuthenticationTokenService from "../../services/authentication-token.service";
 import UserRepository from "../../repositories/user.repository";
 
 export function AuthenticationMiddleware(isHalt = true): any {
