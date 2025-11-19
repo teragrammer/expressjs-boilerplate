@@ -5,10 +5,9 @@ import {logger} from "../../configurations/logger";
 import {UserModel} from "../../models/user.model";
 import {SecurityUtil} from "../../utilities/security.util";
 import {ExtendJoiUtil} from "../../utilities/extend-joi.util";
-import {Knex} from "knex";
 import {DateUtil} from "../../utilities/date.util";
 import {UserInterface} from "../../interfaces/user.interface";
-import {AuthenticationTokenModel} from "../../models/authentication-token.model";
+import AuthenticationTokenService from "../../services/authentication-token.service";
 
 class Controller {
     information = async (req: Request, res: Response): Promise<any> => {
@@ -21,8 +20,7 @@ class Controller {
         }), DATA, res)) return;
 
         try {
-            const KNEX: Knex = req.app.get("knex");
-            const RESULT = await UserModel(KNEX).table()
+            const RESULT = await UserModel().table()
                 .where("id", req.credentials.jwt.uid)
                 .where("status", "Activated")
                 .update(DATA);
@@ -33,10 +31,14 @@ class Controller {
             });
 
             // generate a token
-            const AUTHENTICATION = await AuthenticationTokenModel(KNEX).generate(await req.credentials.user());
+            const TOKEN: string = await AuthenticationTokenService.generate(await req.credentials.user(), {
+                ip: req.ip || null,
+                browser: req.useragent?.browser || null,
+                os: req.useragent?.os || null,
+            });
 
             res.status(200).json({
-                token: AUTHENTICATION.token,
+                token: TOKEN,
             });
         } catch (e) {
             logger.error(e);
@@ -49,9 +51,6 @@ class Controller {
     };
 
     password = async (req: Request, res: Response): Promise<any> => {
-        const KNEX: Knex = req.app.get("knex");
-        const ACCOUNT: UserInterface = await req.credentials.user();
-
         const DATA = req.sanitize.body.only(["current_password", "new_password", "username", "email", "phone"]);
         if (await ExtendJoiUtil().response(Joi.object({
             current_password: Joi.string().required(),
@@ -67,19 +66,20 @@ class Controller {
                     "any.required": "Password is required.",
                 })
                 .allow(null, ""),
-            username: Joi.string().min(2).max(16)
-                .custom(ExtendJoiUtil().unique(KNEX, "users", "username", ACCOUNT.id), errors.DUPLICATE_DATA.message)
+            username: Joi.string().min(2).max(16).pattern(/^[a-zA-Z0-9_]+$/)
+                .custom(ExtendJoiUtil().unique("users", "username", req.credentials.jwt.uid), errors.DUPLICATE_DATA.message)
                 .allow(null, ""),
             email: Joi.string().email().max(180)
-                .custom(ExtendJoiUtil().unique(KNEX, "users", "email", ACCOUNT.id), errors.DUPLICATE_DATA.message)
+                .custom(ExtendJoiUtil().unique("users", "email", req.credentials.jwt.uid), errors.DUPLICATE_DATA.message)
                 .allow(null, ""),
             phone: Joi.string().min(10).max(16)
                 .custom(ExtendJoiUtil().phone, "Phone Number Validation")
-                .custom(ExtendJoiUtil().unique(KNEX, "users", "phone", ACCOUNT.id), errors.DUPLICATE_DATA.message)
+                .custom(ExtendJoiUtil().unique("users", "phone", req.credentials.jwt.uid), errors.DUPLICATE_DATA.message)
                 .allow(null, ""),
         }), DATA, res)) return;
 
         // verify the current password
+        const ACCOUNT: UserInterface = await req.credentials.user();
         if (!ACCOUNT.password || !await SecurityUtil().compare(ACCOUNT.password, DATA.current_password)) {
             return res.status(403).json({
                 code: errors.CREDENTIAL_DO_NOT_MATCH.code,
@@ -96,7 +96,7 @@ class Controller {
             if (typeof DATA.new_password !== "undefined") delete DATA.new_password;
 
             DATA.updated_at = DateUtil().sql();
-            const RESULT = await UserModel(KNEX).table()
+            const RESULT = await UserModel().table()
                 .where("id", ACCOUNT.id)
                 .where("status", "Activated")
                 .update(DATA);
@@ -110,10 +110,14 @@ class Controller {
             if (typeof DATA.username !== "undefined") ACCOUNT.username = DATA.username;
             if (typeof DATA.email !== "undefined") ACCOUNT.email = DATA.email;
             if (typeof DATA.phone !== "undefined") ACCOUNT.phone = DATA.phone;
-            const AUTHENTICATION = await AuthenticationTokenModel(KNEX).generate(ACCOUNT);
+            const TOKEN: string = await AuthenticationTokenService.generate(ACCOUNT, {
+                ip: req.ip || null,
+                browser: req.useragent?.browser || null,
+                os: req.useragent?.os || null,
+            });
 
             res.status(200).json({
-                token: AUTHENTICATION.token,
+                token: TOKEN,
             });
         } catch (e) {
             logger.error(e);

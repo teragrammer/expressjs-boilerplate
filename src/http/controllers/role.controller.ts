@@ -6,11 +6,10 @@ import {DateUtil} from "../../utilities/date.util";
 import {RoleModel} from "../../models/role.model";
 import {ExtendJoiUtil} from "../../utilities/extend-joi.util";
 import {RoleInterface} from "../../interfaces/role.interface";
-import {Knex} from "knex";
 
 class Controller {
     browse = async (req: Request, res: Response): Promise<any> => {
-        const Q = RoleModel(req.app.get("knex")).table();
+        const Q = RoleModel().table();
 
         const IS_PUBLIC: any = req.sanitize.query.numeric("is_public", null);
         if (IS_PUBLIC !== null) Q.where("is_public", IS_PUBLIC);
@@ -32,7 +31,7 @@ class Controller {
 
     view = async (req: Request, res: Response): Promise<any> => {
         const ID = req.params.id;
-        const ROLE: RoleInterface = await RoleModel(req.app.get("knex")).table()
+        const ROLE: RoleInterface = await RoleModel().table()
             .where("id", ID)
             .first();
 
@@ -45,19 +44,18 @@ class Controller {
     };
 
     create = async (req: Request, res: Response): Promise<any> => {
-        const KNEX: Knex = req.app.get("knex");
-
-        const DATA = req.sanitize.body.only(["name", "slug", "description", "is_public"]);
+        const DATA = req.sanitize.body.only(["name", "slug", "description", "is_public", "is_bypass_authorization"]);
         if (await ExtendJoiUtil().response(Joi.object({
             name: Joi.string().min(1).max(50).required(),
-            slug: Joi.string().min(1).max(50).required().external(ExtendJoiUtil().unique(KNEX, "roles", "slug")),
+            slug: Joi.string().min(1).max(50).required().external(ExtendJoiUtil().unique("roles", "slug")),
             description: Joi.string().max(100).allow(null, ""),
             is_public: Joi.number().valid(0, 1).required(),
+            is_bypass_authorization: Joi.number().valid(0, 1).required(),
         }), DATA, res)) return;
 
         try {
             DATA.created_at = DateUtil().sql();
-            const RESULT = await RoleModel(KNEX).table()
+            const RESULT = await RoleModel().table()
                 .returning("id")
                 .insert(DATA);
 
@@ -73,24 +71,28 @@ class Controller {
     };
 
     update = async (req: Request, res: Response): Promise<any> => {
-        const KNEX: Knex = req.app.get("knex");
-
         const ID = req.params.id;
-        const DATA = req.sanitize.body.only(["name", "slug", "description", "is_public"]);
+        const DATA = req.sanitize.body.only(["name", "slug", "description", "is_public", "is_bypass_authorization"]);
         if (await ExtendJoiUtil().response(Joi.object({
             name: Joi.string().min(1).max(50).required(),
-            slug: Joi.string().min(1).max(50).required().external(ExtendJoiUtil().unique(KNEX, "roles", "slug", ID)),
+            slug: Joi.string().min(1).max(50).required().external(ExtendJoiUtil().unique("roles", "slug", ID)),
             description: Joi.string().max(100).allow(null, ""),
             is_public: Joi.number().valid(0, 1).required(),
+            is_bypass_authorization: Joi.number().valid(0, 1).required(),
         }), DATA, res)) return;
 
         try {
             DATA.updated_at = DateUtil().sql();
-            const RESULT = await RoleModel(KNEX).table()
+            const RESULT: number = await RoleModel().table()
                 .where("id", ID)
                 .update(DATA);
 
-            res.status(200).json({result: RESULT === 1});
+            if (RESULT !== 1) return res.status(500).json({
+                code: errors.UPDATE_FAILED.code,
+                message: errors.UPDATE_FAILED.message,
+            });
+
+            res.status(200).send();
         } catch (e) {
             logger.error(e);
 
@@ -103,11 +105,16 @@ class Controller {
 
     delete = async (req: Request, res: Response): Promise<any> => {
         const ID = req.params.id;
-        const RESULT = await RoleModel(req.app.get("knex")).table()
+        const RESULT: number = await RoleModel().table()
             .where("id", ID)
             .delete();
 
-        res.status(200).json({result: RESULT === 1});
+        if (RESULT !== 1) return res.status(500).json({
+            code: errors.DELETE_FAILED.code,
+            message: errors.DELETE_FAILED.message,
+        });
+
+        res.status(200).send();
     };
 }
 

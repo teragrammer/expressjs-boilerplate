@@ -5,48 +5,45 @@ import errors from "../../configurations/errors";
 import {DateUtil} from "../../utilities/date.util";
 import {SecurityUtil} from "../../utilities/security.util";
 import {TwoFactorAuthenticationInterface} from "../../interfaces/two-factor-authentication.interface";
-import {TwoFactorAuthenticationModel} from "../../models/two-factor-authentication.model";
+import {TFA_CONTINUE, TwoFactorAuthenticationModel} from "../../models/two-factor-authentication.model";
 import {__ENV} from "../../configurations/environment";
 import {logger} from "../../configurations/logger";
 import {SettingKeyValueInterface} from "../../interfaces/setting-key-value.interface";
-import {AuthenticationTokenModel} from "../../models/authentication-token.model";
 import {ExtendJoiUtil} from "../../utilities/extend-joi.util";
-import {Knex} from "knex";
-import {GET_CACHE_SETTINGS} from "../../models/setting.model";
+import AuthenticationTokenService from "../../services/authentication-token.service";
+import SettingService from "../../services/setting.service";
+import TwoFactorAuthenticationService from "../../services/two-factor-authentication.service";
 
 class Controller {
     send = async (req: Request, res: Response): Promise<any> => {
-        const CREDENTIALS = req.credentials;
-        const NEXT_TRY = DateUtil().expiredAt(2, "minutes");
-        const CODE = SecurityUtil().randomNumber();
-
-        const KNEX: Knex = req.app.get("knex");
-
         // check if tfa is required
         // to save resources
-        if (CREDENTIALS.jwt.tfa === "con") return res.status(403).json({
+        if (req.credentials.jwt.tfa === TFA_CONTINUE) return res.status(403).json({
             code: errors.OTP_NOT_NEEDED.code,
             message: errors.OTP_NOT_NEEDED.message,
         });
 
         // check for valid email
-        if (IS_EMAIL_EMPTY(CREDENTIALS.jwt.eml)) return res.status(403).json({
+        if (TwoFactorAuthenticationService.isEmailEmpty(req.credentials.jwt.eml)) return res.status(403).json({
             code: errors.UN_CONFIGURED_EMAIL.code,
             message: errors.UN_CONFIGURED_EMAIL.message,
         });
 
         // find for existing tfa
-        const TFA: TwoFactorAuthenticationInterface = await TwoFactorAuthenticationModel(KNEX).table()
-            .where("token_id", CREDENTIALS.jwt.tid)
+        const TFA: TwoFactorAuthenticationInterface = await TwoFactorAuthenticationModel().table()
+            .where("token_id", req.credentials.jwt.tid)
             .first();
 
         try {
+            const NEXT_TRY = DateUtil().expiredAt(2, "minutes");
+            const CODE = SecurityUtil().randomNumber();
+
             // create or update the tfa
             let id;
             if (!TFA) {
-                id = await TwoFactorAuthenticationModel(KNEX).table().returning("id")
+                id = await TwoFactorAuthenticationModel().table().returning("id")
                     .insert({
-                        token_id: CREDENTIALS.jwt.tid,
+                        token_id: req.credentials.jwt.tid,
                         code: await SecurityUtil().hash(CODE),
                         expired_at: DateUtil().expiredAt(5, "minutes"),
                         next_send_at: NEXT_TRY,
@@ -64,7 +61,7 @@ class Controller {
                     message: errors.RESEND_OTP_NOT_POSSIBLE.message,
                 });
 
-                await TwoFactorAuthenticationModel(KNEX).table().where("id", TFA.id).update({
+                await TwoFactorAuthenticationModel().table().where("id", TFA.id).update({
                     code: await SecurityUtil().hash(CODE),
                     expired_at: DateUtil().expiredAt(5, "minutes"),
                     next_send_at: NEXT_TRY,
@@ -74,11 +71,11 @@ class Controller {
 
             // send the code to email
             if (__ENV.NODE_ENV === "production") {
-                const SETTINGS: SettingKeyValueInterface = (await req.app.get(GET_CACHE_SETTINGS)()).pri;
+                const SETTINGS: SettingKeyValueInterface = (await SettingService.getCache()).pri;
 
                 try {
                     await sgMail.send({
-                        to: CREDENTIALS.jwt.eml,
+                        to: req.credentials.jwt.eml || "",
                         from: SETTINGS.tta_eml_snd,
                         subject: SETTINGS.tta_eml_sbj,
                         text: `OTP Code: ${CODE}`,
@@ -111,17 +108,16 @@ class Controller {
         }), DATA, res)) return;
 
         const CREDENTIALS = req.credentials;
-        const KNEX: Knex = req.app.get("knex");
 
         // check if tfa it required
         // to save resources
-        if (CREDENTIALS.jwt.tfa === "con") return res.status(403).json({
+        if (CREDENTIALS.jwt.tfa === TFA_CONTINUE) return res.status(403).json({
             code: errors.OTP_NOT_NEEDED.code,
             message: errors.OTP_NOT_NEEDED.message,
         });
 
         // find for existing tfa
-        const TFA: TwoFactorAuthenticationInterface = await TwoFactorAuthenticationModel(KNEX).table()
+        const TFA: TwoFactorAuthenticationInterface = await TwoFactorAuthenticationModel().table()
             .where("token_id", CREDENTIALS.jwt.tid)
             .first();
         if (!TFA) return res.status(404).json({
@@ -154,7 +150,7 @@ class Controller {
             });
 
             // reset the tries
-            await TwoFactorAuthenticationModel(KNEX).table()
+            await TwoFactorAuthenticationModel().table()
                 .where("id", TFA.id)
                 .update({
                     tries: 0,
@@ -171,7 +167,7 @@ class Controller {
         // verify if code is valid
         if (!await SecurityUtil().compare(TFA.code, DATA.code)) {
             // record number of tries
-            await TwoFactorAuthenticationModel(KNEX).table()
+            await TwoFactorAuthenticationModel().table()
                 .where("id", TFA.id)
                 .increment("tries");
 
@@ -182,16 +178,18 @@ class Controller {
         }
 
         // delete the tfa
-        await TwoFactorAuthenticationModel(KNEX).table().where("id", TFA.id).delete();
+        await TwoFactorAuthenticationModel().table().where("id", TFA.id).delete();
 
         // regenerate new token
-        let token: string = await AuthenticationTokenModel(KNEX).token(await CREDENTIALS.user(), "con");
+        const TOKEN: string = await AuthenticationTokenService.token(await CREDENTIALS.user(), TFA_CONTINUE, {
+            ip: req.ip || null,
+            browser: req.useragent?.browser || null,
+            os: req.useragent?.os || null,
+        });
 
-        res.status(200).json({token});
+        res.status(200).json({token: TOKEN});
     };
 }
-
-const IS_EMAIL_EMPTY = (email: string | null | undefined) => email === undefined || email === null || email === "";
 
 const TwoFactorAuthenticationController = new Controller();
 export default TwoFactorAuthenticationController;

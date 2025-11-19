@@ -5,11 +5,12 @@ import {UserInterface} from "../../interfaces/user.interface";
 import {UserModel} from "../../models/user.model";
 import {DateUtil} from "../../utilities/date.util";
 import {SecurityUtil} from "../../utilities/security.util";
-import {GET_CACHE_SETTINGS} from "../../models/setting.model";
 import {AuthenticationTokenModel} from "../../models/authentication-token.model";
 import {ExtendJoiUtil} from "../../utilities/extend-joi.util";
 import {SettingKeyValueInterface} from "../../interfaces/setting-key-value.interface";
-import {Knex} from "knex";
+import AuthenticationTokenService from "../../services/authentication-token.service";
+import UserRepository from "../../repositories/user.repository";
+import SettingService from "../../services/setting.service";
 
 class Controller {
     login = async (req: Request, res: Response) => {
@@ -19,9 +20,7 @@ class Controller {
             password: Joi.string().required(),
         }), DATA, res)) return;
 
-        const KNEX: Knex = req.app.get("knex");
-
-        const USER: UserInterface = await UserModel(KNEX).table().where("username", DATA.username).first();
+        const USER: UserInterface = await UserRepository.byUsername(DATA.username);
         if (!USER) return res.status(404).json({
             code: errors.DATA_NOT_FOUND.code,
             message: errors.DATA_NOT_FOUND.message,
@@ -47,22 +46,22 @@ class Controller {
                 });
             } else {
                 // reset failed login expiration
-                await UserModel(KNEX).table().update({failed_login_expired_at: null, login_tries: 0});
+                await UserModel().table().update({failed_login_expired_at: null, login_tries: 0});
             }
         }
 
         if (USER.password && !await SecurityUtil().compare(USER.password, DATA.password)) {
             // increase the login attempt failed
-            await UserModel(KNEX).table().where("id", USER.id).increment("login_tries");
+            await UserModel().table().where("id", USER.id).increment("login_tries");
 
             // application settings
-            const SETTINGS: SettingKeyValueInterface = (await req.app.get(GET_CACHE_SETTINGS)()).pri;
+            const SETTINGS: SettingKeyValueInterface = (await SettingService.getCache()).pri;
 
             // update login tries
             const TOTAL_LOGIN_TRIES = (typeof Number(USER.login_tries) + 1 != undefined) ? Number(USER.login_tries) + 1 : 0;
             if (TOTAL_LOGIN_TRIES >= SETTINGS.mx_log_try) {
                 // update the lock out period
-                await UserModel(KNEX).table().where("id", USER.id).update({
+                await UserModel().table().where("id", USER.id).update({
                     failed_login_expired_at: DateUtil().expiredAt(SETTINGS.lck_prd, "minutes"),
                 });
 
@@ -80,19 +79,28 @@ class Controller {
         }
 
         // generate token
-        const AUTHENTICATION = await AuthenticationTokenModel(KNEX).generate(USER);
+        const TOKEN: string = await AuthenticationTokenService.generate(USER, {
+            ip: req.ip || null,
+            browser: req.useragent?.browser || null,
+            os: req.useragent?.os || null,
+        });
 
         res.status(200).json({
-            token: AUTHENTICATION.token,
+            token: TOKEN,
         });
     };
 
-    logout = async (req: Request, res: Response): Promise<void> => {
-        const AUTHENTICATION = await AuthenticationTokenModel(req.app.get("knex")).table()
+    logout = async (req: Request, res: Response): Promise<any> => {
+        const RESULT: number = await AuthenticationTokenModel().table()
             .where("id", req.credentials.jwt.tid)
             .delete();
 
-        res.status(200).json({result: AUTHENTICATION === 1});
+        if (RESULT !== 1) return res.status(500).json({
+            code: errors.DELETE_FAILED.code,
+            message: errors.DELETE_FAILED.message,
+        });
+
+        res.status(200).send();
     };
 }
 

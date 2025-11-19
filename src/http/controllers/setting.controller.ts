@@ -2,17 +2,16 @@ import {Request, Response} from "express";
 import Joi from "joi";
 import errors from "../../configurations/errors";
 import {logger} from "../../configurations/logger";
-import {SET_CACHE_SETTINGS, GET_CACHE_SETTINGS, DATA_TYPES, SettingModel} from "../../models/setting.model";
+import {DATA_TYPES, SET_CACHE_SETTINGS, SettingModel} from "../../models/setting.model";
 import {DateUtil} from "../../utilities/date.util";
 import {ExtendJoiUtil} from "../../utilities/extend-joi.util";
 import {SettingInterface} from "../../interfaces/setting.interface";
-import {Knex} from "knex";
-import {SettingService} from "../../services/data/setting.service";
-import {PUBLISHING_CACHE} from "../../services/redis/redis-publisher.service";
+import RedisPublisherService from "../../services/redis-publisher.service";
+import SettingService from "../../services/setting.service";
 
 class Controller {
     browse = async (req: Request, res: Response): Promise<any> => {
-        const Q = SettingModel(req.app.get("knex")).table();
+        const Q = SettingModel().table();
 
         const IS_DISABLED: any = req.sanitize.query.numeric("is_disabled", null);
         if (IS_DISABLED !== null) Q.where("is_disabled", IS_DISABLED);
@@ -40,12 +39,12 @@ class Controller {
     };
 
     values = async (req: Request, res: Response): Promise<any> => {
-        res.status(200).json((await req.app.get(GET_CACHE_SETTINGS)()).pub);
+        res.status(200).json((await SettingService.getCache()).pub);
     };
 
     view = async (req: Request, res: Response): Promise<any> => {
         const ID = req.params.id;
-        const SETTING: SettingInterface = await SettingModel(req.app.get("knex")).table()
+        const SETTING: SettingInterface = await SettingModel().table()
             .where("id", ID)
             .first();
 
@@ -58,12 +57,10 @@ class Controller {
     };
 
     create = async (req: Request, res: Response): Promise<any> => {
-        const KNEX: Knex = req.app.get("knex");
-
         const DATA = req.sanitize.body.only(["name", "slug", "value", "description", "type", "is_disabled", "is_public"]);
         if (await ExtendJoiUtil().response(Joi.object({
             name: Joi.string().min(1).max(50).required(),
-            slug: Joi.string().min(1).max(50).required().external(ExtendJoiUtil().unique(KNEX, "settings", "slug")),
+            slug: Joi.string().min(1).max(50).required().external(ExtendJoiUtil().unique("settings", "slug")),
             value: Joi.any(),
             description: Joi.string().min(1).max(200),
             type: Joi.string().valid(...DATA_TYPES).required(),
@@ -73,12 +70,12 @@ class Controller {
 
         try {
             DATA.created_at = DateUtil().sql();
-            const RESULT = await SettingModel(KNEX).table()
+            const RESULT = await SettingModel().table()
                 .returning("id")
                 .insert(DATA);
 
             // update the local cache and publish newly created setting
-            if (RESULT.length) await PUBLISHING_CACHE(req, SET_CACHE_SETTINGS, await SettingService().initializer(KNEX));
+            if (RESULT.length) await RedisPublisherService.publishCache(SET_CACHE_SETTINGS, await SettingService.initializer());
 
             res.status(200).json({id: RESULT[0]});
         } catch (e) {
@@ -92,13 +89,11 @@ class Controller {
     };
 
     update = async (req: Request, res: Response): Promise<any> => {
-        const KNEX: Knex = req.app.get("knex");
-
         const ID = req.params.id;
         const DATA = req.body;
         if (await ExtendJoiUtil().response(Joi.object({
             name: Joi.string().min(1).max(50).required(),
-            slug: Joi.string().min(1).max(50).required().external(ExtendJoiUtil().unique(KNEX, "settings", "slug", ID)),
+            slug: Joi.string().min(1).max(50).required().external(ExtendJoiUtil().unique("settings", "slug", ID)),
             value: Joi.any(),
             description: Joi.string().min(1).max(200),
             type: Joi.string().valid(...DATA_TYPES).required(),
@@ -108,14 +103,19 @@ class Controller {
 
         try {
             DATA.updated_at = DateUtil().sql();
-            const RESULT = await SettingModel(KNEX).table()
+            const RESULT = await SettingModel().table()
                 .where("id", ID)
                 .update(DATA);
 
-            // update the local cache and publish newly updated setting
-            if (RESULT === 1) await PUBLISHING_CACHE(req, SET_CACHE_SETTINGS, await SettingService().initializer(KNEX));
+            if (RESULT !== 1) return res.status(500).json({
+                code: errors.UPDATE_FAILED.code,
+                message: errors.UPDATE_FAILED.message,
+            });
 
-            res.status(200).json({result: RESULT === 1});
+            // update the local cache and publish newly updated setting
+            if (RESULT === 1) await RedisPublisherService.publishCache(SET_CACHE_SETTINGS, await SettingService.initializer());
+
+            res.status(200).send();
         } catch (e) {
             logger.error(e);
 
@@ -127,15 +127,20 @@ class Controller {
     };
 
     delete = async (req: Request, res: Response): Promise<any> => {
-        const KNEX: Knex = req.app.get("knex");
-
         const ID = req.params.id;
-        const RESULT = await SettingModel(KNEX).table()
+        const RESULT = await SettingModel().table()
             .where("id", ID)
             .delete();
 
-        // update the local cache and publish newly updated setting
-        if (RESULT === 1) await PUBLISHING_CACHE(req, SET_CACHE_SETTINGS, await SettingService().initializer(KNEX));
+        if (RESULT !== 1) {
+            return res.status(500).json({
+                code: errors.DELETE_FAILED.code,
+                message: errors.DELETE_FAILED.message,
+            });
+        } else {
+            // update the local cache and publish newly updated setting
+            await RedisPublisherService.publishCache(SET_CACHE_SETTINGS, await SettingService.initializer());
+        }
 
         res.status(200).json({result: RESULT === 1});
     };

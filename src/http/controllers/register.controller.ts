@@ -6,22 +6,21 @@ import errors from "../../configurations/errors";
 import {logger} from "../../configurations/logger";
 import {SecurityUtil} from "../../utilities/security.util";
 import {DateUtil} from "../../utilities/date.util";
-import {AuthenticationTokenModel} from "../../models/authentication-token.model";
 import {UserInterface} from "../../interfaces/user.interface";
 import {RoleInterface} from "../../interfaces/role.interface";
-import {Knex} from "knex";
+import AuthenticationTokenService from "../../services/authentication-token.service";
+import {RoleModel} from "../../models/role.model";
+import UserRepository from "../../repositories/user.repository";
 
 class Controller {
     create = async (req: Request, res: Response): Promise<any> => {
-        const KNEX: Knex = req.app.get("knex");
-
         const DATA = req.sanitize.body.only(["first_name", "middle_name", "last_name", "username", "password", "email"]);
         if (await ExtendJoiUtil().response(Joi.object({
             first_name: Joi.string().min(2).max(100).required(),
             middle_name: Joi.string().min(2).max(100).allow(null, ""),
             last_name: Joi.string().min(1).max(100).required(),
-            username: Joi.string().min(3).max(16).required().custom(ExtendJoiUtil().unique(KNEX, "users", "username"), errors.DUPLICATE_DATA.message),
-            email: Joi.string().email().max(180).required().custom(ExtendJoiUtil().unique(KNEX, "users", "email"), errors.DUPLICATE_DATA.message),
+            username: Joi.string().min(3).max(16).pattern(/^[a-zA-Z0-9_]+$/).required().custom(ExtendJoiUtil().unique("users", "username"), errors.DUPLICATE_DATA.message),
+            email: Joi.string().email().max(180).required().custom(ExtendJoiUtil().unique("users", "email"), errors.DUPLICATE_DATA.message),
             password: Joi.string().min(8).max(32)
                 .pattern(/[A-Z]/)           // At least one uppercase letter
                 .pattern(/[a-z]/)           // At least one lowercase letter
@@ -37,7 +36,7 @@ class Controller {
         }), DATA, res)) return;
 
         // check if role is valid
-        const ROLE: RoleInterface = await KNEX.table("roles").where("slug", "customer").first();
+        const ROLE: RoleInterface = await RoleModel().table().where("slug", "customer").first();
         if (!ROLE) return res.status(404).json({
             code: errors.DATA_NOT_FOUND.code,
             message: errors.DATA_NOT_FOUND.message,
@@ -48,24 +47,24 @@ class Controller {
             DATA.role_id = ROLE.id;
             DATA.password = await SecurityUtil().hash(DATA.password);
             DATA.created_at = DateUtil().sql();
-            const RESULT: any = await UserModel(KNEX).table().returning("id").insert(DATA);
-            if (!RESULT.length) return res.status(500).json({
-                code: errors.SERVER_ERROR.code,
-                message: errors.SERVER_ERROR.message,
-            });
+            const [ID] = await UserModel().table().returning("id").insert(DATA);
 
             // get the full details
-            const CUSTOMER: UserInterface = await UserModel(KNEX).profile(RESULT[0]);
+            const CUSTOMER: UserInterface = await UserRepository.byId(ID);
             if (!CUSTOMER) return res.status(404).json({
                 code: errors.DATA_NOT_FOUND.code,
                 message: errors.DATA_NOT_FOUND.message,
             });
 
             // generate a token
-            const AUTHENTICATION = await AuthenticationTokenModel(KNEX).generate(CUSTOMER);
+            const TOKEN: string = await AuthenticationTokenService.generate(CUSTOMER, {
+                ip: req.ip || null,
+                browser: req.useragent?.browser || null,
+                os: req.useragent?.os || null,
+            });
 
             res.status(200).json({
-                credential: AUTHENTICATION.token,
+                token: TOKEN,
             });
         } catch (e: any) {
             logger.error(e);

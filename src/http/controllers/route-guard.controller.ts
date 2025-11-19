@@ -2,17 +2,15 @@ import {Request, Response} from "express";
 import Joi from "joi";
 import errors from "../../configurations/errors";
 import {logger} from "../../configurations/logger";
-import {DateUtil} from "../../utilities/date.util";
 import {ExtendJoiUtil} from "../../utilities/extend-joi.util";
-import {Knex} from "knex";
 import {RouteGuardInterface} from "../../interfaces/route-guard.interface";
-import {SET_CACHE_GUARDS, RouteGuardModel} from "../../models/route-guard.model";
-import {RouteGuardService} from "../../services/data/route-guard.service";
-import {PUBLISHING_CACHE} from "../../services/redis/redis-publisher.service";
+import {RouteGuardModel, SET_CACHE_GUARDS} from "../../models/route-guard.model";
+import RedisPublisherService from "../../services/redis-publisher.service";
+import RouteGuardService from "../../services/route-guard.service";
 
 class Controller {
     browse = async (req: Request, res: Response): Promise<any> => {
-        const Q = RouteGuardModel(req.app.get("knex")).table();
+        const Q = RouteGuardModel().table();
 
         const ROLE_ID: any = req.sanitize.query.numeric("role_id", null);
         if (ROLE_ID !== null) Q.where("role_id", ROLE_ID);
@@ -25,7 +23,7 @@ class Controller {
 
     view = async (req: Request, res: Response): Promise<any> => {
         const ID = req.params.id;
-        const ROUTE_GUARD: RouteGuardInterface = await RouteGuardModel(req.app.get("knex")).table()
+        const ROUTE_GUARD: RouteGuardInterface = await RouteGuardModel().table()
             .where("id", ID)
             .first();
 
@@ -38,34 +36,21 @@ class Controller {
     };
 
     create = async (req: Request, res: Response): Promise<any> => {
-        const KNEX: Knex = req.app.get("knex");
-
         const DATA = req.sanitize.body.only(["role_id", "route"]);
         if (await ExtendJoiUtil().response(Joi.object({
-            role_id: Joi.number().integer().required().external(ExtendJoiUtil().exists(KNEX, "roles")),
+            role_id: Joi.number().integer().required().external(ExtendJoiUtil().exists("roles")),
             route: Joi.string().min(3).max(100).required(),
         }), DATA, res)) return;
 
         try {
-            const RESULT: any[] = await KNEX.transaction(async (trx: any) => {
-                // remove old data or duplicate
-                await RouteGuardModel(trx).table()
-                    .where("role_id", DATA.role_id)
-                    .where("route", DATA.route).delete();
-
-                // insert the new data
-                DATA.created_at = DateUtil().sql();
-
-                // update the local cache and publish newly updated setting
-                return RouteGuardModel(trx).table()
-                    .returning("id")
-                    .insert(DATA);
-            });
+            const [ID] = await RouteGuardModel().table()
+                .returning("id")
+                .insert(DATA);
 
             // update the local cache and publish newly updated setting
-            if (RESULT.length) await PUBLISHING_CACHE(req, SET_CACHE_GUARDS, await RouteGuardService().initializer(req.app.get("knex")));
+            if (ID) await RedisPublisherService.publishCache(SET_CACHE_GUARDS, await RouteGuardService.initializer());
 
-            res.status(200).json({id: RESULT[0]});
+            res.status(200).json({id: ID});
         } catch (e) {
             logger.error(e);
 
@@ -77,15 +62,20 @@ class Controller {
     };
 
     delete = async (req: Request, res: Response): Promise<any> => {
-        const KNEX: Knex = req.app.get("knex");
-
         const ID = req.params.id;
-        const RESULT = await RouteGuardModel(KNEX).table()
+        const RESULT = await RouteGuardModel().table()
             .where("id", ID)
             .delete();
 
-        // update the local cache and publish newly updated setting
-        if (RESULT === 1) await PUBLISHING_CACHE(req, SET_CACHE_GUARDS, await RouteGuardService().initializer(req.app.get("knex")));
+        if (RESULT !== 1) {
+            return res.status(500).json({
+                code: errors.DELETE_FAILED.code,
+                message: errors.DELETE_FAILED.message,
+            });
+        } else {
+            // update the local cache and publish newly updated setting
+            await RedisPublisherService.publishCache(SET_CACHE_GUARDS, await RouteGuardService.initializer());
+        }
 
         res.status(200).json({result: RESULT === 1});
     };
