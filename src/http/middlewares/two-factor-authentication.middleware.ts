@@ -1,5 +1,6 @@
 import {NextFunction, Request, Response} from "express";
 import errors from "../../configurations/errors";
+import {TFA_HOLD} from "../../models/two-factor-authentication.model";
 
 export function TwoFactorAuthenticationMiddleware(isHalt = true): any {
     return async function (req: Request, res: Response, next: NextFunction) {
@@ -10,7 +11,7 @@ export function TwoFactorAuthenticationMiddleware(isHalt = true): any {
             message: errors.EXPIRED_AUTH_TOKEN.message,
         });
 
-        if (credentials.jwt.tfa === "hol") return res.status(403).json({
+        if (credentials.jwt.tfa === TFA_HOLD) return res.status(403).json({
             code: "AUTH_OTP_INCOMPLETE",
             message: errors.INCOMPLETE_OTP.message,
         });
