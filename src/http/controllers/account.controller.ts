@@ -8,9 +8,10 @@ import {ExtendJoiUtil} from "../../utilities/extend-joi.util";
 import {DateUtil} from "../../utilities/date.util";
 import {UserInterface} from "../../interfaces/user.interface";
 import AuthenticationTokenService from "../../services/authentication-token.service";
+import catchAsync from "../../utilities/catch-async";
 
 class Controller {
-    information = async (req: Request, res: Response): Promise<any> => {
+    information = catchAsync(async (req: Request, res: Response): Promise<any> => {
         const DATA = req.sanitize.body.only(["first_name", "middle_name", "last_name", "address"]);
         if (await ExtendJoiUtil().response(Joi.object({
             first_name: Joi.string().min(1).max(100).required(),
@@ -48,9 +49,9 @@ class Controller {
                 message: errors.SERVER_ERROR.message,
             });
         }
-    };
+    });
 
-    password = async (req: Request, res: Response): Promise<any> => {
+    password = catchAsync(async (req: Request, res: Response): Promise<any> => {
         const DATA = req.sanitize.body.only(["current_password", "new_password", "username", "email", "phone"]);
         if (await ExtendJoiUtil().response(Joi.object({
             current_password: Joi.string().required(),
@@ -127,7 +128,7 @@ class Controller {
                 message: errors.SERVER_ERROR.message,
             });
         }
-    };
+    });
 }
 
 const AccountController = new Controller();

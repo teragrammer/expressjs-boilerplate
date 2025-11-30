@@ -11,9 +11,10 @@ import {RoleInterface} from "../../interfaces/role.interface";
 import AuthenticationTokenService from "../../services/authentication-token.service";
 import {RoleModel} from "../../models/role.model";
 import UserRepository from "../../repositories/user.repository";
+import catchAsync from "../../utilities/catch-async";
 
 class Controller {
-    create = async (req: Request, res: Response): Promise<any> => {
+    create = catchAsync(async (req: Request, res: Response): Promise<any> => {
         const DATA = req.sanitize.body.only(["first_name", "middle_name", "last_name", "username", "password", "email"]);
         if (await ExtendJoiUtil().response(Joi.object({
             first_name: Joi.string().min(2).max(100).required(),
@@ -74,7 +75,7 @@ class Controller {
                 message: errors.SERVER_ERROR.message,
             });
         }
-    };
+    });
 }
 
 const RegisterController = new Controller();

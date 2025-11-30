@@ -11,9 +11,10 @@ import {SettingKeyValueInterface} from "../../interfaces/setting-key-value.inter
 import AuthenticationTokenService from "../../services/authentication-token.service";
 import UserRepository from "../../repositories/user.repository";
 import SettingService from "../../services/setting.service";
+import catchAsync from "../../utilities/catch-async";
 
 class Controller {
-    login = async (req: Request, res: Response) => {
+    login = catchAsync(async (req: Request, res: Response) => {
         const DATA = req.sanitize.body.only(["username", "password"]);
         if (await ExtendJoiUtil().response(Joi.object({
             username: Joi.string().required(),
@@ -88,9 +89,9 @@ class Controller {
         res.status(200).json({
             token: TOKEN,
         });
-    };
+    });
 
-    logout = async (req: Request, res: Response): Promise<any> => {
+    logout = catchAsync(async (req: Request, res: Response): Promise<any> => {
         const RESULT: number = await AuthenticationTokenModel().table()
             .where("id", req.credentials.jwt.tid)
             .delete();
@@ -101,7 +102,7 @@ class Controller {
         });
 
         res.status(200).send();
-    };
+    });
 }
 
 const RegisterController = new Controller();

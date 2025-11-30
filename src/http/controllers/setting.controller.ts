@@ -8,9 +8,10 @@ import {ExtendJoiUtil} from "../../utilities/extend-joi.util";
 import {SettingInterface} from "../../interfaces/setting.interface";
 import RedisPublisherService from "../../services/redis-publisher.service";
 import SettingService from "../../services/setting.service";
+import catchAsync from "../../utilities/catch-async";
 
 class Controller {
-    browse = async (req: Request, res: Response): Promise<any> => {
+    browse = catchAsync(async (req: Request, res: Response): Promise<any> => {
         const Q = SettingModel().table();
 
         const IS_DISABLED: any = req.sanitize.query.numeric("is_disabled", null);
@@ -36,13 +37,13 @@ class Controller {
         const SETTINGS: SettingInterface[] = await Q.offset(PAGINATE.offset).limit(PAGINATE.perPage);
 
         res.status(200).json(SETTINGS);
-    };
+    });
 
-    values = async (req: Request, res: Response): Promise<any> => {
+    values = catchAsync(async (req: Request, res: Response): Promise<any> => {
         res.status(200).json((await SettingService.getCache()).pub);
-    };
+    });
 
-    view = async (req: Request, res: Response): Promise<any> => {
+    view = catchAsync(async (req: Request, res: Response): Promise<any> => {
         const ID = req.params.id;
         const SETTING: SettingInterface = await SettingModel().table()
             .where("id", ID)
@@ -54,9 +55,9 @@ class Controller {
         });
 
         return res.status(200).json(SETTING);
-    };
+    });
 
-    create = async (req: Request, res: Response): Promise<any> => {
+    create = catchAsync(async (req: Request, res: Response): Promise<any> => {
         const DATA = req.sanitize.body.only(["name", "slug", "value", "description", "type", "is_disabled", "is_public"]);
         if (await ExtendJoiUtil().response(Joi.object({
             name: Joi.string().min(1).max(50).required(),
@@ -86,9 +87,9 @@ class Controller {
                 message: errors.SERVER_ERROR.message,
             });
         }
-    };
+    });
 
-    update = async (req: Request, res: Response): Promise<any> => {
+    update = catchAsync(async (req: Request, res: Response): Promise<any> => {
         const ID = req.params.id;
         const DATA = req.body;
         if (await ExtendJoiUtil().response(Joi.object({
@@ -124,9 +125,9 @@ class Controller {
                 message: errors.SERVER_ERROR.message,
             });
         }
-    };
+    });
 
-    delete = async (req: Request, res: Response): Promise<any> => {
+    delete = catchAsync(async (req: Request, res: Response): Promise<any> => {
         const ID = req.params.id;
         const RESULT = await SettingModel().table()
             .where("id", ID)
@@ -143,7 +144,7 @@ class Controller {
         }
 
         res.status(200).json({result: RESULT === 1});
-    };
+    });
 }
 
 const SettingController = new Controller();

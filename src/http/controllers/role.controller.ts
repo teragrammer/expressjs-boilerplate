@@ -6,9 +6,10 @@ import {DateUtil} from "../../utilities/date.util";
 import {RoleModel} from "../../models/role.model";
 import {ExtendJoiUtil} from "../../utilities/extend-joi.util";
 import {RoleInterface} from "../../interfaces/role.interface";
+import catchAsync from "../../utilities/catch-async";
 
 class Controller {
-    browse = async (req: Request, res: Response): Promise<any> => {
+    browse = catchAsync(async (req: Request, res: Response): Promise<any> => {
         const Q = RoleModel().table();
 
         const IS_PUBLIC: any = req.sanitize.query.numeric("is_public", null);
@@ -27,9 +28,9 @@ class Controller {
         const ROLES: RoleInterface[] = await Q.offset(PAGINATE.offset).limit(PAGINATE.perPage);
 
         res.status(200).json(ROLES);
-    };
+    });
 
-    view = async (req: Request, res: Response): Promise<any> => {
+    view = catchAsync(async (req: Request, res: Response): Promise<any> => {
         const ID = req.params.id;
         const ROLE: RoleInterface = await RoleModel().table()
             .where("id", ID)
@@ -41,9 +42,9 @@ class Controller {
         });
 
         return res.status(200).json(ROLE);
-    };
+    });
 
-    create = async (req: Request, res: Response): Promise<any> => {
+    create = catchAsync(async (req: Request, res: Response): Promise<any> => {
         const DATA = req.sanitize.body.only(["name", "slug", "description", "is_public", "is_bypass_authorization"]);
         if (await ExtendJoiUtil().response(Joi.object({
             name: Joi.string().min(1).max(50).required(),
@@ -68,9 +69,9 @@ class Controller {
                 message: errors.SERVER_ERROR.message,
             });
         }
-    };
+    });
 
-    update = async (req: Request, res: Response): Promise<any> => {
+    update = catchAsync(async (req: Request, res: Response): Promise<any> => {
         const ID = req.params.id;
         const DATA = req.sanitize.body.only(["name", "slug", "description", "is_public", "is_bypass_authorization"]);
         if (await ExtendJoiUtil().response(Joi.object({
@@ -101,9 +102,9 @@ class Controller {
                 message: errors.SERVER_ERROR.message,
             });
         }
-    };
+    });
 
-    delete = async (req: Request, res: Response): Promise<any> => {
+    delete = catchAsync(async (req: Request, res: Response): Promise<any> => {
         const ID = req.params.id;
         const RESULT: number = await RoleModel().table()
             .where("id", ID)
@@ -115,7 +116,7 @@ class Controller {
         });
 
         res.status(200).send();
-    };
+    });
 }
 
 const RoleController = new Controller();

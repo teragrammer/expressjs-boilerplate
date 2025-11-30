@@ -11,6 +11,7 @@ import {SecurityUtil} from "../../utilities/security.util";
 import AuthenticationTokenService from "../../services/authentication-token.service";
 import PasswordRecoveryService from "../../services/password-recovery.service";
 import UserRepository from "../../repositories/user.repository";
+import catchAsync from "../../utilities/catch-async";
 
 const CODE_LENGTH = 6;
 
@@ -21,7 +22,7 @@ const MAX_TRIES = 5;
 const NEXT_TRY_MINUTES = 3;
 
 class Controller {
-    send = async (req: Request, res: Response): Promise<any> => {
+    send = catchAsync(async (req: Request, res: Response): Promise<any> => {
         const DATA = req.sanitize.body.only(["to", RECOVERY_EMAIL, RECOVERY_PHONE]);
         if (await ExtendJoiUtil().response(Joi.object({
             to: Joi.string().required().valid(...TYPES),
@@ -64,9 +65,9 @@ class Controller {
         });
 
         return res.status(200).send();
-    };
+    });
 
-    validate = async (req: Request, res: Response): Promise<any> => {
+    validate = catchAsync(async (req: Request, res: Response): Promise<any> => {
         const DATA = req.sanitize.body.only(["to", "code", RECOVERY_EMAIL, RECOVERY_PHONE]);
         if (await ExtendJoiUtil().response(Joi.object({
             to: Joi.string().required().valid(...TYPES),
@@ -144,7 +145,7 @@ class Controller {
         res.status(200).json({
             token: TOKEN,
         });
-    };
+    });
 }
 
 const PasswordRecoveryController = new Controller();

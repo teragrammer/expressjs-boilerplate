@@ -7,9 +7,10 @@ import {SecurityUtil} from "../../utilities/security.util";
 import {UserInterface} from "../../interfaces/user.interface";
 import {DateUtil} from "../../utilities/date.util";
 import {ExtendJoiUtil} from "../../utilities/extend-joi.util";
+import catchAsync from "../../utilities/catch-async";
 
 class Controller {
-    browse = async (req: Request, res: Response): Promise<any> => {
+    browse = catchAsync(async (req: Request, res: Response): Promise<any> => {
         const Q = UserModel().table();
 
         const ROLE_ID: any = req.sanitize.query.numeric("role_id");
@@ -37,9 +38,9 @@ class Controller {
         for (let i = 0; i < USERS.length; i++) UserModel().hidden(USERS[i]);
 
         res.status(200).json(USERS);
-    };
+    });
 
-    view = async (req: Request, res: Response): Promise<any> => {
+    view = catchAsync(async (req: Request, res: Response): Promise<any> => {
         const ID = req.params.id;
         const USER: UserInterface = await UserModel().table()
             .where("id", ID)
@@ -54,9 +55,9 @@ class Controller {
         delete USER.password;
 
         return res.status(200).json(USER);
-    };
+    });
 
-    create = async (req: Request, res: Response): Promise<any> => {
+    create = catchAsync(async (req: Request, res: Response): Promise<any> => {
         const DATA = req.sanitize.body.only([
             "first_name", "middle_name", "last_name",
             "role_id", "phone", "email", "username", "password",
@@ -107,9 +108,9 @@ class Controller {
                 message: errors.SERVER_ERROR.message,
             });
         }
-    };
+    });
 
-    update = async (req: Request, res: Response): Promise<any> => {
+    update = catchAsync(async (req: Request, res: Response): Promise<any> => {
         const ID = req.params.id;
 
         const DATA = req.sanitize.body.only([
@@ -167,9 +168,9 @@ class Controller {
                 message: errors.SERVER_ERROR.message,
             });
         }
-    };
+    });
 
-    delete = async (req: Request, res: Response): Promise<any> => {
+    delete = catchAsync(async (req: Request, res: Response): Promise<any> => {
         const ID = req.params.id;
         const RESULT: number = await UserModel().table()
             .where("id", ID)
@@ -181,7 +182,7 @@ class Controller {
         });
 
         res.status(200).send();
-    };
+    });
 }
 
 const UserController = new Controller();

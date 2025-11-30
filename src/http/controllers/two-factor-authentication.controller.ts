@@ -13,9 +13,10 @@ import {ExtendJoiUtil} from "../../utilities/extend-joi.util";
 import AuthenticationTokenService from "../../services/authentication-token.service";
 import SettingService from "../../services/setting.service";
 import TwoFactorAuthenticationService from "../../services/two-factor-authentication.service";
+import catchAsync from "../../utilities/catch-async";
 
 class Controller {
-    send = async (req: Request, res: Response): Promise<any> => {
+    send = catchAsync(async (req: Request, res: Response): Promise<any> => {
         // check if tfa is required
         // to save resources
         if (req.credentials.jwt.tfa === TFA_CONTINUE) return res.status(403).json({
@@ -99,9 +100,9 @@ class Controller {
                 message: errors.SERVER_ERROR.message,
             });
         }
-    };
+    });
 
-    validate = async (req: Request, res: Response): Promise<any> => {
+    validate = catchAsync(async (req: Request, res: Response): Promise<any> => {
         const DATA = req.sanitize.body.only(["code"]);
         if (await ExtendJoiUtil().response(Joi.object({
             code: Joi.number().integer().required(),
@@ -188,7 +189,7 @@ class Controller {
         });
 
         res.status(200).json({token: TOKEN});
-    };
+    });
 }
 
 const TwoFactorAuthenticationController = new Controller();

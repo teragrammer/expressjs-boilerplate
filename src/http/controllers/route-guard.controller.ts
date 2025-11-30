@@ -7,9 +7,10 @@ import {RouteGuardInterface} from "../../interfaces/route-guard.interface";
 import {RouteGuardModel, SET_CACHE_GUARDS} from "../../models/route-guard.model";
 import RedisPublisherService from "../../services/redis-publisher.service";
 import RouteGuardService from "../../services/route-guard.service";
+import catchAsync from "../../utilities/catch-async";
 
 class Controller {
-    browse = async (req: Request, res: Response): Promise<any> => {
+    browse = catchAsync(async (req: Request, res: Response): Promise<any> => {
         const Q = RouteGuardModel().table();
 
         const ROLE_ID: any = req.sanitize.query.numeric("role_id", null);
@@ -19,9 +20,9 @@ class Controller {
         const ROUTE_GUARDS: RouteGuardInterface[] = await Q.offset(PAGINATE.offset).limit(PAGINATE.perPage);
 
         res.status(200).json(ROUTE_GUARDS);
-    };
+    });
 
-    view = async (req: Request, res: Response): Promise<any> => {
+    view = catchAsync(async (req: Request, res: Response): Promise<any> => {
         const ID = req.params.id;
         const ROUTE_GUARD: RouteGuardInterface = await RouteGuardModel().table()
             .where("id", ID)
@@ -33,9 +34,9 @@ class Controller {
         });
 
         return res.status(200).json(ROUTE_GUARD);
-    };
+    });
 
-    create = async (req: Request, res: Response): Promise<any> => {
+    create = catchAsync(async (req: Request, res: Response): Promise<any> => {
         const DATA = req.sanitize.body.only(["role_id", "route"]);
         if (await ExtendJoiUtil().response(Joi.object({
             role_id: Joi.number().integer().required().external(ExtendJoiUtil().exists("roles")),
@@ -59,9 +60,9 @@ class Controller {
                 message: errors.SERVER_ERROR.message,
             });
         }
-    };
+    });
 
-    delete = async (req: Request, res: Response): Promise<any> => {
+    delete = catchAsync(async (req: Request, res: Response): Promise<any> => {
         const ID = req.params.id;
         const RESULT = await RouteGuardModel().table()
             .where("id", ID)
@@ -78,7 +79,7 @@ class Controller {
         }
 
         res.status(200).json({result: RESULT === 1});
-    };
+    });
 }
 
 const RouteGuardController = new Controller();
