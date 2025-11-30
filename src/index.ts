@@ -1,4 +1,4 @@
-import express from "express";
+import express, {NextFunction, Request, Response} from "express";
 import os from "os";
 import cors from "cors";
 import helmet from "helmet";
@@ -76,9 +76,13 @@ app.use((_req: express.Request, res: express.Response) => {
 });
 
 // error handling
-app.use((err: any, _req: any, res: any) => {
-    logger.error(err.message);
-    res.status(500).json({code: errors.SERVER_ERROR.code, message: errors.SERVER_ERROR.message});
+app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
+    logger.error(`${errors.SERVER_ERROR.message}, ${err.message}`);
+
+    res.status(err.status || 500).json({
+        code: errors.SERVER_ERROR.code,
+        message: __ENV.NODE_ENV === "production" ? errors.SERVER_ERROR.message : err.message,
+    });
 });
 
 // run the server
