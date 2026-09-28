@@ -1,5 +1,4 @@
 // src/modules/auth/controllers/password-recovery.controller.ts
-
 import {Request, Response} from "express";
 import catchAsync from "../../../common/utils/catch-async";
 import {PasswordRecoveryService} from "../services/password-recovery.service";
