@@ -23,8 +23,8 @@ import {RedisSubscriber} from "../shared/redis/redis-subscriber";
 import {SettingService} from "../modules/system/settings/setting.service";
 import {RouteGuardService} from "../modules/system/route-guards/route-guard.service";
 import {UserService} from "../modules/users/services/user.service";
-import {AuthService} from "../modules/auth/services/auth.service";
-import {TokenService} from "../modules/auth/services/auth-token.service";
+import {AuthenticationService} from "../modules/auth/services/authentication.service";
+import {TokenService} from "../modules/auth/services/authentication-token.service";
 import {TwoFactorAuthenticationService} from "../modules/auth/services/two-factor-authentication.service";
 import {PasswordRecoveryService} from "../modules/auth/services/password-recovery.service";
 import {RoleService} from "../modules/system/roles/role.service";
@@ -61,7 +61,7 @@ const dateUtil = new DateUtil();
 
 export const userService = new UserService(userRepository, securityUtil);
 export const tokenService = new TokenService();
-export const authService = new AuthService(securityUtil, authenticationTokenRepository, roleService, userService, userRepository, tokenService, dateUtil);
+export const authService = new AuthenticationService(securityUtil, authenticationTokenRepository, roleService, userService, userRepository, tokenService, dateUtil);
 
 // Mail provider
 const mailService = new SendGridMailService(
