@@ -22,6 +22,11 @@ environment configuration to help you kickstart your API development with best p
 - Profile Information and Password Change
 - Application Settings (Can be manage by admin)
 
+### Test
+- Unit
+- Integration
+- Load / Performance
+
 ### Request Extensions
 
 - `req.credentials`: .jwt payload object from verified jwt header, .user() get the current authenticated user
