@@ -22,7 +22,14 @@ export class SecurityUtil {
      * NO CONFIG REQUIRED: Generates a cryptographically secure random string.
      */
     public randomString(size: number = 32): string {
-        return crypto.randomBytes(size).toString("hex");
+        if (!Number.isInteger(size) || size < 0) {
+            throw new Error("Size must be a non-negative integer");
+        }
+
+        return crypto
+            .randomBytes(Math.ceil(size / 2))
+            .toString("hex")
+            .slice(0, size);
     }
 
     /**
