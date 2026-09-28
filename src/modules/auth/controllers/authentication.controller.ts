@@ -1,14 +1,13 @@
 // src/modules/auth/controllers/authentication.controller.ts
-
 import {Request, Response} from "express";
 import catchAsync from "../../../common/utils/catch-async";
-import {AuthService} from "../services/auth.service";
+import {AuthenticationService} from "../services/authentication.service";
 import {LoginInput} from "../interfaces/login-input.interface";
 import {assertCredentials} from "../../../common/utils/request-credentials";
 
 export class AuthenticationController {
     constructor(
-        private readonly authService: AuthService,
+        private readonly authService: AuthenticationService,
     ) {
     }
 
