@@ -2,7 +2,7 @@ import {beforeEach, describe, expect, it, vi} from "vitest";
 import {NextFunction, Request, Response} from "express";
 
 import {AuthenticationController} from "./authentication.controller";
-import {AuthService} from "../services/auth.service";
+import {AuthenticationService} from "../services/authentication.service";
 
 const {mockLogin, mockLogout} = vi.hoisted(() => ({
     mockLogin: vi.fn(),
@@ -31,7 +31,7 @@ describe("AuthenticationController", () => {
         const authService = {
             login: mockLogin,
             logout: mockLogout,
-        } as unknown as AuthService;
+        } as unknown as AuthenticationService;
 
         controller = new AuthenticationController(authService);
 
