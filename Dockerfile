@@ -15,6 +15,7 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
     libpng-dev \
     libonig-dev \
     libxml2-dev \
+    nano \
     zip \
     unzip
 
@@ -28,6 +29,9 @@ RUN npm -v
 RUN npm install -g npm@latest
 RUN npm install -g nodemon
 RUN npm install -g npm-check-updates
+
+# Install OpenCode
+RUN curl -fsSL https://opencode.ai/v2/install | bash
 
 # Clean up
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
