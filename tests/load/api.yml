@@ -1,0 +1,21 @@
+config:
+  target: "http://localhost:3000"
+
+  phases:
+    - duration: 30
+      arrivalRate: 5
+
+    - duration: 60
+      arrivalRate: 20
+
+    - duration: 30
+      arrivalRate: 50
+
+scenarios:
+  - name: "API endpoints"
+    flow:
+      - get:
+          url: "/health"
+
+      - get:
+          url: "/users"
