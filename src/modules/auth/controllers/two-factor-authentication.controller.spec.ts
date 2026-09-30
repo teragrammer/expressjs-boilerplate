@@ -179,7 +179,7 @@ describe("TwoFactorAuthenticationController Unit Tests", () => {
 
                 expect(tfaService.sendOtp).toHaveBeenCalledWith({
                     tokenId: 100,
-                    email: "   ",
+                    email: "user@example.com",
                     tfaCleared: false,
                 });
 

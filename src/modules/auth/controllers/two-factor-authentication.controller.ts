@@ -3,6 +3,7 @@ import {Request, Response} from "express";
 import catchAsync from "../../../common/utils/catch-async";
 import {TwoFactorAuthenticationService} from "../services/two-factor-authentication.service";
 import {assertCredentials} from "../../../common/utils/request-credentials";
+import {User} from "../../users/user.interface";
 
 export class TwoFactorAuthenticationController {
     constructor(
@@ -13,10 +14,11 @@ export class TwoFactorAuthenticationController {
     send = catchAsync(async (req: Request, res: Response): Promise<void> => {
         assertCredentials(req);
         const {jwt} = req.credentials;
+        const user: User = await req.credentials.user();
 
         const result = await this.tfaService.sendOtp({
             tokenId: jwt.tid,
-            email: jwt.eml,
+            email: user.email || undefined,
             tfaCleared: jwt.tfa,
         });
 
