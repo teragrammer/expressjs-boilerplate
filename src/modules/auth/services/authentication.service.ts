@@ -1,8 +1,8 @@
-// src/modules/auth/services/auth.service.ts
+// src/modules/auth/services/authentication.service.ts
 
 import {RoleService} from "../../system/roles/role.service";
 import {UserService} from "../../users/services/user.service";
-import {TokenService} from "./auth-token.service";
+import {TokenService} from "./authentication-token.service";
 import {SecurityUtil} from "../../../common/utils/security.util";
 import {DateUtil} from "../../../common/utils/date.util";
 import {RegisterInput} from "../interfaces/register-input.interface";
@@ -16,7 +16,7 @@ import {JwtExtendedPayload} from "../interfaces/jwt.interface";
 import {AuthenticationToken} from "../interfaces/authentication.token";
 import {settingService} from "../../../config/container";
 
-export class AuthService {
+export class AuthenticationService {
     constructor(
         private readonly securityUtil: SecurityUtil,
         private readonly authenticationTokenRepository: AuthenticationTokenRepository,

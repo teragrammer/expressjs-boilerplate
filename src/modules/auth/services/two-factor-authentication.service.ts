@@ -4,7 +4,7 @@ import {SecurityUtil} from "../../../common/utils/security.util";
 import {DateUtil} from "../../../common/utils/date.util";
 import {AppError} from "../../../common/utils/errors";
 import Messages from "../../../common/utils/messages";
-import {TokenService} from "./auth-token.service";
+import {TokenService} from "./authentication-token.service";
 import {AuthenticationTokenRepository} from "../repositories/authentication-token.repository";
 import {SettingService} from "../../system/settings/setting.service";
 import {MailService} from "../../../common/interfaces/mail.interface";
@@ -49,9 +49,10 @@ export class TwoFactorAuthenticationService {
         this.assertOtpRequired(input.tfaCleared);
         this.assertEmailConfigured(input.email);
 
-        const {id, nextTry, plainCode} =
-            await this.generateOtp(input.tokenId);
+        // generate OTP code
+        const {id, nextTry, plainCode} = await this.generateOtp(input.tokenId);
 
+        // send email
         await this.sendOtpEmail(input.email!, plainCode);
 
         return {

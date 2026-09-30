@@ -1,5 +1,4 @@
 // src/modules/auth/repositories/authentication-token.repository.ts
-
 import {Knex} from "knex";
 import {DBKnex} from "../../../config/knex";
 import {

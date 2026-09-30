@@ -1,5 +1,4 @@
 // src/modules/users/validations/account-information.schema.ts
-
 import Joi from '../../../shared/validations/joi';
 
 export const accountInformationSchema = Joi.object({

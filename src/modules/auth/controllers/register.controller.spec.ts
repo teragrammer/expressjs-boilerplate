@@ -2,7 +2,7 @@ import {beforeEach, describe, expect, it, vi} from "vitest";
 import {NextFunction, Request, Response} from "express";
 
 import {RegisterController} from "./register.controller";
-import {AuthService} from "../services/auth.service";
+import {AuthenticationService} from "../services/authentication.service";
 
 const {mockRegister} = vi.hoisted(() => ({
     mockRegister: vi.fn(),
@@ -28,7 +28,7 @@ describe("RegisterController", () => {
 
         const authService = {
             register: mockRegister,
-        } as unknown as AuthService;
+        } as unknown as AuthenticationService;
 
         controller = new RegisterController(authService);
 

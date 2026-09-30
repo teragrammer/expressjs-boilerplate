@@ -1,5 +1,4 @@
 // src/modules/auth/validations/password-recovery-send.schema.ts
-
 import Joi from '../../../shared/validations/joi';
 import {RECOVERY_EMAIL, TYPES} from "../interfaces/password.recovery.interface";
 

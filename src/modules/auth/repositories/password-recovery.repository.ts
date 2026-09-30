@@ -1,5 +1,4 @@
 // src/modules/auth/repositories/password-recovery.repository.ts
-
 import {Knex} from "knex";
 import {DBKnex} from "../../../config/knex";
 import {PasswordRecovery, Type,} from "../interfaces/password.recovery.interface";
@@ -28,12 +27,12 @@ export class PasswordRecoveryRepository {
         sendTo: string,
         type?: Type,
     ): Promise<PasswordRecovery | null> {
-        const query = this.table();
+        let query = this.table();
 
-        query.where({send_to: sendTo});
+        query = query.where({send_to: sendTo});
 
         if (type) {
-            query.andWhere({type});
+            query = query.andWhere({type});
         }
 
         const record = await query.first();

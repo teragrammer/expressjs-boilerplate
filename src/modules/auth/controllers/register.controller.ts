@@ -2,12 +2,12 @@
 
 import {Request, Response} from "express";
 import catchAsync from "../../../common/utils/catch-async";
-import {AuthService} from "../services/auth.service";
+import {AuthenticationService} from "../services/authentication.service";
 import {RegisterInput} from "../interfaces/register-input.interface";
 
 export class RegisterController {
     constructor(
-        private readonly authService: AuthService,
+        private readonly authService: AuthenticationService,
     ) {
     }
 

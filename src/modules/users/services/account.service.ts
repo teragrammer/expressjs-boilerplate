@@ -3,7 +3,7 @@ import {SecurityAccountDTO, UpdateUserDTO, User} from "../user.interface";
 import {UserRepository} from "../user.repository";
 import {AppError} from "../../../common/utils/errors";
 import Messages from "../../../common/utils/messages";
-import {TokenService} from "../../auth/services/auth-token.service";
+import {TokenService} from "../../auth/services/authentication-token.service";
 import {SecurityUtil} from "../../../common/utils/security.util";
 
 export class AccountService {
