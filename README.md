@@ -1,8 +1,8 @@
-# ExpressJS Boilerplate API (MysQL)
+# ExpressJS Boilerplate API
 
 ![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=flat&logo=docker&logoColor=white)
 ![Express.js](https://img.shields.io/badge/express.js-%23404d59.svg?style=flat&logo=express&logoColor=%2361DAFB)
-![MySQL](https://img.shields.io/badge/mysql-4479A1.svg?style=flat&logo=mysql&logoColor=white)
+![PostgreSQL](https://www.postgresql.org)
 ![Redis](https://img.shields.io/badge/redis-%23DD0031.svg?style=flat&logo=redis&logoColor=white)
 
 ```
@@ -13,7 +13,7 @@ environment configuration to help you kickstart your API development with best p
 
 ### Features
 
-- Database Connection (MySQL)
+- Database Connection (PostgreSQL)
 - Redis Connection (cache application settings and roles guard)
 - Registration and Login (JWT Token)
 - User Roles (Can be manage by admin)
@@ -109,7 +109,7 @@ If you like this project and need help with development, customization, or integ
 
 I’m available for freelance work, consulting, and collaboration.
 
-Thank you for checking out ExpressJS Boilerplate API for MySQL!
+Thank you for checking out ExpressJS Boilerplate API for PostgreSQL!
 Feel free to contribute or open issues.
 ```
 
