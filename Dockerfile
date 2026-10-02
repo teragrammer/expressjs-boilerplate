@@ -30,6 +30,18 @@ RUN npm install -g npm@latest
 RUN npm install -g nodemon
 RUN npm install -g npm-check-updates
 
+# Configure SSH and Git
+# Create the .ssh directory and write the config file
+RUN mkdir -p /root/.ssh && \
+    chmod 700 /root/.ssh && \
+    printf "Host github.com\n  Hostname ssh.github.com\n  Port 443\n  User git\n" > /root/.ssh/config && \
+    chmod 600 /root/.ssh/config
+
+RUN echo "StrictHostKeyChecking no" >> /root/.ssh/config
+
+# Mark /app as a safe directory for Git
+RUN git config --global --add safe.directory /app
+
 # Install OpenCode
 RUN curl -fsSL https://opencode.ai/v2/install | bash
 
