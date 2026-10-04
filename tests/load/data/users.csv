@@ -1,0 +1,4 @@
+username,password,role
+admin,pass1234,admin
+manager,pass1234,manager
+customer,pass1234,customer

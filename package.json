@@ -12,7 +12,11 @@
     "db:seed": "node ./node_modules/knex/bin/cli.js seed:run --knexfile ./knexfile.ts",
     "db:reset": "npm run db:migrate && npm run db:seed",
     "make:migration": "node ./node_modules/knex/bin/cli.js migrate:make",
-    "make:seed": "node ./node_modules/knex/bin/cli.js seed:make"
+    "make:seed": "node ./node_modules/knex/bin/cli.js seed:make",
+    "load:test": "bash tests/load/run.sh",
+    "load:test:smoke": "bash tests/load/run.sh smoke",
+    "load:test:stress": "bash tests/load/run.sh stress",
+    "load:test:soak": "bash tests/load/run.sh soak"
   },
   "keywords": [],
   "author": "",

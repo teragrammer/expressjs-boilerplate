@@ -1,0 +1,155 @@
+# Soak Test Configuration
+# Long-duration test to identify memory leaks and degradation
+# Usage: npm run load:test:soak
+
+config:
+  target: "{{ $processEnvironment.TARGET_URL }}"
+
+  phases:
+    - name: "Soak Baseline"
+      duration: 300
+      arrivalRate: 20
+
+    - name: "Soak Sustained"
+      duration: 1800
+      arrivalRate: 30
+
+    - name: "Soak Peak"
+      duration: 300
+      arrivalRate: 50
+
+    - name: "Soak Recovery"
+      duration: 300
+      arrivalRate: 20
+
+  defaults:
+    headers:
+      Content-Type: "application/json"
+      Accept: "application/json"
+
+  plugins:
+    expect: {}
+    metrics-by-endpoint: {}
+
+  ensure:
+    thresholds:
+      - http.response_time.p95: 1000
+      - http.response_time.p99: 2000
+
+  payload:
+    path: "data/users.csv"
+    fields:
+      - "username"
+      - "password"
+      - "role"
+    order: sequence
+    skipHeader: true
+
+  processor: "./plugins/hooks.js"
+
+scenarios:
+  - name: "Login Flow"
+    weight: 30
+    flow:
+      - post:
+          url: "/api/v1/auth/login"
+          json:
+            username: "{{ username }}"
+            password: "{{ password }}"
+          capture:
+            - json: "$.token"
+              as: "authToken"
+          expect:
+            - statusCode: 200
+
+      - think: 2
+
+      - get:
+          url: "/api/v1/users"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          expect:
+            - statusCode: [200, 403]
+
+      - think: 2
+
+      - get:
+          url: "/api/v1/settings"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          expect:
+            - statusCode: [200, 403]
+
+  - name: "Read Heavy"
+    weight: 40
+    flow:
+      - post:
+          url: "/api/v1/auth/login"
+          json:
+            username: "{{ username }}"
+            password: "{{ password }}"
+          capture:
+            - json: "$.token"
+              as: "authToken"
+
+      - think: 1
+
+      - get:
+          url: "/api/v1/users"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          expect:
+            - statusCode: [200, 403]
+
+      - think: 1
+
+      - get:
+          url: "/api/v1/roles"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          expect:
+            - statusCode: [200, 403]
+
+      - think: 1
+
+      - get:
+          url: "/api/v1/settings"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          expect:
+            - statusCode: [200, 403]
+
+      - think: 1
+
+      - get:
+          url: "/api/v1/route/guards"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          expect:
+            - statusCode: [200, 403]
+
+  - name: "Account Operations"
+    weight: 20
+    flow:
+      - post:
+          url: "/api/v1/auth/login"
+          json:
+            username: "{{ username }}"
+            password: "{{ password }}"
+          capture:
+            - json: "$.token"
+              as: "authToken"
+
+      - think: 1
+
+      - put:
+          url: "/api/v1/account/information"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            first_name: "Soak"
+            middle_name: "Test"
+            last_name: "User"
+            address: "123 Soak Test Ave"
+          expect:
+            - statusCode: [200, 401, 403]

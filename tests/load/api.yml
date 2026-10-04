@@ -1,21 +1,284 @@
+# Artillery Load Test Configuration
+# Production-ready load testing for Express 5 + TypeScript REST API
+#
+# Usage:
+#   npm run load:test              # Run with default config
+#   npm run load:test:smoke        # Quick smoke test
+#   npm run load:test:stress       # High-intensity stress test
+#   npm run load:test:soak         # Long-duration soak test
+#
+# Environment variables:
+#   TARGET_URL    - Base URL (default: http://localhost:4000)
+#   DURATION      - Override phase duration in seconds
+#   RATE          - Override arrival rate
+#   WORKERS       - Number of CPU workers for artillery
+
 config:
-  target: "http://localhost:3000"
+  target: "{{ $processEnvironment.TARGET_URL }}"
 
+  # ── Load Phases ──────────────────────────────────────────────────────
+  # Gradual ramp-up to simulate realistic traffic patterns
   phases:
-    - duration: 30
+    # Warm-up: low traffic to initialize connections
+    - name: "Warm-up"
+      duration: 30
       arrivalRate: 5
+      rampTo: 10
 
-    - duration: 60
-      arrivalRate: 20
+    # Ramp-up: gradually increase load
+    - name: "Ramp-up"
+      duration: 60
+      arrivalRate: 10
+      rampTo: 50
 
-    - duration: 30
+    # Sustained load: steady-state traffic
+    - name: "Sustained"
+      duration: 120
       arrivalRate: 50
 
+    # Spike: sudden burst of traffic
+    - name: "Spike"
+      duration: 30
+      arrivalRate: 100
+
+    # Cool-down: gradual decrease
+    - name: "Cool-down"
+      duration: 30
+      arrivalRate: 50
+      rampTo: 5
+
+  # ── Default Headers ──────────────────────────────────────────────────
+  defaults:
+    headers:
+      Content-Type: "application/json"
+      Accept: "application/json"
+
+  # ── Plugins ──────────────────────────────────────────────────────────
+  plugins:
+    expect: { }
+    metrics-by-endpoint: { }
+
+  # ── Performance Thresholds ───────────────────────────────────────────
+  # Fail the test if these thresholds are not met
+  ensure:
+    thresholds:
+      - http.response_time.p95: 500
+      - http.response_time.p99: 1000
+      - http.codes.2xx: 95
+
+  # ── Data Files ───────────────────────────────────────────────────────
+  payload:
+    path: "data/users.csv"
+    fields:
+      - "username"
+      - "password"
+      - "role"
+    order: sequence
+    skipHeader: true
+
+  # ── Hooks ────────────────────────────────────────────────────────────
+  processor: "./plugins/hooks.js"
+
+# ── Scenarios ──────────────────────────────────────────────────────────
 scenarios:
-  - name: "API endpoints"
+  # ── Authentication Flow ────────────────────────────────────────────
+  - name: "Login Flow"
+    weight: 25
     flow:
-      - get:
-          url: "/health"
+      - post:
+          url: "/api/v1/auth/login"
+          json:
+            username: "{{ username }}"
+            password: "{{ password }}"
+          capture:
+            - json: "$.token"
+              as: "authToken"
+          expect:
+            - statusCode: 200
+            - contentType: json
+            - hasProperty: token
+
+      - think: 1
 
       - get:
-          url: "/users"
+          url: "/api/v1/auth/logout"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          expect:
+            - statusCode: 204
+
+  # ── User Management (auth required) ────────────────────────────────
+  - name: "User Browse"
+    weight: 15
+    flow:
+      - post:
+          url: "/api/v1/auth/login"
+          json:
+            username: "{{ username }}"
+            password: "{{ password }}"
+          capture:
+            - json: "$.token"
+              as: "authToken"
+
+      - think: 1
+
+      - get:
+          url: "/api/v1/users"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          expect:
+            - statusCode: [ 200, 403 ]
+            - contentType: json
+
+      - think: 2
+
+      - get:
+          url: "/api/v1/users/1"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          expect:
+            - statusCode: [ 200, 403 ]
+
+  # ── Settings Management (auth required) ────────────────────────────
+  - name: "Settings Browse"
+    weight: 15
+    flow:
+      - post:
+          url: "/api/v1/auth/login"
+          json:
+            username: "{{ username }}"
+            password: "{{ password }}"
+          capture:
+            - json: "$.token"
+              as: "authToken"
+
+      - think: 1
+
+      - get:
+          url: "/api/v1/settings"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          expect:
+            - statusCode: [ 200, 403 ]
+
+      - think: 1
+
+      - get:
+          url: "/api/v1/settings/values"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          expect:
+            - statusCode: [ 200, 403 ]
+
+  # ── Roles Management (auth required) ───────────────────────────────
+  - name: "Roles Browse"
+    weight: 10
+    flow:
+      - post:
+          url: "/api/v1/auth/login"
+          json:
+            username: "{{ username }}"
+            password: "{{ password }}"
+          capture:
+            - json: "$.token"
+              as: "authToken"
+
+      - think: 1
+
+      - get:
+          url: "/api/v1/roles"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          expect:
+            - statusCode: [ 200, 403 ]
+
+      - think: 1
+
+      - get:
+          url: "/api/v1/roles/1"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          expect:
+            - statusCode: [ 200, 403 ]
+
+  # ── Account Management (auth + 2FA required) ───────────────────────
+  - name: "Account Information"
+    weight: 10
+    flow:
+      - post:
+          url: "/api/v1/auth/login"
+          json:
+            username: "{{ username }}"
+            password: "{{ password }}"
+          capture:
+            - json: "$.token"
+              as: "authToken"
+
+      - think: 1
+
+      - put:
+          url: "/api/v1/account/information"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            first_name: "Load"
+            middle_name: "Test"
+            last_name: "User"
+            address: "123 Load Test St"
+          expect:
+            - statusCode: [ 200, 401, 403 ]
+
+  # ── Password Recovery (no auth) ───────────────────────────────────
+  - name: "Password Recovery"
+    weight: 5
+    flow:
+      - post:
+          url: "/api/v1/auth/password-recovery/send"
+          json:
+            type: "email"
+            send_to: "loadtest@example.com"
+          expect:
+            - statusCode: [ 200, 400, 429 ]
+
+  # ── Mixed Read Operations ──────────────────────────────────────────
+  - name: "Mixed Reads"
+    weight: 10
+    flow:
+      - post:
+          url: "/api/v1/auth/login"
+          json:
+            username: "{{ username }}"
+            password: "{{ password }}"
+          capture:
+            - json: "$.token"
+              as: "authToken"
+
+      - think: 1
+
+      - get:
+          url: "/api/v1/users"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+
+      - think: 1
+
+      - get:
+          url: "/api/v1/settings"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+
+      - think: 1
+
+      - get:
+          url: "/api/v1/roles"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+
+      - think: 1
+
+      - get:
+          url: "/api/v1/route/guards"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          expect:
+            - statusCode: [ 200, 403 ]

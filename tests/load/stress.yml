@@ -1,0 +1,160 @@
+# Stress Test Configuration
+# High-intensity test to find breaking points
+# Usage: npm run load:test:stress
+
+config:
+  target: "{{ $processEnvironment.TARGET_URL }}"
+
+  phases:
+    - name: "Stress Ramp"
+      duration: 60
+      arrivalRate: 50
+      rampTo: 200
+
+    - name: "Stress Peak"
+      duration: 120
+      arrivalRate: 200
+
+    - name: "Stress Recovery"
+      duration: 60
+      arrivalRate: 200
+      rampTo: 10
+
+  defaults:
+    headers:
+      Content-Type: "application/json"
+      Accept: "application/json"
+
+  plugins:
+    expect: {}
+    metrics-by-endpoint: {}
+
+  ensure:
+    thresholds:
+      - http.response_time.p95: 2000
+      - http.response_time.p99: 5000
+
+  payload:
+    path: "data/users.csv"
+    fields:
+      - "username"
+      - "password"
+      - "role"
+    order: sequence
+    skipHeader: true
+
+  processor: "./plugins/hooks.js"
+
+scenarios:
+  - name: "Login Heavy"
+    weight: 30
+    flow:
+      - post:
+          url: "/api/v1/auth/login"
+          json:
+            username: "{{ username }}"
+            password: "{{ password }}"
+          capture:
+            - json: "$.token"
+              as: "authToken"
+          expect:
+            - statusCode: 200
+
+      - think: 0.5
+
+      - get:
+          url: "/api/v1/users"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          expect:
+            - statusCode: [200, 403]
+
+      - think: 0.5
+
+      - get:
+          url: "/api/v1/settings"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          expect:
+            - statusCode: [200, 403]
+
+  - name: "Write Operations"
+    weight: 20
+    flow:
+      - post:
+          url: "/api/v1/auth/login"
+          json:
+            username: "admin"
+            password: "123456"
+          capture:
+            - json: "$.token"
+              as: "authToken"
+
+      - think: 0.5
+
+      - post:
+          url: "/api/v1/users"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            first_name: "Load"
+            middle_name: "Test"
+            last_name: "User"
+            username: "loadtest-{{ $randomString() }}"
+            password: "TestPass123!"
+            email: "loadtest-{{ $randomString() }}@example.com"
+            role_id: 3
+            phone: "+1234567890"
+            address: "123 Load Test St"
+            comments: "Created by artillery stress test"
+            status: 1
+          expect:
+            - statusCode: [200, 201, 403]
+
+  - name: "Mixed Operations"
+    weight: 45
+    flow:
+      - post:
+          url: "/api/v1/auth/login"
+          json:
+            username: "{{ username }}"
+            password: "{{ password }}"
+          capture:
+            - json: "$.token"
+              as: "authToken"
+
+      - think: 0.5
+
+      - get:
+          url: "/api/v1/users"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          expect:
+            - statusCode: [200, 403]
+
+      - think: 0.5
+
+      - get:
+          url: "/api/v1/roles"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          expect:
+            - statusCode: [200, 403]
+
+      - think: 0.5
+
+      - get:
+          url: "/api/v1/settings"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          expect:
+            - statusCode: [200, 403]
+
+      - think: 0.5
+
+      - get:
+          url: "/api/v1/route/guards"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          expect:
+            - statusCode: [200, 403]

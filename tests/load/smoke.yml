@@ -1,0 +1,55 @@
+# Smoke Test Configuration
+# Quick validation that the API is responding correctly
+# Usage: npm run load:test:smoke
+
+config:
+  target: "{{ $processEnvironment.TARGET_URL }}"
+
+  phases:
+    - name: "Smoke"
+      duration: 10
+      arrivalRate: 1
+
+  defaults:
+    headers:
+      Content-Type: "application/json"
+      Accept: "application/json"
+
+  plugins:
+    expect: {}
+
+  ensure:
+    thresholds:
+      - http.response_time.p95: 1000
+
+scenarios:
+  - name: "Login"
+    weight: 40
+    flow:
+      - post:
+          url: "/api/v1/auth/login"
+          json:
+            username: "admin"
+            password: "123456"
+          expect:
+            - statusCode: 200
+            - hasProperty: token
+
+  - name: "Browse Users"
+    weight: 30
+    flow:
+      - post:
+          url: "/api/v1/auth/login"
+          json:
+            username: "admin"
+            password: "123456"
+          capture:
+            - json: "$.token"
+              as: "authToken"
+
+      - get:
+          url: "/api/v1/users"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          expect:
+            - statusCode: [200, 403]
