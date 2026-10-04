@@ -1,7 +1,7 @@
 // src/@types/express/index.d.ts
 import "express-useragent";
-import {AuthenticationToken} from "../../modules/auth/interfaces/authentication.token";
-import {JwtExtendedPayload} from "../../modules/auth/interfaces/jwt.interface";
+import {AuthenticationToken} from "../../modules/auth/authentication/authentication.interface";
+import {JwtExtendedPayload} from "../../modules/auth/authentication/authentication.interface";
 import {User} from "../../modules/users/user.interface";
 
 export interface RequestCredentials {

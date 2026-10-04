@@ -9,11 +9,11 @@ import {DateUtil} from "../common/utils/date.util";
 // Repositories
 import {SettingRepository} from "../modules/system/settings/setting.repository";
 import {RouteGuardRepository} from "../modules/system/route-guards/route-guard.repository";
-import {TwoFactorAuthenticationRepository} from "../modules/auth/repositories/two-factor-authentication.repository";
-import {AuthenticationTokenRepository} from "../modules/auth/repositories/authentication-token.repository";
+import {TwoFactorAuthenticationRepository} from "../modules/auth/two-factor-authentication/two-factor-authentication.repository";
+import {AuthenticationTokenRepository} from "../modules/auth/authentication/authentication-token.repository";
 import {RoleRepository} from "../modules/system/roles/role.repository";
 import {UserRepository} from "../modules/users/user.repository";
-import {PasswordRecoveryRepository} from "../modules/auth/repositories/password-recovery.repository";
+import {PasswordRecoveryRepository} from "../modules/auth/password-recovery/password-recovery.repository";
 
 // Shared Cache Elements
 import {RedisCache} from "../shared/redis/redis-cache";
@@ -23,10 +23,10 @@ import {RedisSubscriber} from "../shared/redis/redis-subscriber";
 import {SettingService} from "../modules/system/settings/setting.service";
 import {RouteGuardService} from "../modules/system/route-guards/route-guard.service";
 import {UserService} from "../modules/users/services/user.service";
-import {AuthenticationService} from "../modules/auth/services/authentication.service";
-import {TokenService} from "../modules/auth/services/authentication-token.service";
-import {TwoFactorAuthenticationService} from "../modules/auth/services/two-factor-authentication.service";
-import {PasswordRecoveryService} from "../modules/auth/services/password-recovery.service";
+import {AuthenticationService} from "../modules/auth/authentication/authentication.service";
+import {TokenService} from "../modules/auth/authentication/authentication-token.service";
+import {TwoFactorAuthenticationService} from "../modules/auth/two-factor-authentication/two-factor-authentication.service";
+import {PasswordRecoveryService} from "../modules/auth/password-recovery/password-recovery.service";
 import {RoleService} from "../modules/system/roles/role.service";
 
 // Event Handlers
@@ -61,17 +61,18 @@ const dateUtil = new DateUtil();
 
 export const userService = new UserService(userRepository, securityUtil);
 export const tokenService = new TokenService();
-export const authService = new AuthenticationService(securityUtil, authenticationTokenRepository, roleService, userService, userRepository, tokenService, dateUtil);
-
-// Mail provider
-const mailService = new SendGridMailService(
-    __ENV.SENDGRID_API_KEY,
-);
 
 // Application services
 export const settingService = new SettingService(
     settingRepository,
     redisCache,
+);
+
+export const authService = new AuthenticationService(securityUtil, authenticationTokenRepository, roleService, userService, userRepository, tokenService, dateUtil, settingService);
+
+// Mail provider
+const mailService = new SendGridMailService(
+    __ENV.SENDGRID_API_KEY,
 );
 
 const passwordRecoveryRepository =

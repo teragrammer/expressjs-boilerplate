@@ -1,7 +1,7 @@
 // src/routes/v1.ts
 import {Router} from "express";
 
-import authRoutes from "../modules/auth/routes"
+import authRoutes from "../modules/auth/auth.routes"
 import accountRoutes from "../modules/users/account.routes"
 import userRoutes from "../modules/users/user.routes";
 import settingRoutes from "../modules/system/settings/setting.routes";

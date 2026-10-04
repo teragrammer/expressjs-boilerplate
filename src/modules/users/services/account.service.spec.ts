@@ -2,7 +2,7 @@ import {beforeEach, describe, expect, it, vi} from "vitest";
 
 import {AccountService} from "./account.service";
 import {UserRepository} from "../user.repository";
-import {TokenService} from "../../auth/services/authentication-token.service";
+import {TokenService} from "../../auth/authentication/authentication-token.service";
 import {SecurityUtil} from "../../../common/utils/security.util";
 import {
     SecurityAccountDTO,

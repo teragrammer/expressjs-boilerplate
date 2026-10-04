@@ -1,6 +1,6 @@
 // src/common/middleware/authentication.middleware.ts
 import {NextFunction, Request, Response} from "express";
-import {JwtExtendedPayload} from "../../modules/auth/interfaces/jwt.interface";
+import {JwtExtendedPayload} from "../../modules/auth/authentication/authentication.interface";
 import {AppError} from "../utils/errors";
 
 // 🧠 IMPORT from your isolated container instead of hardcoding instantiations here!

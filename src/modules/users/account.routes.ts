@@ -7,7 +7,7 @@ import {accountInformationSchema} from "./validations/account-information.schema
 import {AccountController} from "./controllers/account.controller";
 import {AccountService} from "./services/account.service";
 import {UserRepository} from "./user.repository";
-import {TokenService} from "../auth/services/authentication-token.service";
+import {TokenService} from "../auth/authentication/authentication-token.service";
 import {accountPasswordSchema} from "./validations/account-password.schema";
 import {SecurityUtil} from "../../common/utils/security.util";
 import {__ENV} from "../../config/environment";

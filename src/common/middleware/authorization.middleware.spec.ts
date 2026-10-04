@@ -3,9 +3,9 @@ import {beforeEach, describe, expect, it, vi} from "vitest";
 import {NextFunction, Request, Response} from "express";
 
 import {AuthorizationMiddleware} from "./authorization.middleware";
-import {JwtExtendedPayload} from "../../modules/auth/interfaces/jwt.interface";
+import {JwtExtendedPayload} from "../../modules/auth/authentication/authentication.interface";
 import {User} from "../../modules/users/user.interface";
-import {AuthenticationToken} from "../../modules/auth/interfaces/authentication.token";
+import {AuthenticationToken} from "../../modules/auth/authentication/authentication.interface";
 
 const {
     mockGetCache,
