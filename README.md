@@ -48,7 +48,7 @@ environment configuration to help you kickstart your API development with best p
 - Clone the repository
 
 ```
-$ git clone https://github.com/teragrammer/expressjs-boilerplate-mysql.git
+$ git clone https://github.com/teragrammer/expressjs-boilerplate.git
 $ cd expressjs-boilerplate
 ```
 
