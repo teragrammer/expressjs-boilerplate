@@ -1,30 +1,53 @@
 // database/migrations/20250313141555_authentication_tokens.ts
+import type {Kysely} from "kysely";
+import {sql} from "kysely";
 
-import type {Knex} from "knex";
+export async function up(db: Kysely<any>): Promise<void> {
+    await db.schema
+        .createTable("authentication_tokens")
+        .addColumn("id", "serial", (col) => col.primaryKey())
+        .addColumn("user_id", "integer")
+        .addColumn("tries", "integer", (col) =>
+            col.notNull().defaultTo(0),
+        )
+        .addColumn("expired_at", "timestamptz")
+        .addColumn("ip", "varchar(100)")
+        .addColumn("browser", "varchar(100)")
+        .addColumn("os", "varchar(100)")
+        .addColumn("created_at", "timestamptz", (col) =>
+            col.defaultTo(sql`now()`),
+        )
+        .addColumn("updated_at", "timestamptz", (col) =>
+            col.defaultTo(sql`now()`),
+        )
+        .addForeignKeyConstraint(
+            "authentication_tokens_user_id_fk",
+            ["user_id"],
+            "users",
+            ["id"],
+            (cb) => cb.onUpdate("cascade").onDelete("cascade"),
+        )
+        .execute();
 
-export async function up(knex: Knex): Promise<void> {
-    return knex.schema.createTable("authentication_tokens", table => {
-        table.increments("id").primary();
+    await db.schema
+        .createIndex("idx_authentication_tokens_user_id")
+        .on("authentication_tokens")
+        .column("user_id")
+        .execute();
 
-        table.integer("user_id").unsigned().index().nullable();
-        table.foreign("user_id")
-            .references("users.id")
-            .onUpdate("CASCADE")
-            .onDelete("CASCADE");
+    await db.schema
+        .createIndex("idx_authentication_tokens_expired_at")
+        .on("authentication_tokens")
+        .column("expired_at")
+        .execute();
 
-        table.dateTime("expired_at").index().nullable();
-
-        // meta data
-        table.string("ip", 100).nullable();
-        table.string("browser", 100).nullable();
-        table.string("os", 100).nullable();
-
-        table.dateTime("created_at").index().defaultTo(knex.fn.now()).nullable();
-        table.dateTime("updated_at").defaultTo(knex.fn.now()).nullable();
-    });
+    await db.schema
+        .createIndex("idx_authentication_tokens_created_at")
+        .on("authentication_tokens")
+        .column("created_at")
+        .execute();
 }
 
-export async function down(knex: Knex): Promise<void> {
-    return knex.schema.dropTable("authentication_tokens");
+export async function down(db: Kysely<any>): Promise<void> {
+    await db.schema.dropTable("authentication_tokens").execute();
 }
-

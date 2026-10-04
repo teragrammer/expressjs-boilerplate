@@ -1,26 +1,39 @@
-import {Knex} from "knex";
+import type {Kysely} from "kysely";
+import type {Database} from "../../src/config/schema";
 import {securityUtil} from "../../src/config/container";
 
-export async function seed(knex: Knex): Promise<void> {
-    // Insert roles
-    const [ADMIN_ROLE] = await knex("roles").insert({
-        name: 'Administrator',
-        slug: 'admin',
-        is_public: 0,
-        is_bypass_authorization: 1
-    }).returning('id');
-    const [MANAGER_ROLE] = await knex("roles").insert({name: 'Manager', slug: 'manager', is_public: 0}).returning('id');
-    const [CUSTOMER_ROLE] = await knex("roles").insert({
-        name: 'Customer',
-        slug: 'customer',
-        is_public: 0
-    }).returning('id');
+export async function seed(db: Kysely<Database>): Promise<void> {
+    const adminRole = await db
+        .insertInto("roles")
+        .values({
+            name: 'Administrator',
+            slug: 'admin',
+            is_public: false,
+            is_bypass_authorization: true,
+        })
+        .returning("id")
+        .executeTakeFirstOrThrow();
 
-    // Inserts users
+    const managerRole = await db
+        .insertInto("roles")
+        .values({name: 'Manager', slug: 'manager', is_public: false})
+        .returning("id")
+        .executeTakeFirstOrThrow();
+
+    const customerRole = await db
+        .insertInto("roles")
+        .values({name: 'Customer', slug: 'customer', is_public: false})
+        .returning("id")
+        .executeTakeFirstOrThrow();
+
     const password = await securityUtil.hash("pass1234");
-    await knex("users").insert([
-        {username: "admin", password: password, role_id: ADMIN_ROLE.id},
-        {username: "manager", password: password, role_id: MANAGER_ROLE.id},
-        {username: "customer", password: password, role_id: CUSTOMER_ROLE.id},
-    ]);
+
+    await db
+        .insertInto("users")
+        .values([
+            {username: "admin", password: password, role_id: adminRole.id},
+            {username: "manager", password: password, role_id: managerRole.id},
+            {username: "customer", password: password, role_id: customerRole.id},
+        ])
+        .execute();
 }

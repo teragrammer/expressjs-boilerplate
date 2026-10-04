@@ -1,25 +1,35 @@
 // database/migrations/20250313141537_roles.ts
+import type {Kysely} from "kysely";
+import {sql} from "kysely";
 
-import type {Knex} from "knex";
+export async function up(db: Kysely<any>): Promise<void> {
+    await db.schema
+        .createTable("roles")
+        .addColumn("id", "serial", (col) => col.primaryKey())
+        .addColumn("name", "varchar(100)", (col) => col.notNull())
+        .addColumn("slug", "varchar(100)", (col) => col.notNull().unique())
+        .addColumn("description", "text")
+        .addColumn("is_public", "boolean", (col) =>
+            col.notNull().defaultTo(false),
+        )
+        .addColumn("is_bypass_authorization", "boolean", (col) =>
+            col.notNull().defaultTo(false),
+        )
+        .addColumn("created_at", "timestamptz", (col) =>
+            col.notNull().defaultTo(sql`now()`),
+        )
+        .addColumn("updated_at", "timestamptz", (col) =>
+            col.notNull().defaultTo(sql`now()`),
+        )
+        .execute();
 
-export async function up(knex: Knex): Promise<void> {
-    return knex.schema.createTable('roles', (table) => {
-        table.increments('id').primary();
-
-        table.string('name', 100).notNullable();
-        table.string('slug', 100).unique().index().notNullable();
-        table.text('description').nullable(); // Highly compatible and standard
-
-        // Use true JS booleans; Knex will write 0/1 for SQLite/MySQL and TRUE/FALSE for Postgres
-        table.boolean('is_public').notNullable().defaultTo(false);
-        table.boolean('is_bypass_authorization').notNullable().defaultTo(false);
-
-        // Standardized on timezone-aware timestamps
-        table.timestamp('created_at', {useTz: true}).index().defaultTo(knex.fn.now()).notNullable();
-        table.timestamp('updated_at', {useTz: true}).defaultTo(knex.fn.now()).notNullable();
-    });
+    await db.schema
+        .createIndex("idx_roles_created_at")
+        .on("roles")
+        .column("created_at")
+        .execute();
 }
 
-export async function down(knex: Knex): Promise<void> {
-    return knex.schema.dropTableIfExists('roles');
+export async function down(db: Kysely<any>): Promise<void> {
+    await db.schema.dropTable("roles").execute();
 }

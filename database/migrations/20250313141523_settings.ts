@@ -1,49 +1,40 @@
 // database/migrations/20250313141523_settings.ts
-import type { Knex } from "knex";
-import { DATA_TYPES } from "../../src/modules/system/settings/setting.model";
+import type {Kysely} from "kysely";
+import {sql} from "kysely";
+import {DATA_TYPES} from "../../src/modules/system/settings/setting.model";
 
-export async function up(knex: Knex): Promise<void> {
-    return knex.schema.createTable("settings", table => {
-        table.increments("id").primary();
+const TYPE_CHECK_VALUES = DATA_TYPES.map((type) => `'${type}'`).join(", ");
 
-        table.string("name", 100).unique().notNullable();
-
-        table
-            .string("slug", 100)
-            .unique()
-            .notNullable();
-
-        table.text("value").nullable();
-
-        table.text("description").nullable();
-
-        table
-            .enum("type", DATA_TYPES)
-            .notNullable()
-            .defaultTo("string");
-
-        table
-            .boolean("is_disabled")
-            .notNullable()
-            .defaultTo(false);
-
-        table
-            .boolean("is_public")
-            .notNullable()
-            .defaultTo(true);
-
-        table
-            .dateTime("created_at")
-            .notNullable()
-            .defaultTo(knex.fn.now());
-
-        table
-            .dateTime("updated_at")
-            .notNullable()
-            .defaultTo(knex.fn.now());
-    });
+export async function up(db: Kysely<any>): Promise<void> {
+    await db.schema
+        .createTable("settings")
+        .addColumn("id", "serial", (col) => col.primaryKey())
+        .addColumn("name", "varchar(100)", (col) => col.notNull().unique())
+        .addColumn("slug", "varchar(100)", (col) => col.notNull().unique())
+        .addColumn("value", "text")
+        .addColumn("description", "text")
+        .addColumn("type", "varchar(20)", (col) =>
+            col.notNull().defaultTo("string"),
+        )
+        .addColumn("is_disabled", "boolean", (col) =>
+            col.notNull().defaultTo(false),
+        )
+        .addColumn("is_public", "boolean", (col) =>
+            col.notNull().defaultTo(true),
+        )
+        .addColumn("created_at", "timestamptz", (col) =>
+            col.notNull().defaultTo(sql`now()`),
+        )
+        .addColumn("updated_at", "timestamptz", (col) =>
+            col.notNull().defaultTo(sql`now()`),
+        )
+        .addCheckConstraint(
+            "settings_type_check",
+            sql`type in (${sql.raw(TYPE_CHECK_VALUES)})`,
+        )
+        .execute();
 }
 
-export async function down(knex: Knex): Promise<void> {
-    return knex.schema.dropTable("settings");
+export async function down(db: Kysely<any>): Promise<void> {
+    await db.schema.dropTable("settings").execute();
 }
