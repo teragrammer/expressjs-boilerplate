@@ -8,7 +8,7 @@
 ![PostgreSQL](https://img.shields.io/badge/postgresql-%234169E1.svg?style=flat&logo=postgresql&logoColor=white)
 ![Redis](https://img.shields.io/badge/redis-%23DD0031.svg?style=flat&logo=redis&logoColor=white)
 ![Vitest](https://img.shields.io/badge/vitest-%236E9F1.svg?style=flat&logo=vitest&logoColor=white)
-![Knex.js](https://img.shields.io/badge/knex.js-%23D26A35.svg?style=flat&logo=knexdotjs&logoColor=white)
+![Kysely](https://img.shields.io/badge/kysely-%23E5853B.svg?style=flat&logo=typescript&logoColor=white)
 
 A minimal and clean Express.js boilerplate for building RESTful APIs quickly.
 This starter template includes essential features like routing, middleware setup, error handling, and

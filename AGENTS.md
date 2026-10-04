@@ -7,8 +7,8 @@ Express 5 + TypeScript REST API boilerplate. Despite the README title and some c
 - `npm run dev` — nodemon + ts-node, watches `src/`
 - `npm run build` — tsc compile. Gotcha: tsconfig `outDir` is `./dist`, but `npm run start` runs `node build/server.js`; the build/start pair is currently broken (output lands in `dist/`).
 - `npm test` / `npm run test:run` — vitest. Always use these npm scripts instead of calling `npx vitest` directly: all tests share one database and the scripts enforce `--no-file-parallelism`.
-- `npm run db:migrate` / `db:seed` / `db:reset` — knex via `knexfile.ts`; must run from the repo root (migration/seed directories resolve from `process.cwd()`).
-- `npm run make:migration` / `make:seed` — scaffold a new migration/seed file.
+- `npm run db:migrate` / `db:seed` / `db:reset` — Kysely via ts-node scripts in `scripts/db/` with the static registry in `src/config/migrator.ts`; must run from the repo root (migration/seed directories resolve from `process.cwd()`).
+- `npm run make:migration` / `make:seed` — scaffold a new migration/seed file (register migrations in `src/config/migrator.ts`, wire seeds into `scripts/db/seed.ts`).
 - Load tests: artillery against `tests/load/api.yml` (targets `localhost:3000`).
 
 ## Testing

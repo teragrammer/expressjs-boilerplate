@@ -24,7 +24,7 @@ Follow these steps strictly whenever a commit action is requested or code change
     - For modified files, run `git diff` to inspect changes.
     - For newly created files, inspect their contents directly.
 3. **Group Files Logically:** Do not bundle everything into one messy commit. Group related files into atomic batches:
-    - **Database Group:** New/modified Knex migrations, seeds, or schemas.
+    - **Database Group:** New/modified Kysely migrations, seeds, or schemas.
     - **Features Group:** Express routes, controllers, and core business logic.
     - **Tests Group:** Vitest test files and mocking utilities.
     - **Configs & Docs Group:** `package.json`, environment templates, or `README.md`.
