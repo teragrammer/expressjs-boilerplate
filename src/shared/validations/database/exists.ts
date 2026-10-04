@@ -1,16 +1,16 @@
 // src/shared/validations/database/exists.ts
 import Joi from 'joi';
-import {Knex} from 'knex';
-import {DBKnex} from '../../../config/knex';
+import {sql} from 'kysely';
+import {db as defaultDb, type DatabaseExecutor} from '../../../config/database';
 
 interface ExistsOptions {
     column?: string;
-    db?: Knex;
+    db?: DatabaseExecutor;
 }
 
 export const validateExists = (
     table: string,
-    {column = 'id', db = DBKnex}: ExistsOptions = {}
+    {column = 'id', db = defaultDb}: ExistsOptions = {}
 ) => {
     const validIdentifierRegex = /^[a-zA-Z0-9_]+$/;
     if (!validIdentifierRegex.test(table) || !validIdentifierRegex.test(column)) {
@@ -20,14 +20,19 @@ export const validateExists = (
     return async (value: any, helpers: Joi.CustomHelpers): Promise<any> => {
         if (value === undefined || value === null) return value;
 
-        let row: any;
+        let row: unknown;
 
         // 1. ONLY wrap the database operation in try/catch
         try {
-            row = await db(table)
-                .select(1)
-                .where(column, value)
-                .first();
+            // Table/column identifiers are allowlisted above; the value
+            // stays parameterized through the query builder.
+            row = await db
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                .selectFrom(table as any)
+                .select(sql`1`.as('one'))
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                .where(column as any, '=', value)
+                .executeTakeFirst();
         } catch (error) {
             console.error(`Database validation error on ${table}.${column}:`, error);
 

@@ -1,5 +1,5 @@
 // src/config/container.ts
-import {DBKnex} from "./knex";
+import {db} from "./database";
 import {DBRedis} from "./redis";
 import {logger} from "./logger";
 import {__ENV} from "./environment";
@@ -52,10 +52,10 @@ export const redisSubscriber = new RedisSubscriber(
 );
 
 // Repositories
-const userRepository = new UserRepository(DBKnex);
-const settingRepository = new SettingRepository(DBKnex);
-const routeGuardRepository = new RouteGuardRepository(DBKnex);
-const authenticationTokenRepository = new AuthenticationTokenRepository(DBKnex);
+const userRepository = new UserRepository(db);
+const settingRepository = new SettingRepository(db);
+const routeGuardRepository = new RouteGuardRepository(db);
+const authenticationTokenRepository = new AuthenticationTokenRepository(db);
 const roleService = new RoleService(new RoleRepository());
 const dateUtil = new DateUtil();
 
@@ -75,7 +75,7 @@ export const settingService = new SettingService(
 );
 
 const passwordRecoveryRepository =
-    new PasswordRecoveryRepository(DBKnex);
+    new PasswordRecoveryRepository(db);
 
 export const routeGuardService = new RouteGuardService(
     routeGuardRepository,
@@ -84,7 +84,7 @@ export const routeGuardService = new RouteGuardService(
 
 export const twoFactorAuthenticationService = new TwoFactorAuthenticationService(
     securityUtil,
-    new TwoFactorAuthenticationRepository(DBKnex),
+    new TwoFactorAuthenticationRepository(db),
     authenticationTokenRepository,
     tokenService,
     dateUtil,

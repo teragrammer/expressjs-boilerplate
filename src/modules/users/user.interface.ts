@@ -5,7 +5,7 @@ export type Gender = typeof GENDERS[number];
 export const STATUSES = ["Activated", "Suspended", "Deactivated", "Pending"] as const;
 export type Status = typeof STATUSES[number];
 
-// Represents the actual raw row returned by your Knex database client
+// Represents the actual raw row returned by the PostgreSQL driver
 export interface UserRow {
     id: number;
     first_name: string | null;
@@ -14,10 +14,10 @@ export interface UserRow {
     gender: Gender | null;
     address: string | null;
     phone: string | null;
-    is_phone_verified: number; // 0 or 1 at database layer
+    is_phone_verified: boolean;
     email: string | null;
-    is_email_verified: number; // 0 or 1 at database layer
-    has_tfa: number; // 0 or 1 at database layer
+    is_email_verified: boolean;
+    has_tfa: boolean;
     tfa_secret: string | null;
     role_id: number;
     username: string | null;

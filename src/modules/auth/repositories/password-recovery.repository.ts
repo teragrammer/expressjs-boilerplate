@@ -1,6 +1,7 @@
 // src/modules/auth/repositories/password-recovery.repository.ts
-import {Knex} from "knex";
-import {DBKnex} from "../../../config/knex";
+import type {Transaction} from "kysely";
+import {db as defaultDb, type DatabaseExecutor} from "../../../config/database";
+import type {Database} from "../../../config/schema";
 import {PasswordRecovery, Type,} from "../interfaces/password.recovery.interface";
 
 export const PASSWORD_RECOVERIES_TABLE = "password_recoveries";
@@ -16,93 +17,115 @@ export interface PasswordRecoveryCreateData {
 }
 
 export class PasswordRecoveryRepository {
-    constructor(private readonly db: Knex = DBKnex) {
-    }
-
-    private table(db: Knex = this.db) {
-        return db<PasswordRecovery>(PASSWORD_RECOVERIES_TABLE);
+    constructor(private readonly db: DatabaseExecutor = defaultDb) {
     }
 
     async findBySendTo(
         sendTo: string,
         type?: Type,
     ): Promise<PasswordRecovery | null> {
-        let query = this.table();
-
-        query = query.where({send_to: sendTo});
+        let query = this.db
+            .selectFrom(PASSWORD_RECOVERIES_TABLE)
+            .selectAll()
+            .where("send_to", "=", sendTo);
 
         if (type) {
-            query = query.andWhere({type});
+            query = query.where("type", "=", type);
         }
 
-        const record = await query.first();
+        const record = await query.executeTakeFirst();
 
         return record ?? null;
     }
 
     async create(
         data: PasswordRecoveryCreateData,
-        trx?: Knex.Transaction,
+        trx?: Transaction<Database>,
     ): Promise<PasswordRecovery> {
-        const [record] = await this.table(trx ?? this.db)
-            .insert({
+        const executor: DatabaseExecutor = trx ?? this.db;
+
+        return executor
+            .insertInto(PASSWORD_RECOVERIES_TABLE)
+            .values({
                 ...data,
                 tries: data.tries ?? 0,
                 next_try_at: data.next_try_at ?? null,
             })
-            .returning("*");
-
-        return record;
+            .returningAll()
+            .executeTakeFirstOrThrow();
     }
 
     async update(
         id: number,
         data: Partial<PasswordRecovery>,
-        trx?: Knex.Transaction,
+        trx?: Transaction<Database>,
     ): Promise<PasswordRecovery | null> {
-        const [record] = await this.table(trx ?? this.db)
-            .where({id})
-            .update({
-                ...data,
+        const executor: DatabaseExecutor = trx ?? this.db;
+
+        // Never overwrite the primary key or creation timestamp.
+        const {
+            id: _ignoredId,
+            created_at: _ignoredCreatedAt,
+            ...updatable
+        } = data;
+
+        const record = await executor
+            .updateTable(PASSWORD_RECOVERIES_TABLE)
+            .set({
+                ...updatable,
                 updated_at: new Date(),
             })
-            .returning("*");
+            .where("id", "=", id)
+            .returningAll()
+            .executeTakeFirst();
 
         return record ?? null;
     }
 
     async deleteById(
         id: number,
-        trx?: Knex.Transaction,
+        trx?: Transaction<Database>,
     ): Promise<boolean> {
-        const deletedRows = await this.table(trx ?? this.db)
-            .where({id})
-            .delete();
+        const executor: DatabaseExecutor = trx ?? this.db;
 
-        return deletedRows > 0;
+        const result = await executor
+            .deleteFrom(PASSWORD_RECOVERIES_TABLE)
+            .where("id", "=", id)
+            .executeTakeFirst();
+
+        return Number(result.numDeletedRows) > 0;
     }
 
     async deleteBySendTo(
         sendTo: string,
         type?: Type,
-        trx?: Knex.Transaction,
+        trx?: Transaction<Database>,
     ): Promise<boolean> {
-        const query = this.table(trx ?? this.db)
-            .where({send_to: sendTo});
+        const executor: DatabaseExecutor = trx ?? this.db;
+
+        let query = executor
+            .deleteFrom(PASSWORD_RECOVERIES_TABLE)
+            .where("send_to", "=", sendTo);
 
         if (type) {
-            query.andWhere({type});
+            query = query.where("type", "=", type);
         }
 
-        const deletedRows = await query.delete();
+        const result = await query.executeTakeFirst();
 
-        return deletedRows > 0;
+        return Number(result.numDeletedRows) > 0;
     }
 
     async withTransaction<T>(
-        callback: (trx: Knex.Transaction) => Promise<T>,
+        callback: (trx: Transaction<Database>) => Promise<T>,
     ): Promise<T> {
-        return this.db.transaction(callback);
+        if (!("transaction" in this.db)) {
+            throw new Error(
+                "withTransaction requires the shared database instance, not a transaction.",
+            );
+        }
+
+        return this.db.transaction().execute(callback);
     }
 
     async updateTries(
@@ -110,12 +133,14 @@ export class PasswordRecoveryRepository {
         tries: number,
         nextTryAt: Date | null,
     ): Promise<void> {
-        await this.table()
-            .where({id})
-            .update({
+        await this.db
+            .updateTable(PASSWORD_RECOVERIES_TABLE)
+            .set({
                 tries,
                 next_try_at: nextTryAt,
                 updated_at: new Date(),
-            });
+            })
+            .where("id", "=", id)
+            .execute();
     }
 }

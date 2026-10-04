@@ -1,37 +1,25 @@
 // src/modules/system/route-guards/route-guard.repository.ts
-import {Knex} from "knex";
-import {DBKnex} from "../../../config/knex";
+import {db as defaultDb, type DatabaseExecutor} from "../../../config/database";
 import {BrowseRouteGuardQuery, CreateRouteGuardDTO, RouteGuard, RouteGuardRow,} from "./route-guard.interface";
 import {ROLE_TABLE} from "../roles/role.repository";
 
 export const ROUTE_GUARD_TABLE = "route_guards";
 
-export class RouteGuardRepository {
-    private readonly db: Knex;
+const JOINED_COLUMNS = [
+    "route_guards.id",
+    "route_guards.role_id",
+    "route_guards.route",
+    "route_guards.created_at",
+    "route_guards.updated_at",
+    "roles.slug as role_slug",
+] as const;
 
-    constructor(db: Knex = DBKnex) {
+export class RouteGuardRepository {
+    private readonly db: DatabaseExecutor;
+
+    constructor(db: DatabaseExecutor = defaultDb) {
         this.db = db;
     }
-
-    /**
-     * Typed route guards table query builder.
-     */
-    private get table() {
-        return this.db<RouteGuardRow>(ROUTE_GUARD_TABLE);
-    }
-
-    /**
-     * Columns returned when a route guard is queried together
-     * with its role information.
-     */
-    private static readonly joinedSelect = [
-        `${ROUTE_GUARD_TABLE}.id`,
-        `${ROUTE_GUARD_TABLE}.role_id`,
-        `${ROUTE_GUARD_TABLE}.route`,
-        `${ROUTE_GUARD_TABLE}.created_at`,
-        `${ROUTE_GUARD_TABLE}.updated_at`,
-        `${ROLE_TABLE}.slug as role_slug`,
-    ];
 
     /**
      * Base query for route guards that require role information.
@@ -39,27 +27,22 @@ export class RouteGuardRepository {
      * Keeping the join in one place prevents the same join and
      * select list from being duplicated across repository methods.
      */
-    private get joinedTable() {
-        return this.table
-            .join(
-                ROLE_TABLE,
-                `${ROUTE_GUARD_TABLE}.role_id`,
-                `${ROLE_TABLE}.id`,
-            )
-            .select(RouteGuardRepository.joinedSelect);
+    private joinedQuery() {
+        return this.db
+            .selectFrom(ROUTE_GUARD_TABLE)
+            .innerJoin(ROLE_TABLE, `${ROLE_TABLE}.id`, `${ROUTE_GUARD_TABLE}.role_id`)
+            .select(JOINED_COLUMNS);
     }
 
     async create(data: CreateRouteGuardDTO): Promise<RouteGuard> {
-        const insertPayload: Partial<RouteGuard> = {
-            role_id: data.role_id,
-            route: data.route,
-        };
-
-        const [newRow] = await this.table
-            .insert(insertPayload)
-            .returning("*");
-
-        return newRow;
+        return this.db
+            .insertInto(ROUTE_GUARD_TABLE)
+            .values({
+                role_id: data.role_id,
+                route: data.route,
+            })
+            .returningAll()
+            .executeTakeFirstOrThrow();
     }
 
     async browse(
@@ -73,11 +56,12 @@ export class RouteGuardRepository {
 
         const offset = (page - 1) * perPage;
 
-        let query = this.joinedTable;
+        let query = this.joinedQuery();
 
         if (role_id !== undefined) {
             query = query.where(
                 `${ROUTE_GUARD_TABLE}.role_id`,
+                "=",
                 role_id,
             );
         }
@@ -88,7 +72,8 @@ export class RouteGuardRepository {
                 "desc",
             )
             .offset(offset)
-            .limit(perPage);
+            .limit(perPage)
+            .execute();
     }
 
     /**
@@ -97,20 +82,23 @@ export class RouteGuardRepository {
      * Used to build the authorization cache.
      */
     async findRouteGuardsGroupedByRole(): Promise<RouteGuardRow[]> {
-        return this.joinedTable;
+        return this.joinedQuery().execute();
     }
 
     async findById(id: number): Promise<RouteGuardRow | null> {
-        return this.joinedTable
-            .where(`${ROUTE_GUARD_TABLE}.id`, id)
-            .first();
+        const row = await this.joinedQuery()
+            .where(`${ROUTE_GUARD_TABLE}.id`, "=", id)
+            .executeTakeFirst();
+
+        return row ?? null;
     }
 
     async delete(id: number): Promise<boolean> {
-        const deletedRows = await this.table
-            .where({id})
-            .del();
+        const result = await this.db
+            .deleteFrom(ROUTE_GUARD_TABLE)
+            .where("id", "=", id)
+            .executeTakeFirst();
 
-        return deletedRows > 0;
+        return Number(result.numDeletedRows) > 0;
     }
 }

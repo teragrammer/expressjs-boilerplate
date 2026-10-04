@@ -5,7 +5,7 @@ import cluster from "node:cluster";
 import app, {bootstrap} from "./app";
 import {logger} from "./config/logger";
 import {__ENV} from "./config/environment";
-import {checkDbConnection, DBKnex} from "./config/knex";
+import {checkDbConnection, closeDatabase} from "./config/database";
 import {disconnectRedis} from "./config/redis";
 
 const DEFAULT_CLUSTER_WORKERS = Math.max(1, os.cpus().length);
@@ -211,13 +211,11 @@ function registerGracefulShutdown(
  * Closes application infrastructure connections.
  */
 async function closeDependencies(): Promise<void> {
-    if (DBKnex) {
-        await DBKnex.destroy();
+    await closeDatabase();
 
-        logger.info(
-            `[Worker ${process.pid}] Database pool safely drained.`,
-        );
-    }
+    logger.info(
+        `[Worker ${process.pid}] Database pool safely drained.`,
+    );
 
     await disconnectRedis();
 

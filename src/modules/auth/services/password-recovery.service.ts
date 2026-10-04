@@ -99,8 +99,8 @@ export class PasswordRecoveryService {
         /*
          * The mail operation intentionally occurs inside the transaction.
          *
-         * If MailService throws, Knex rolls back the inserted recovery
-         * record automatically.
+         * If MailService throws, the transaction rolls back
+         * the inserted recovery record automatically.
          */
         await this.recoveryRepository.withTransaction(async (trx) => {
             if (existingRecovery) {

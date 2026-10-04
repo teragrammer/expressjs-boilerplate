@@ -14,8 +14,7 @@ export type SettingDataType =
 /**
  * Raw database representation.
  *
- * MySQL BOOLEAN is effectively TINYINT(1), so Knex/mysql2
- * commonly returns 0/1 for these columns.
+ * PostgreSQL booleans come back as native booleans via node-postgres.
  */
 export interface SettingRow {
     id: number;
@@ -24,8 +23,8 @@ export interface SettingRow {
     value: string | null;
     description: string | null;
     type: SettingDataType;
-    is_disabled: number;
-    is_public: number;
+    is_disabled: boolean;
+    is_public: boolean;
     created_at: Date | string;
     updated_at: Date | string;
 }

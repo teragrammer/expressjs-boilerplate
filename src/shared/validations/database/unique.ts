@@ -1,18 +1,18 @@
 // src/shared/validations/database/unique.ts
 import Joi from 'joi';
-import { Knex } from 'knex';
-import { DBKnex } from "../../../config/knex";
+import {sql} from 'kysely';
+import {db as defaultDb, type DatabaseExecutor} from "../../../config/database";
 
 interface CompositeUniqueOptions {
     ignoreId?: string | number;
     idColumn?: string;
-    db?: Knex;
+    db?: DatabaseExecutor;
 }
 
 export const validateCompositeUnique = (
     table: string,
     columns: string[],
-    { ignoreId, idColumn = 'id', db = DBKnex }: CompositeUniqueOptions = {}
+    {ignoreId, idColumn = 'id', db = defaultDb}: CompositeUniqueOptions = {}
 ) => {
     const validIdentifierRegex = /^[a-zA-Z0-9_]+$/;
     if (!validIdentifierRegex.test(table) || !validIdentifierRegex.test(idColumn) || !columns.every(col => validIdentifierRegex.test(col))) {
@@ -22,22 +22,27 @@ export const validateCompositeUnique = (
     return async (value: Record<string, any>, helpers: Joi.CustomHelpers): Promise<Record<string, any>> => {
         if (!value) return value;
 
-        let row: any;
+        let row: unknown;
 
         // 1. ONLY wrap the database operation in try/catch
         try {
-            const query = db(table).select(1);
+            // Table/column identifiers are allowlisted above; values stay
+            // parameterized through the query builder.
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            let query = db.selectFrom(table as any).select(sql`1`.as('one'));
 
             columns.forEach((col) => {
                 const fieldValue = value[col];
-                query.where(col, fieldValue !== undefined ? fieldValue : null);
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                query = query.where(col as any, '=', fieldValue !== undefined ? fieldValue : null);
             });
 
             if (ignoreId !== undefined && ignoreId !== null) {
-                query.whereNot(idColumn, ignoreId);
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                query = query.where(idColumn as any, '<>', ignoreId);
             }
 
-            row = await query.first();
+            row = await query.executeTakeFirst();
         } catch (error) {
             console.error(`Database unique validation error on ${table} [${columns.join(', ')}]:`, error);
 
@@ -48,7 +53,7 @@ export const validateCompositeUnique = (
                         message: 'An internal validation error occurred.',
                         path: helpers.state.path ?? [],
                         type: 'database.error',
-                        context: { key: columns.join('_') }
+                        context: {key: columns.join('_')}
                     }
                 ],
                 value
@@ -64,7 +69,7 @@ export const validateCompositeUnique = (
                         message: `The combination of fields (${columns.join(', ')}) already exists.`,
                         path: helpers.state.path && helpers.state.path.length > 0 ? helpers.state.path : columns,
                         type: 'any.unique',
-                        context: { key: columns.join('_'), value }
+                        context: {key: columns.join('_'), value}
                     }
                 ],
                 value

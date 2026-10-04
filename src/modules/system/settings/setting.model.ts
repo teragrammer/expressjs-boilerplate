@@ -1,6 +1,4 @@
-import {Knex} from "knex";
 import {SettingKeyValue} from "./setting-key-value.interface";
-import {DBKnex} from "../../../config/knex";
 
 export const SETTING_TABLE = "settings";
 
@@ -11,10 +9,4 @@ export const SET_CACHE_SETTINGS = "cache:settings";
 export interface InitializerSettingInterface {
     pri: SettingKeyValue;
     pub: SettingKeyValue;
-}
-
-export function SettingModel(knex?: Knex) {
-    return {
-        table: () => (knex ? knex : DBKnex).table(SETTING_TABLE),
-    };
 }
