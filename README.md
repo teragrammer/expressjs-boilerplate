@@ -53,7 +53,15 @@ $ cd expressjs-boilerplate
 
 ```
 $ docker compose up -d
-$ sh bin/run.sh
+$ sh scripts/docker.sh -r
+```
+
+- Manage the container with `scripts/docker.sh`:
+
+```
+$ sh scripts/docker.sh -r   # Run: start the container and open a bash shell
+$ sh scripts/docker.sh -s   # Stop: stop the running container
+$ sh scripts/docker.sh -d   # Destroy: tear down containers, images, networks, and volumes
 ```
 
 - Install dependencies
