@@ -1,9 +1,14 @@
 # ExpressJS Boilerplate API
 
+![Build Status](https://github.com/teragrammer/expressjs-boilerplate/actions/workflows/test.yml/badge.svg)
 ![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=flat&logo=docker&logoColor=white)
 ![Express.js](https://img.shields.io/badge/express.js-%23404d59.svg?style=flat&logo=express&logoColor=%2361DAFB)
-![PostgreSQL](https://www.postgresql.org)
+![Node.js](https://img.shields.io/badge/node.js-%23339933.svg?style=flat&logo=nodedotjs&logoColor=white)
+![TypeScript](https://img.shields.io/badge/typescript-%233178C6.svg?style=flat&logo=typescript&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/postgresql-%234169E1.svg?style=flat&logo=postgresql&logoColor=white)
 ![Redis](https://img.shields.io/badge/redis-%23DD0031.svg?style=flat&logo=redis&logoColor=white)
+![Vitest](https://img.shields.io/badge/vitest-%236E9F1.svg?style=flat&logo=vitest&logoColor=white)
+![Knex.js](https://img.shields.io/badge/knex.js-%23D26A35.svg?style=flat&logo=knexdotjs&logoColor=white)
 
 ```
 A minimal and clean Express.js boilerplate for building RESTful APIs quickly. 
