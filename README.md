@@ -10,11 +10,9 @@
 ![Vitest](https://img.shields.io/badge/vitest-%236E9F1.svg?style=flat&logo=vitest&logoColor=white)
 ![Knex.js](https://img.shields.io/badge/knex.js-%23D26A35.svg?style=flat&logo=knexdotjs&logoColor=white)
 
-```
-A minimal and clean Express.js boilerplate for building RESTful APIs quickly. 
-This starter template includes essential features like routing, middleware setup, error handling, and 
+A minimal and clean Express.js boilerplate for building RESTful APIs quickly.
+This starter template includes essential features like routing, middleware setup, error handling, and
 environment configuration to help you kickstart your API development with best practices.
-```
 
 ### Features
 
