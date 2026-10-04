@@ -3,7 +3,7 @@ import request from "supertest";
 import sgMail from "@sendgrid/mail";
 
 import app from "../../src/app";
-import {DBKnex} from "../../src/config/knex";
+import {db} from "../../src/config/database";
 import {securityUtil, tokenService,} from "../../src/config/container";
 
 interface TestUserContext {
@@ -17,9 +17,11 @@ const createdAuthenticationTokenIds: number[] = [];
 const createdTfaIds: number[] = [];
 
 const createAuthenticatedUser = async (): Promise<TestUserContext> => {
-    const role = await DBKnex("roles")
-        .where({slug: "customer"})
-        .first();
+    const role = await db
+        .selectFrom("roles")
+        .selectAll()
+        .where("slug", "=", "customer")
+        .executeTakeFirst();
 
     if (!role) {
         throw new Error(
@@ -37,18 +39,16 @@ const createAuthenticatedUser = async (): Promise<TestUserContext> => {
 
     const email = `${username}@example.com`;
 
-    const [user] = await DBKnex("users")
-        .insert({
+    const user = await db
+        .insertInto("users")
+        .values({
             username,
             email,
             role_id: role.id,
             status: "Activated",
         })
-        .returning("*");
-
-    if (!user) {
-        throw new Error("Unable to create test user");
-    }
+        .returningAll()
+        .executeTakeFirstOrThrow();
 
     /*
      * Normalize the database ID once.
@@ -69,22 +69,16 @@ const createAuthenticatedUser = async (): Promise<TestUserContext> => {
      * Create the authentication token in the SAME database used
      * by the application.
      */
-    const [authenticationToken] = await DBKnex(
-        "authentication_tokens",
-    )
-        .insert({
+    const authenticationToken = await db
+        .insertInto("authentication_tokens")
+        .values({
             user_id: userId,
             expired_at: new Date(
                 Date.now() + 60 * 60 * 1000,
             ),
         })
-        .returning("*");
-
-    if (!authenticationToken) {
-        throw new Error(
-            "Unable to create authentication token",
-        );
-    }
+        .returningAll()
+        .executeTakeFirstOrThrow();
 
     const authenticationTokenId = Number(
         authenticationToken.id,
@@ -109,14 +103,12 @@ const createAuthenticatedUser = async (): Promise<TestUserContext> => {
      * This catches test-fixture/database problems before the
      * application gets involved.
      */
-    const persistedToken = await DBKnex(
-        "authentication_tokens",
-    )
-        .where({
-            id: authenticationTokenId,
-            user_id: userId,
-        })
-        .first();
+    const persistedToken = await db
+        .selectFrom("authentication_tokens")
+        .selectAll()
+        .where("id", "=", authenticationTokenId)
+        .where("user_id", "=", userId)
+        .executeTakeFirst();
 
     if (!persistedToken) {
         throw new Error(
@@ -150,11 +142,11 @@ const createTfaRecord = async (
      * This prevents the confusing PostgreSQL FK error and makes
      * the actual test-fixture problem obvious.
      */
-    const authenticationToken = await DBKnex(
-        "authentication_tokens",
-    )
-        .where({id: tokenId})
-        .first();
+    const authenticationToken = await db
+        .selectFrom("authentication_tokens")
+        .selectAll()
+        .where("id", "=", tokenId)
+        .executeTakeFirst();
 
     if (!authenticationToken) {
         throw new Error(
@@ -166,10 +158,9 @@ const createTfaRecord = async (
         plainOtp,
     );
 
-    const [tfa] = await DBKnex(
-        "two_factor_authentications",
-    )
-        .insert({
+    const tfa = await db
+        .insertInto("two_factor_authentications")
+        .values({
             token_id: tokenId,
             code: hashedOtp,
             expired_at: new Date(
@@ -178,13 +169,8 @@ const createTfaRecord = async (
             tries: 0,
             expired_tries_at: null,
         })
-        .returning("*");
-
-    if (!tfa) {
-        throw new Error(
-            "Unable to create TFA record",
-        );
-    }
+        .returningAll()
+        .executeTakeFirstOrThrow();
 
     const tfaId = Number(tfa.id);
 
@@ -220,9 +206,10 @@ describe("Two-factor authentication", () => {
          * Delete children before parents because of FK constraints.
          */
         if (createdTfaIds.length > 0) {
-            await DBKnex("two_factor_authentications")
-                .whereIn("id", createdTfaIds)
-                .del();
+            await db
+                .deleteFrom("two_factor_authentications")
+                .where("id", "in", createdTfaIds)
+                .execute();
 
             createdTfaIds.length = 0;
         }
@@ -230,20 +217,23 @@ describe("Two-factor authentication", () => {
         if (
             createdAuthenticationTokenIds.length > 0
         ) {
-            await DBKnex("authentication_tokens")
-                .whereIn(
+            await db
+                .deleteFrom("authentication_tokens")
+                .where(
                     "id",
+                    "in",
                     createdAuthenticationTokenIds,
                 )
-                .del();
+                .execute();
 
             createdAuthenticationTokenIds.length = 0;
         }
 
         if (createdUserIds.length > 0) {
-            await DBKnex("users")
-                .whereIn("id", createdUserIds)
-                .del();
+            await db
+                .deleteFrom("users")
+                .where("id", "in", createdUserIds)
+                .execute();
 
             createdUserIds.length = 0;
         }
@@ -265,13 +255,15 @@ describe("Two-factor authentication", () => {
              * Ensure the parent token exists immediately before
              * making the authenticated request.
              */
-            const tokenBeforeRequest = await DBKnex(
-                "authentication_tokens",
-            )
-                .where({
-                    id: authenticationTokenId,
-                })
-                .first();
+            const tokenBeforeRequest = await db
+                .selectFrom("authentication_tokens")
+                .selectAll()
+                .where(
+                    "id",
+                    "=",
+                    authenticationTokenId,
+                )
+                .executeTakeFirst();
 
             expect(tokenBeforeRequest).toBeDefined();
 
@@ -334,24 +326,30 @@ describe("Two-factor authentication", () => {
                 Number.isSafeInteger(responseTfaId),
             ).toBe(true);
 
-            const tfa = await DBKnex(
-                "two_factor_authentications",
-            )
-                .where({
-                    id: responseTfaId,
-                    token_id: authenticationTokenId,
-                })
-                .first();
+            const tfa = await db
+                .selectFrom("two_factor_authentications")
+                .selectAll()
+                .where(
+                    "id",
+                    "=",
+                    responseTfaId,
+                )
+                .where(
+                    "token_id",
+                    "=",
+                    authenticationTokenId,
+                )
+                .executeTakeFirst();
 
             expect(tfa).toBeDefined();
 
-            expect(Number(tfa.token_id)).toBe(
+            expect(Number(tfa!.token_id)).toBe(
                 authenticationTokenId,
             );
 
             expect(
                 await securityUtil.compare(
-                    tfa.code,
+                    tfa!.code,
                     plainOtp,
                 ),
             ).toBe(true);
@@ -416,11 +414,11 @@ describe("Two-factor authentication", () => {
                 tfa: true,
             });
 
-            const deletedTfa = await DBKnex(
-                "two_factor_authentications",
-            )
-                .where({id: tfa.id})
-                .first();
+            const deletedTfa = await db
+                .selectFrom("two_factor_authentications")
+                .selectAll()
+                .where("id", "=", tfa.id)
+                .executeTakeFirst();
 
             expect(deletedTfa).toBeUndefined();
         });
@@ -438,13 +436,15 @@ describe("Two-factor authentication", () => {
             /*
              * Verify the parent exists before inserting the child.
              */
-            const parentToken = await DBKnex(
-                "authentication_tokens",
-            )
-                .where({
-                    id: authenticationTokenId,
-                })
-                .first();
+            const parentToken = await db
+                .selectFrom("authentication_tokens")
+                .selectAll()
+                .where(
+                    "id",
+                    "=",
+                    authenticationTokenId,
+                )
+                .executeTakeFirst();
 
             expect(parentToken).toBeDefined();
 
@@ -470,17 +470,17 @@ describe("Two-factor authentication", () => {
                 "token",
             );
 
-            const persistedTfa = await DBKnex(
-                "two_factor_authentications",
-            )
-                .where({id: tfa.id})
-                .first();
+            const persistedTfa = await db
+                .selectFrom("two_factor_authentications")
+                .selectAll()
+                .where("id", "=", tfa.id)
+                .executeTakeFirst();
 
             expect(persistedTfa).toBeDefined();
-            expect(Number(persistedTfa.token_id)).toBe(
+            expect(Number(persistedTfa!.token_id)).toBe(
                 authenticationTokenId,
             );
-            expect(Number(persistedTfa.tries)).toBe(1);
+            expect(Number(persistedTfa!.tries)).toBe(1);
         });
     });
 

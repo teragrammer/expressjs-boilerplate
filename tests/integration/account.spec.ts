@@ -3,7 +3,7 @@ import {afterEach, describe, expect, it} from "vitest";
 import request from "supertest";
 
 import app from "../../src/app";
-import {DBKnex} from "../../src/config/knex";
+import {db} from "../../src/config/database";
 import {securityUtil, tokenService,} from "../../src/config/container";
 
 const createAuthenticatedUser = async () => {
@@ -11,9 +11,11 @@ const createAuthenticatedUser = async () => {
     const email = `${username}@example.com`;
     const password = "OldPassword123!";
 
-    const role = await DBKnex("roles")
-        .where({slug: "customer"})
-        .first();
+    const role = await db
+        .selectFrom("roles")
+        .selectAll()
+        .where("slug", "=", "customer")
+        .executeTakeFirst();
 
     if (!role) {
         throw new Error(
@@ -23,33 +25,25 @@ const createAuthenticatedUser = async () => {
 
     const hashedPassword = await securityUtil.hash(password);
 
-    const [user] = await DBKnex("users")
-        .insert({
+    const user = await db
+        .insertInto("users")
+        .values({
             username,
             email,
             password: hashedPassword,
             role_id: role.id,
         })
-        .returning("*");
+        .returningAll()
+        .executeTakeFirstOrThrow();
 
-    if (!user) {
-        throw new Error("Unable to create test user");
-    }
-
-    const [authenticationToken] = await DBKnex(
-        "authentication_tokens",
-    )
-        .insert({
+    const authenticationToken = await db
+        .insertInto("authentication_tokens")
+        .values({
             user_id: user.id,
             expired_at: new Date(Date.now() + 60 * 60 * 1000),
         })
-        .returning("*");
-
-    if (!authenticationToken) {
-        throw new Error(
-            "Unable to create authentication token",
-        );
-    }
+        .returningAll()
+        .executeTakeFirstOrThrow();
 
     const token = tokenService.generateToken({
         uid: user.id,
@@ -69,8 +63,8 @@ const createAuthenticatedUser = async () => {
 
 describe("User account", () => {
     afterEach(async () => {
-        await DBKnex("authentication_tokens").del();
-        await DBKnex("users").del();
+        await db.deleteFrom("authentication_tokens").execute();
+        await db.deleteFrom("users").execute();
     });
 
     describe("PUT /api/v1/account/information", () => {
@@ -96,16 +90,18 @@ describe("User account", () => {
                 expect.any(String),
             );
 
-            const updatedUser = await DBKnex("users")
-                .where({id: user.id})
-                .first();
+            const updatedUser = await db
+                .selectFrom("users")
+                .selectAll()
+                .where("id", "=", user.id)
+                .executeTakeFirst();
 
             expect(updatedUser).toBeDefined();
 
-            expect(updatedUser.first_name).toBe("John");
-            expect(updatedUser.middle_name).toBe("Michael");
-            expect(updatedUser.last_name).toBe("Doe");
-            expect(updatedUser.address).toBe(
+            expect(updatedUser!.first_name).toBe("John");
+            expect(updatedUser!.middle_name).toBe("Michael");
+            expect(updatedUser!.last_name).toBe("Doe");
+            expect(updatedUser!.address).toBe(
                 "123 Main Street, Singapore",
             );
         });
@@ -216,15 +212,17 @@ describe("User account", () => {
                 expect.any(String),
             );
 
-            const updatedUser = await DBKnex("users")
-                .where({id: user.id})
-                .first();
+            const updatedUser = await db
+                .selectFrom("users")
+                .selectAll()
+                .where("id", "=", user.id)
+                .executeTakeFirst();
 
             expect(updatedUser).toBeDefined();
-            expect(updatedUser.password).toBeDefined();
+            expect(updatedUser!.password).toBeDefined();
 
             const passwordMatches = await securityUtil.compare(
-                updatedUser.password,
+                updatedUser!.password!,
                 newPassword,
             );
 
@@ -260,13 +258,15 @@ describe("User account", () => {
 
             expect(response.status).not.toBe(200);
 
-            const unchangedUser = await DBKnex("users")
-                .where({id: user.id})
-                .first();
+            const unchangedUser = await db
+                .selectFrom("users")
+                .selectAll()
+                .where("id", "=", user.id)
+                .executeTakeFirst();
 
             const originalPasswordMatches =
                 await securityUtil.compare(
-                    unchangedUser.password,
+                    unchangedUser!.password!,
                     "OldPassword123!",
                 );
 
@@ -300,12 +300,14 @@ describe("User account", () => {
                 expect.any(String),
             );
 
-            const updatedUser = await DBKnex("users")
-                .where({id: user.id})
-                .first();
+            const updatedUser = await db
+                .selectFrom("users")
+                .selectAll()
+                .where("id", "=", user.id)
+                .executeTakeFirst();
 
-            expect(updatedUser.username).toBe(newUsername);
-            expect(updatedUser.email).toBe(newEmail);
+            expect(updatedUser!.username).toBe(newUsername);
+            expect(updatedUser!.email).toBe(newEmail);
 
             const loginResponse = await request(app)
                 .post("/api/v1/auth/login")

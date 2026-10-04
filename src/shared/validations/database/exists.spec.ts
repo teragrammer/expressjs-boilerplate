@@ -1,40 +1,41 @@
 // src/shared/validations/database/exists.spec.ts
 import {describe, expect, it, vi} from 'vitest';
 import Joi from 'joi';
-import {Knex} from 'knex';
 import {validateExists} from "./exists";
 
 describe('validateExists validation', () => {
-    // Create a lightweight mock of Knex using Vitest's vi.fn()
-    const mockKnex = (() => {
-        return {
+    // Create a lightweight mock of the Kysely executor using Vitest's vi.fn()
+    const createMockDb = (row: unknown) => {
+        const builder = {
             select: vi.fn().mockReturnThis(),
             where: vi.fn().mockReturnThis(),
-            first: vi.fn().mockImplementation(() => {
-                // Mock behavior: record exists
-                return Promise.resolve({1: 1});
-            })
+            executeTakeFirst: vi.fn().mockResolvedValue(row)
         };
-    }) as unknown as Knex;
+
+        return {
+            selectFrom: vi.fn().mockReturnValue(builder),
+            __builder: builder
+        };
+    };
 
     it('should pass validation when record exists', async () => {
+        const mockDb = createMockDb({one: 1});
+
         const schema = Joi.number().external(
-            validateExists('users', {db: mockKnex})
+            validateExists('users', {db: mockDb as any})
         );
 
         await expect(schema.validateAsync(1)).resolves.toBe(1);
+
+        expect(mockDb.selectFrom).toHaveBeenCalledWith('users');
+        expect(mockDb.__builder.where).toHaveBeenCalledWith('id', '=', 1);
     });
 
     it('should fail validation and throw Joi error when record does not exist', async () => {
-        // Setup mock to return undefined (no row found)
-        const emptyMockKnex = (() => ({
-            select: vi.fn().mockReturnThis(),
-            where: vi.fn().mockReturnThis(),
-            first: vi.fn().mockResolvedValue(undefined)
-        })) as unknown as Knex;
+        const mockDb = createMockDb(undefined);
 
         const schema = Joi.number().external(
-            validateExists('users', {db: emptyMockKnex})
+            validateExists('users', {db: mockDb as any})
         );
 
         await expect(schema.validateAsync(999)).rejects.toThrow(Joi.ValidationError);

@@ -3,7 +3,7 @@ import {describe, expect, it} from "vitest";
 import request from "supertest";
 
 import app from "../../src/app";
-import {DBKnex} from "../../src/config/knex";
+import {db} from "../../src/config/database";
 import {securityUtil} from "../../src/config/container";
 
 describe("POST /api/v1/auth/login", () => {
@@ -13,17 +13,22 @@ describe("POST /api/v1/auth/login", () => {
         const hashedPassword = await securityUtil.hash(password);
 
         // Get an existing role required by the users table.
-        const role = await DBKnex("roles")
-            .where({slug: "customer"})
-            .first();
+        const role = await db
+            .selectFrom("roles")
+            .selectAll()
+            .where("slug", "=", "customer")
+            .executeTakeFirst();
 
         expect(role).toBeDefined();
 
-        await DBKnex("users").insert({
-            username,
-            password: hashedPassword,
-            role_id: role.id,
-        });
+        await db
+            .insertInto("users")
+            .values({
+                username,
+                password: hashedPassword,
+                role_id: role!.id,
+            })
+            .execute();
 
         const response = await request(app)
             .post("/api/v1/auth/login")

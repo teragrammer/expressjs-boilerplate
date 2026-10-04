@@ -4,16 +4,18 @@ import request from "supertest";
 import sgMail from "@sendgrid/mail";
 
 import app from "../../src/app";
-import {DBKnex} from "../../src/config/knex";
+import {db} from "../../src/config/database";
 import {securityUtil} from "../../src/config/container";
 
 const createTestUser = async () => {
     const username = securityUtil.randomString(8);
     const email = `${username}@example.com`;
 
-    const role = await DBKnex("roles")
-        .where({slug: "customer"})
-        .first();
+    const role = await db
+        .selectFrom("roles")
+        .selectAll()
+        .where("slug", "=", "customer")
+        .executeTakeFirst();
 
     if (!role) {
         throw new Error(
@@ -24,18 +26,16 @@ const createTestUser = async () => {
     const password = "OldPassword123!";
     const hashedPassword = await securityUtil.hash(password);
 
-    const [user] = await DBKnex("users")
-        .insert({
+    const user = await db
+        .insertInto("users")
+        .values({
             username,
             email,
             password: hashedPassword,
             role_id: role.id,
         })
-        .returning("*");
-
-    if (!user) {
-        throw new Error("Unable to create test user");
-    }
+        .returningAll()
+        .executeTakeFirstOrThrow();
 
     return {
         user,
@@ -69,7 +69,7 @@ describe("Password recovery", () => {
 
         // Keep tests isolated if a recovery record remains because
         // a test intentionally exercises an unsuccessful workflow.
-        await DBKnex("password_recoveries").del();
+        await db.deleteFrom("password_recoveries").execute();
     });
 
     it("should send a password recovery code to an existing user's email", async () => {
@@ -111,22 +111,22 @@ describe("Password recovery", () => {
 
         expect(plainCode).toMatch(/^\d+$/);
 
-        const recovery = await DBKnex("password_recoveries")
-            .where({
-                type: "email",
-                send_to: email,
-            })
-            .first();
+        const recovery = await db
+            .selectFrom("password_recoveries")
+            .selectAll()
+            .where("type", "=", "email")
+            .where("send_to", "=", email)
+            .executeTakeFirst();
 
         expect(recovery).toBeDefined();
 
-        expect(recovery.tries).toBe(0);
-        expect(recovery.next_try_at).toBeNull();
-        expect(recovery.next_resend_at).toBeDefined();
-        expect(recovery.expired_at).toBeDefined();
+        expect(recovery!.tries).toBe(0);
+        expect(recovery!.next_try_at).toBeNull();
+        expect(recovery!.next_resend_at).toBeDefined();
+        expect(recovery!.expired_at).toBeDefined();
 
         const isCodeValid = await securityUtil.compare(
-            recovery.code,
+            recovery!.code,
             plainCode,
         );
 
@@ -164,12 +164,12 @@ describe("Password recovery", () => {
             "",
         );
 
-        const recovery = await DBKnex("password_recoveries")
-            .where({
-                type: "email",
-                send_to: email,
-            })
-            .first();
+        const recovery = await db
+            .selectFrom("password_recoveries")
+            .selectAll()
+            .where("type", "=", "email")
+            .where("send_to", "=", email)
+            .executeTakeFirst();
 
         expect(recovery).toBeDefined();
 
@@ -192,11 +192,11 @@ describe("Password recovery", () => {
                 "Password has been successfully reset. You can now log in with your new password.",
         });
 
-        const deletedRecovery = await DBKnex("password_recoveries")
-            .where({
-                id: recovery.id,
-            })
-            .first();
+        const deletedRecovery = await db
+            .selectFrom("password_recoveries")
+            .selectAll()
+            .where("id", "=", recovery!.id)
+            .executeTakeFirst();
 
         expect(deletedRecovery).toBeUndefined();
 
@@ -242,15 +242,15 @@ describe("Password recovery", () => {
         expect(sendResponse.status).toBe(200);
         expect(sendMailSpy).toHaveBeenCalledTimes(1);
 
-        const recovery = await DBKnex("password_recoveries")
-            .where({
-                type: "email",
-                send_to: email,
-            })
-            .first();
+        const recovery = await db
+            .selectFrom("password_recoveries")
+            .selectAll()
+            .where("type", "=", "email")
+            .where("send_to", "=", email)
+            .executeTakeFirst();
 
         expect(recovery).toBeDefined();
-        expect(recovery.tries).toBe(0);
+        expect(recovery!.tries).toBe(0);
 
         const response = await request(app)
             .post("/api/v1/auth/password-recovery/validate")
@@ -269,16 +269,14 @@ describe("Password recovery", () => {
                 "Password has been successfully reset. You can now log in with your new password.",
         });
 
-        const updatedRecovery = await DBKnex(
-            "password_recoveries",
-        )
-            .where({
-                id: recovery.id,
-            })
-            .first();
+        const updatedRecovery = await db
+            .selectFrom("password_recoveries")
+            .selectAll()
+            .where("id", "=", recovery!.id)
+            .executeTakeFirst();
 
         expect(updatedRecovery).toBeDefined();
-        expect(updatedRecovery.tries).toBe(1);
+        expect(updatedRecovery!.tries).toBe(1);
     });
 
     it("should not reveal whether an email belongs to an existing account", async () => {
@@ -306,12 +304,12 @@ describe("Password recovery", () => {
 
         expect(sendMailSpy).not.toHaveBeenCalled();
 
-        const recovery = await DBKnex("password_recoveries")
-            .where({
-                type: "email",
-                send_to: email,
-            })
-            .first();
+        const recovery = await db
+            .selectFrom("password_recoveries")
+            .selectAll()
+            .where("type", "=", "email")
+            .where("send_to", "=", email)
+            .executeTakeFirst();
 
         expect(recovery).toBeUndefined();
     });
