@@ -38,7 +38,7 @@ export function buildRedisConfig(): RedisOptions | null {
             };
         } catch (error: any) {
             logger.error(`CRITICAL: Failed to load TLS certificates for Redis: ${error.message}`);
-            throw new Error(`Redis TLS initialization failed: ${error.message}`);
+            throw new Error(`Redis TLS initialization failed: ${error.message}`, { cause: error });
         }
     }
 
@@ -59,7 +59,7 @@ export class RedisConnectionManager {
     private initializeClients(): void {
         try {
             const baseConfig = buildRedisConfig();
-            if (!baseConfig) return;
+            if (!baseConfig) {return;}
 
             // 1. Standard Publisher config
             this.publisherClient = new Redis(baseConfig);
@@ -106,8 +106,8 @@ export class RedisConnectionManager {
 
     public async disconnectAll(): Promise<void> {
         const promises: Promise<string>[] = [];
-        if (this.publisherClient) promises.push(this.publisherClient.quit());
-        if (this.subscriberClient) promises.push(this.subscriberClient.quit());
+        if (this.publisherClient) {promises.push(this.publisherClient.quit());}
+        if (this.subscriberClient) {promises.push(this.subscriberClient.quit());}
         await Promise.all(promises);
         logger.info("All Redis connections shut down cleanly.");
     }

@@ -19,7 +19,7 @@ export class RedisSubscriber {
     }
 
     isConnected(): boolean {
-        if (!this.isEnabled) return false;
+        if (!this.isEnabled) {return false;}
         return this.subscriber?.status === "ready" || this.subscriber?.status === "connect";
     }
 
@@ -55,15 +55,15 @@ export class RedisSubscriber {
      * to their corresponding registered local handlers.
      */
     private setupGlobalMessageListener() {
-        if (this.isListenerAttached || !this.subscriber) return;
+        if (this.isListenerAttached || !this.subscriber) {return;}
 
         // Type casting to access underlying EventEmitter methods on ioredis client
         const emitter = this.subscriber as any;
-        if (typeof emitter.on !== "function") return;
+        if (typeof emitter.on !== "function") {return;}
 
         emitter.on("message", async (channel: string, message: string) => {
             const channelHandlers = this.handlers.get(channel);
-            if (!channelHandlers) return;
+            if (!channelHandlers) {return;}
 
             for (const handler of channelHandlers) {
                 try {

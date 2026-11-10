@@ -7,7 +7,7 @@ export class DateUtil {
      * Keeps performance high by avoiding wrapper libraries where possible.
      */
     private normalize(date?: Date | string | number | null, fallback = new Date()): Date {
-        if (date === null || date === undefined) return fallback;
+        if (date === null || date === undefined) {return fallback;}
         return date instanceof Date ? date : new Date(date);
     }
 

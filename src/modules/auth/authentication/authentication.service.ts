@@ -5,15 +5,12 @@ import {UserService} from "../../users/services/user.service";
 import {TokenService} from "./authentication-token.service";
 import {SecurityUtil} from "../../../common/utils/security.util";
 import {DateUtil} from "../../../common/utils/date.util";
-import {RegisterInput} from "./authentication.interface";
-import {LoginInput} from "./authentication.interface";
+import {AuthenticationToken, JwtExtendedPayload, LoginInput, RegisterInput} from "./authentication.interface";
 import {UserRepository} from "../../users/user.repository";
 import {AppError} from "../../../common/utils/errors";
 import Messages from "../../../common/utils/messages";
 import {User} from "../../users/user.interface";
 import {AuthenticationTokenRepository} from "./authentication-token.repository";
-import {JwtExtendedPayload} from "./authentication.interface";
-import {AuthenticationToken} from "./authentication.interface";
 import {SettingService} from "../../system/settings/setting.service";
 
 export class AuthenticationService {

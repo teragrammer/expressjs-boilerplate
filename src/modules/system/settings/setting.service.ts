@@ -99,7 +99,7 @@ export class SettingService {
             return this.parser(settings);
         } catch (error) {
             console.error(`Database retrieval failed for is_public=${is_public}:`, error);
-            throw new Error("Unable to fetch configuration settings from database.");
+            throw new Error("Unable to fetch configuration settings from database.", { cause: error });
         }
     }
 
@@ -112,11 +112,11 @@ export class SettingService {
 
         // Fallback: If no settings, we assert the empty object as SettingKeyValue
         // or you can return a default configuration object.
-        if (!settings || !settings.length) return parsedObj as SettingKeyValue;
+        if (!settings || !settings.length) {return parsedObj as SettingKeyValue;}
 
         for (const setting of settings) {
             const {slug, type, value} = setting;
-            if (!slug) continue;
+            if (!slug) {continue;}
 
             // Cast key to keyof SettingKeyValue so TS allows dynamic assignment
             const key = slug as keyof SettingKeyValue;

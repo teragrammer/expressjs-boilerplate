@@ -50,6 +50,7 @@ export function buildPoolConfig(): PoolConfig {
 
             throw new Error(
                 `Database TLS initialization failed: ${message}`,
+                { cause: error },
             );
         }
     }

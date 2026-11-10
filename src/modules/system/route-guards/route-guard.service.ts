@@ -83,7 +83,7 @@ export class RouteGuardService {
 
         for (const row of rows) {
             const {role_slug, route} = row;
-            if (!role_slug) continue;
+            if (!role_slug) {continue;}
 
             if (!guards[role_slug]) {
                 guards[role_slug] = [];

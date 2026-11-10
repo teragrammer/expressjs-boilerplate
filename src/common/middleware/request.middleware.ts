@@ -5,7 +5,7 @@ import * as xss from "xss";
 import {SanitizerHelper} from "../../@types/express";
 
 const sanitizeString = (value: unknown): any => {
-    if (typeof value !== "string") return value;
+    if (typeof value !== "string") {return value;}
 
     const cleaned = xss.filterXSS(value, {
         whiteList: {},

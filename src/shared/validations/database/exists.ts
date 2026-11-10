@@ -18,7 +18,7 @@ export const validateExists = (
     }
 
     return async (value: any, helpers: Joi.CustomHelpers): Promise<any> => {
-        if (value === undefined || value === null) return value;
+        if (value === undefined || value === null) {return value;}
 
         let row: unknown;
 

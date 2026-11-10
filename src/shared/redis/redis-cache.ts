@@ -21,7 +21,7 @@ export class RedisCache {
      * Checks if the write/read cache connection is healthy
      */
     isConnected(): boolean {
-        if (!this.isEnabled || !this.publisher) return false;
+        if (!this.isEnabled || !this.publisher) {return false;}
         return this.publisher.status === "ready" || this.publisher.status === "connect";
     }
 
@@ -30,10 +30,10 @@ export class RedisCache {
      */
     async get<T>(key: string): Promise<T | null> {
         try {
-            if (!this.isConnected() || !this.publisher) return null;
+            if (!this.isConnected() || !this.publisher) {return null;}
 
             const securedData = await this.publisher.get(key);
-            if (!securedData) return null;
+            if (!securedData) {return null;}
 
             const decryptedData = await this.securityUtil.unshield(securedData);
             return JSON.parse(decryptedData) as T;
@@ -48,7 +48,7 @@ export class RedisCache {
      */
     async set<T>(key: string, value: T, ttlSeconds?: number): Promise<void> {
         try {
-            if (!this.isConnected() || !this.publisher) return;
+            if (!this.isConnected() || !this.publisher) {return;}
 
             const rawString = JSON.stringify(value);
             const encryptedPayload = await this.securityUtil.shield(rawString);

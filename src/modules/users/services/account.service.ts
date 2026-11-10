@@ -17,7 +17,7 @@ export class AccountService {
     async information(id: number, data: UpdateUserDTO): Promise<string> {
         const user: User | null = await this.userRepository.update(id, data, "Activated");
 
-        if (!user) throw new AppError(Messages.SERVER_ERROR);
+        if (!user) {throw new AppError(Messages.SERVER_ERROR);}
 
         // generate a JWT token
         return this.tokenService.generateToken({
@@ -44,9 +44,9 @@ export class AccountService {
         }
 
         // generate a JWT token
-        if (typeof data.username !== "undefined") user.username = data.username;
-        if (typeof data.email !== "undefined") user.email = data.email;
-        if (typeof data.phone !== "undefined") user.phone = data.phone;
+        if (typeof data.username !== "undefined") {user.username = data.username;}
+        if (typeof data.email !== "undefined") {user.email = data.email;}
+        if (typeof data.phone !== "undefined") {user.phone = data.phone;}
         return this.tokenService.generateToken({
             uid: user.id,
             tid: 0,

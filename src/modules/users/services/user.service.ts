@@ -49,7 +49,7 @@ export class UserService {
         }
 
         const user: User | null = await this.userRepository.create(data);
-        if (!user) throw new AppError(Messages.SERVER_ERROR);
+        if (!user) {throw new AppError(Messages.SERVER_ERROR);}
 
         return user;
     }
@@ -60,7 +60,7 @@ export class UserService {
         }
 
         const user: User | null = await this.userRepository.update(id, data);
-        if (!user) throw new AppError(Messages.DATA_NOT_FOUND);
+        if (!user) {throw new AppError(Messages.DATA_NOT_FOUND);}
 
         return user;
     }

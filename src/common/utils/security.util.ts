@@ -36,7 +36,7 @@ export class SecurityUtil {
      * NO CONFIG REQUIRED: Generates a cryptographically SECURE random numeric string.
      */
     public randomNumber(length: number = 6): string {
-        if (length <= 0) return "";
+        if (length <= 0) {return "";}
         let result = "";
         while (result.length < length) {
             const byte = crypto.randomBytes(1)[0];

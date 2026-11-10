@@ -1,7 +1,6 @@
 // src/modules/users/user.repository.ts
-import {sql, type Selectable} from "kysely";
+import {sql, type Selectable, type Transaction} from "kysely";
 import {db as defaultDb, type DatabaseExecutor} from "../../config/database";
-import type {Transaction} from "kysely";
 import type {Database} from "../../config/schema";
 import {BrowseUsersQuery, BrowseUsersResult, CreateUserDTO, Status, UpdateUserDTO, User, UserRow,} from "./user.interface";
 

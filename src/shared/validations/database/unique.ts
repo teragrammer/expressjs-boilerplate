@@ -20,7 +20,7 @@ export const validateCompositeUnique = (
     }
 
     return async (value: Record<string, any>, helpers: Joi.CustomHelpers): Promise<Record<string, any>> => {
-        if (!value) return value;
+        if (!value) {return value;}
 
         let row: unknown;
 
