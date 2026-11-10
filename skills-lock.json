@@ -1,0 +1,155 @@
+{
+  "version": 1,
+  "skills": {
+    "api-and-interface-design": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/api-and-interface-design/SKILL.md",
+      "computedHash": "0d823e9ff32f529f21492a3fd7635fc75b43ff1eb1788d4be0974bfa42e22ae3"
+    },
+    "brainstorming": {
+      "source": "obra/superpowers",
+      "sourceType": "github",
+      "skillPath": "skills/brainstorming/SKILL.md",
+      "computedHash": "b344a85378eb5e5da192bceb0f9c0c15a4820a3ee8b5ad867e3a70ef3c691e3d"
+    },
+    "ci-cd-and-automation": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/ci-cd-and-automation/SKILL.md",
+      "computedHash": "f655c44b80ec36532fa058f7b94e7463330b8ccacda35eba05d85c677a4f6a7d"
+    },
+    "code-simplification": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/code-simplification/SKILL.md",
+      "computedHash": "e4c1f0c12274be9981e1301bfbb9b3112b63e2209413071728b132c9b4ee2f5b"
+    },
+    "doc-coauthoring": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "skillPath": "skills/doc-coauthoring/SKILL.md",
+      "computedHash": "b964e4c3ffe13f66f76dd7919073e60c7aec622cd8a8363bb36323188100cf8e"
+    },
+    "documentation-and-adrs": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/documentation-and-adrs/SKILL.md",
+      "computedHash": "85db994c5d2853bbd9ebdb8542e43d92b7229918a0c70126f0e94280ea1ceeec"
+    },
+    "domain-modeling": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/domain-modeling/SKILL.md",
+      "computedHash": "b3eb40152b81f0c98fd2095a023c019452dbdce56f7540cc67fece2972db8369"
+    },
+    "finishing-a-development-branch": {
+      "source": "obra/superpowers",
+      "sourceType": "github",
+      "skillPath": "skills/finishing-a-development-branch/SKILL.md",
+      "computedHash": "4f571e7befb8b0946d9d7770232c818812412e9ab1dfb811f847edfba1fc6275"
+    },
+    "grill-with-docs": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/grill-with-docs/SKILL.md",
+      "computedHash": "35e62aa423aaeab6a414bcac273f56dfb17802ef2334b41b6a3b00f28196c8cf"
+    },
+    "improve-codebase-architecture": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/improve-codebase-architecture/SKILL.md",
+      "computedHash": "f768cb44209e0d30e3449b8f95ea3dc8293093f73cfe02127d530db43412cf76"
+    },
+    "incremental-implementation": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/incremental-implementation/SKILL.md",
+      "computedHash": "bb1198705f46dc9ff75fb5685a7a872de5924d743b44eb202135f5046750ab7e"
+    },
+    "mcp-builder": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "skillPath": "skills/mcp-builder/SKILL.md",
+      "computedHash": "863dfe94bc38b62389884e78fee7f0a9c31bd74a6032f602eb84a66f4b8315c9"
+    },
+    "observability-and-instrumentation": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/observability-and-instrumentation/SKILL.md",
+      "computedHash": "e5eba32f952a29d20c0383728a9505d0ca2a90f1d8d075603e53804b441b2dd2"
+    },
+    "performance-optimization": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/performance-optimization/SKILL.md",
+      "computedHash": "276aec00aaabae98f4bd6d565745378b498e0d11688315f32179587746b93805"
+    },
+    "pr": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/pr/SKILL.md",
+      "computedHash": "22a15d4d469344b38e03eb0e95772478393975836289393b1bad3c0febcdc679"
+    },
+    "receiving-code-review": {
+      "source": "obra/superpowers",
+      "sourceType": "github",
+      "skillPath": "skills/receiving-code-review/SKILL.md",
+      "computedHash": "59361179fc9225173e0c145ffd9bafbf9fdbf8b43ce3dc308497a0b4f83a6063"
+    },
+    "requesting-code-review": {
+      "source": "obra/superpowers",
+      "sourceType": "github",
+      "skillPath": "skills/requesting-code-review/SKILL.md",
+      "computedHash": "b095ac8c980339436b41de9989328f3f288f2e2a70452df28452bbeb6531d604"
+    },
+    "security-and-hardening": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/security-and-hardening/SKILL.md",
+      "computedHash": "f79bc2010272830c6d65400cfa5e860edc37af8607f1439a0a88aa3cea111ef1"
+    },
+    "skill-creator": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "skillPath": "skills/skill-creator/SKILL.md",
+      "computedHash": "5ea13a6d9f0d4bb694405d79acd00cadec0d21bb138c4dd10fcf3c500cb835c2"
+    },
+    "systematic-debugging": {
+      "source": "obra/superpowers",
+      "sourceType": "github",
+      "skillPath": "skills/systematic-debugging/SKILL.md",
+      "computedHash": "b7b6e98c3bffe371893bdb69845ec61124a65b6a96313dc8d6a2bce4437b13eb"
+    },
+    "test-driven-development": {
+      "source": "obra/superpowers",
+      "sourceType": "github",
+      "skillPath": "skills/test-driven-development/SKILL.md",
+      "computedHash": "3cfe4ebb6fa7288f668d87880d279c8e48f7a92b63415e296857060f5ce22e05"
+    },
+    "using-git-worktrees": {
+      "source": "obra/superpowers",
+      "sourceType": "github",
+      "skillPath": "skills/using-git-worktrees/SKILL.md",
+      "computedHash": "48c8a1040e378e0cb7208107294e3afa9067b9370c3f33b49a443eb6b7528b0d"
+    },
+    "verification-before-completion": {
+      "source": "obra/superpowers",
+      "sourceType": "github",
+      "skillPath": "skills/verification-before-completion/SKILL.md",
+      "computedHash": "b529822bdac4b197b180fe12225cff86b930b65910435103c10622df7f041651"
+    },
+    "writing-plans": {
+      "source": "obra/superpowers",
+      "sourceType": "github",
+      "skillPath": "skills/writing-plans/SKILL.md",
+      "computedHash": "c2647b5bf067be353a893e5a39a632cbbeb7ad81e61fa5ae227ece5490029073"
+    },
+    "writing-skills": {
+      "source": "obra/superpowers",
+      "sourceType": "github",
+      "skillPath": "skills/writing-skills/SKILL.md",
+      "computedHash": "5dfeb4768effae27e94cc7ce27420f461a09fbca4c6e3846cf7acb1765d5d3d7"
+    }
+  }
+}
