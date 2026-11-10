@@ -19,17 +19,22 @@ async function shutdown(code: number): Promise<never> {
     process.exit(code);
 }
 
-async function main(): Promise<void> {
+/**
+ * Runs all pending database migrations.
+ */
+export async function main(): Promise<void> {
     await migrateToLatest();
     // eslint-disable-next-line no-console
     console.log("All migrations have been executed.");
 }
 
-void main().then(
-    () => shutdown(0),
-    (error: unknown) => {
-        // eslint-disable-next-line no-console
-        console.error("Migration failed:", error);
-        void shutdown(1);
-    },
-);
+if (require.main === module) {
+    void main().then(
+        () => shutdown(0),
+        (error: unknown) => {
+            // eslint-disable-next-line no-console
+            console.error("Migration failed:", error);
+            void shutdown(1);
+        },
+    );
+}

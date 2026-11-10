@@ -20,18 +20,23 @@ async function shutdown(code: number): Promise<never> {
     process.exit(code);
 }
 
-async function main(): Promise<void> {
+/**
+ * Runs all database seeders in dependency order.
+ */
+export async function main(): Promise<void> {
     await seedSettings(db);
     await seedUsers(db);
     // eslint-disable-next-line no-console
     console.log("All seeders have been executed.");
 }
 
-void main().then(
-    () => shutdown(0),
-    (error: unknown) => {
-        // eslint-disable-next-line no-console
-        console.error("Seeding failed:", error);
-        void shutdown(1);
-    },
-);
+if (require.main === module) {
+    void main().then(
+        () => shutdown(0),
+        (error: unknown) => {
+            // eslint-disable-next-line no-console
+            console.error("Seeding failed:", error);
+            void shutdown(1);
+        },
+    );
+}
