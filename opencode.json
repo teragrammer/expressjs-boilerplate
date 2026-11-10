@@ -1,0 +1,35 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "commands": {
+    "test": {
+      "description": "Run the full Vitest suite for Express and Kysely, and suggest fixes if any tests fail.",
+      "agent": "build",
+      "template": "Please run the full Vitest test suite for this Express.js and Kysely application.\n\n1. Execute Tests: Run the complete test suite (using `npm test`).\n2. Analyze Failures: If any tests fail, carefully examine the test logs, stack traces, and relevant Express routes or Kysely database queries/migrations/seeds.\n3. Suggest & Apply Fixes: Root-cause the failing assertions and provide precise fixes or code patches to resolve them."
+    }
+  },
+  "mcp": {
+    "servers": {
+      "filesystem": {
+        "type": "local",
+        "command": ["npx", "-y", "@modelcontextprotocol/server-filesystem", "."]
+      },
+      "memory": {
+        "type": "local",
+        "command": ["npx", "-y", "@modelcontextprotocol/server-memory"]
+      },
+      "sequential-thinking": {
+        "type": "local",
+        "command": ["npx", "-y", "@modelcontextprotocol/server-sequential-thinking"]
+      },
+      "postgres": {
+        "type": "local",
+        "command": ["node", "scripts/mcp/postgres.mjs"]
+      },
+      "context7": {
+        "type": "remote",
+        "url": "https://mcp.context7.com/mcp",
+        "oauth": false
+      }
+    }
+  }
+}

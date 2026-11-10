@@ -7,3 +7,6 @@ node_modules/
 
 # Load test reports (generated artifacts)
 tests/load/reports/
+
+# OpenCode local configuration and state
+.opencode/

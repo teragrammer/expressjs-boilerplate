@@ -8,6 +8,9 @@
     "start": "node build/server.js",
     "test": "vitest --no-file-parallelism",
     "test:run": "vitest run --no-file-parallelism",
+    "setup": "npm run setup:skills",
+    "setup:skills": "npx skills experimental_install",
+    "setup:check": "npx skills experimental_install --dry-run",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "db:migrate": "ts-node scripts/db/migrate.ts",
@@ -18,7 +21,8 @@
     "load:test": "bash tests/load/run.sh",
     "load:test:smoke": "bash tests/load/run.sh smoke",
     "load:test:stress": "bash tests/load/run.sh stress",
-    "load:test:soak": "bash tests/load/run.sh soak"
+    "load:test:soak": "bash tests/load/run.sh soak",
+    "prepare": "npm run setup:skills"
   },
   "keywords": [],
   "author": "",
