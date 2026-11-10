@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "nodemon",
     "build": "rimraf build && tsc",
-    "start": "node build/server.js",
+    "start": "node dist/src/index.js",
     "test": "vitest --no-file-parallelism",
     "test:run": "vitest run --no-file-parallelism",
     "setup": "npm run setup:skills",
