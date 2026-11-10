@@ -26,6 +26,7 @@ export const __ENV = Object.freeze({
     DB_POOL_MIN: getInt("DB_POOL_MIN", 2),
     DB_POOL_MAX: getInt("DB_POOL_MAX", 10),
     DB_SSL: getBol("DB_SSL"),
+    DB_SSL_REJECT_UNAUTHORIZED: getBol("DB_SSL_REJECT_UNAUTHORIZED"),
     DB_SSL_CA: getStr("DB_SSL_CA"),
     DB_SSL_CERT: getStr("DB_SSL_CERT"),
     DB_SSL_KEY: getStr("DB_SSL_KEY"),
@@ -42,7 +43,7 @@ export const __ENV = Object.freeze({
 
     JWT_TFA: getBol("JWT_TFA"),
     JWT_SECRET: getStr("JWT_SECRET"),
-    JWT_EXPIRATION_DAYS: getInt("JWT_EXPIRATION_DAYS") * 86400, // 1 day = 86400 seconds
+    JWT_EXPIRATION_DAYS: getInt("JWT_EXPIRATION_DAYS", 7), // days
 
     BCRYPT_SALT_ROUND: getInt("BCRYPT_SALT_ROUND"),
     BCRYPT_SECRET: getStr("BCRYPT_SECRET"),

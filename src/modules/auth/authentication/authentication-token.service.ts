@@ -42,6 +42,8 @@ export class TokenService {
                 uid: decoded.uid,
                 tid: decoded.tid,
                 tfa: decoded.tfa,
+                rol: decoded.rol,
+                bpa: decoded.bpa,
             };
         } catch (error: any) {
             if (error instanceof jwt.TokenExpiredError) {

@@ -36,12 +36,17 @@ export function AuthenticationMiddleware(isHalt = true): any {
             req.credentials = {
                 jwt: payload,
                 user: async () => {
-                    return await userService.findById(payload.uid);
+                    return await userService.findAuthById(payload.uid);
                 },
                 authentication: async () => {
                     return await authService.findAuthenticationToken(payload);
                 }
             };
+
+            // Enforce server-side session existence for revocable tokens.
+            if (payload.tid && payload.tid > 0) {
+                await req.credentials.authentication();
+            }
 
             return next();
         } catch (err) {

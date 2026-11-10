@@ -7,6 +7,7 @@ import Messages from "../../../common/utils/messages";
 import {TokenService} from "../authentication/authentication-token.service";
 import {AuthenticationTokenRepository} from "../authentication/authentication-token.repository";
 import {SettingService} from "../../system/settings/setting.service";
+import {RoleService} from "../../system/roles/role.service";
 import {MailService} from "../../../common/interfaces/mail.interface";
 import {
     SendOtpInput,
@@ -23,6 +24,7 @@ export class TwoFactorAuthenticationService {
         private readonly dateUtil: DateUtil,
         private readonly settingService: SettingService,
         private readonly mailService: MailService,
+        private readonly roleService: RoleService,
     ) {
     }
 
@@ -97,10 +99,14 @@ export class TwoFactorAuthenticationService {
         await this.authenticationTokenRepository
             .purgeExpiredTokensByUserId(input.user.id);
 
+        const role = await this.roleService.findById(input.user.role_id);
+
         return this.authTokenService.generateToken({
             uid: input.user.id,
             tid: input.tokenId,
             tfa: true,
+            rol: role.slug,
+            bpa: role.is_bypass_authorization ? 1 : 0,
         });
     }
 

@@ -15,7 +15,8 @@ export class AccountController {
         assertCredentials(req);
         const token = await this.accountService.information(
             req.credentials.jwt.uid,
-            req.sanitize.data as UpdateUserDTO
+            req.sanitize.data as UpdateUserDTO,
+            req.credentials.jwt.tfa,
         );
 
         res.status(200).json(token);
@@ -25,7 +26,7 @@ export class AccountController {
         assertCredentials(req);
         const token: string = await this.accountService.password(
             await req.credentials.user(),
-            req.sanitize.data as unknown as SecurityAccountDTO
+            req.sanitize.data as unknown as SecurityAccountDTO,
         );
 
         res.status(200).json(token);

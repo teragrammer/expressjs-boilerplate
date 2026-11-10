@@ -412,6 +412,8 @@ describe("Two-factor authentication", () => {
                 uid: userId,
                 tid: authenticationTokenId,
                 tfa: true,
+                rol: "customer",
+                bpa: 0,
             });
 
             const deletedTfa = await db

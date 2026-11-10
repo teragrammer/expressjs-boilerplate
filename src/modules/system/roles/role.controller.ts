@@ -44,20 +44,18 @@ export class RoleController {
         const isPublic = req.sanitize.query.numeric("is_public");
         const search: string = req.sanitize.query.get("search");
 
-        const paginate = req.app.get("paginate");
 
         const filters: BrowseRoleQuery = {
-            page: Math.max(
-                1,
-                Number(paginate.page ?? 1),
-            ),
-            perPage: Math.min(
-                100,
-                Math.max(
-                    1,
-                    Number(paginate.perPage ?? 20),
-                ),
-            ),
+            page: (() => {
+                const paginate = req.pagination ?? req.app?.get?.("paginate");
+                if (!paginate) {throw new TypeError("Missing pagination context");}
+                return Math.max(1, paginate.page ?? 1);
+            })(),
+            perPage: (() => {
+                const paginate = req.pagination ?? req.app?.get?.("paginate");
+                if (!paginate) {throw new TypeError("Missing pagination context");}
+                return Math.min(100, Math.max(1, paginate.perPage ?? 20));
+            })(),
             ...(isPublic !== null && {
                 is_public: isPublic === 1,
             }),

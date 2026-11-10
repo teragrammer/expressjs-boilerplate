@@ -40,10 +40,17 @@ function configureSecurity(
 
     app.use(useragent());
 
-    cors({
-        origin: __ENV.CORS_ORIGINS,
-        credentials: true,
-    });
+    const corsOrigin =
+        __ENV.CORS_ORIGINS === "*" || !__ENV.CORS_ORIGINS
+            ? true
+            : __ENV.CORS_ORIGINS.split(",").map((o) => o.trim());
+
+    app.use(
+        cors({
+            origin: corsOrigin,
+            credentials: true,
+        }),
+    );
 }
 
 function configureProxy(

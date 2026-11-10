@@ -19,20 +19,18 @@ export class RouteGuardController {
 
     browse = catchAsync(async (req: Request, res: Response): Promise<void> => {
         const roleId = req.sanitize.query.numeric("role_id");
-        const paginate = req.app.get("paginate");
 
         const filters = {
-            page: Math.max(
-                1,
-                Number(paginate.page ?? 1),
-            ),
-            perPage: Math.min(
-                100,
-                Math.max(
-                    1,
-                    Number(paginate.perPage ?? 20),
-                ),
-            ),
+            page: (() => {
+                const paginate = req.pagination ?? req.app?.get?.("paginate");
+                if (!paginate) {throw new TypeError("Missing pagination context");}
+                return Math.max(1, paginate.page ?? 1);
+            })(),
+            perPage: (() => {
+                const paginate = req.pagination ?? req.app?.get?.("paginate");
+                if (!paginate) {throw new TypeError("Missing pagination context");}
+                return Math.min(100, Math.max(1, paginate.perPage ?? 20));
+            })(),
             ...(roleId !== null && {
                 role_id: roleId,
             }),

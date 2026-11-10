@@ -42,7 +42,9 @@ export function buildPoolConfig(): PoolConfig {
                     : undefined,
                 cert: fs.readFileSync(__ENV.DB_SSL_CERT, "utf8"),
                 key: fs.readFileSync(__ENV.DB_SSL_KEY, "utf8"),
-                rejectUnauthorized: false, // Required for self-signed chain setups
+                rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED === undefined
+                    ? true
+                    : __ENV.DB_SSL_REJECT_UNAUTHORIZED,
             };
         } catch (error) {
             const message =

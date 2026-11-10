@@ -60,6 +60,21 @@ export class UserRepository {
     }
 
     async findById(id: number): Promise<User | null> {
+        const row = await this.db
+            .selectFrom(USER_TABLE)
+            .select(USER_PUBLIC_COLUMNS)
+            .where("id", "=", id)
+            .where("deleted_at", "is", null)
+            .executeTakeFirst();
+
+        return row ? this.mapToUser(row as any) : null;
+    }
+
+    /**
+     * Internal lookup that includes sensitive columns such as password.
+     * Used only for authentication/account flows, never for public API responses.
+     */
+    async findAuthById(id: number): Promise<User | null> {
         const row = await this.activeUsers()
             .where("id", "=", id)
             .executeTakeFirst();

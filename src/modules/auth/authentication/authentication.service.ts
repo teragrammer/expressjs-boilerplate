@@ -12,6 +12,7 @@ import Messages from "../../../common/utils/messages";
 import {User} from "../../users/user.interface";
 import {AuthenticationTokenRepository} from "./authentication-token.repository";
 import {SettingService} from "../../system/settings/setting.service";
+import {__ENV} from "../../../config/environment";
 
 export class AuthenticationService {
     constructor(
@@ -48,10 +49,24 @@ export class AuthenticationService {
             created_at: createdAt,
         });
 
+        // Persist a revocable session row for this registration token.
+        const session = await this.authenticationTokenRepository.create({
+            user_id: newUser.id,
+            expired_at: this.dateUtil.expiredAt(
+                Number(__ENV.JWT_EXPIRATION_DAYS || 7),
+                "days",
+            ),
+            ip: null,
+            browser: null,
+            os: null,
+        });
+
         const token = this.tokenService.generateToken({
             uid: newUser.id,
-            tid: 0,
+            tid: session.id,
             tfa: false,
+            rol: role.slug,
+            bpa: role.is_bypass_authorization ? 1 : 0,
         });
 
         return {token};
@@ -65,6 +80,11 @@ export class AuthenticationService {
 
         // Mitigate Username Enumeration. If user is missing, skip to generic fail block.
         if (!user) {
+            // Perform a dummy comparison to reduce timing-based user enumeration.
+            await this.securityUtil.compare(
+                "$2b$12$00000000000000000000000000000000000000000000000000000",
+                data.password,
+            );
             this.handleFailedLogin();
         }
 
@@ -92,9 +112,9 @@ export class AuthenticationService {
         const isPasswordMatch = await this.securityUtil.compare(user.password, data.password);
 
         if (!isPasswordMatch) {
-            await this.userRepository.incrementLoginTries(user.id);
+            const updatedUser = await this.userRepository.incrementLoginTries(user.id);
             const settings = await this.settingService.getCache();
-            const totalLoginTries = Number(user.login_tries || 0) + 1;
+            const totalLoginTries = Number(updatedUser?.login_tries || 0);
 
             if (totalLoginTries >= settings.pri.mx_log_try) {
                 await this.userRepository.update(user.id, {
@@ -110,11 +130,28 @@ export class AuthenticationService {
         // purge expired tokens
         await this.authenticationTokenRepository.purgeExpiredTokensByUserId(user.id);
 
+        // Resolve the user's role so authorization claims can be embedded.
+        const role = await this.roleService.findById(user.role_id);
+
+        // Persist a revocable session row for this login.
+        const session = await this.authenticationTokenRepository.create({
+            user_id: user.id,
+            expired_at: this.dateUtil.expiredAt(
+                Number(__ENV.JWT_EXPIRATION_DAYS || 7),
+                "days",
+            ),
+            ip: null,
+            browser: null,
+            os: null,
+        });
+
         // generate a JWT token
         const token = this.tokenService.generateToken({
             uid: user.id,
-            tid: 0,
+            tid: session.id,
             tfa: false,
+            rol: role.slug,
+            bpa: role.is_bypass_authorization ? 1 : 0,
         });
 
         return {token};

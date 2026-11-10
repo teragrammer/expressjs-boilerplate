@@ -12,7 +12,7 @@ const {mockVerifyToken, mockFindUser, mockFindAuthToken} = vi.hoisted(() => ({
 
 vi.mock("../../../src/config/container", () => ({
     tokenService: {verifyToken: mockVerifyToken},
-    userService: {findById: mockFindUser},
+    userService: {findById: mockFindUser, findAuthById: mockFindUser},
     authService: {findAuthenticationToken: mockFindAuthToken},
 }));
 

@@ -148,6 +148,7 @@ describe("AccountController", () => {
             expect(mockInformation).toHaveBeenCalledWith(
                 1,
                 validatedData,
+                false,
             );
 
             expect(req.sanitize!.body.only).not.toHaveBeenCalled();
@@ -174,6 +175,7 @@ describe("AccountController", () => {
             expect(mockInformation).toHaveBeenCalledWith(
                 42,
                 validatedData,
+                false,
             );
 
             expect(mockInformation).not.toHaveBeenCalledWith(
@@ -207,6 +209,7 @@ describe("AccountController", () => {
             expect(mockInformation).toHaveBeenCalledWith(
                 1,
                 validatedData,
+                false,
             );
 
             expectErrorForwarded(serviceError);
@@ -256,6 +259,7 @@ describe("AccountController", () => {
             expect(mockInformation).toHaveBeenCalledWith(
                 1,
                 req.sanitize!.data,
+                false,
             );
 
             expectSuccessfulResponse(undefined);

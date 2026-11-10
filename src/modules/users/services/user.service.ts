@@ -82,6 +82,18 @@ export class UserService {
         return user;
     }
 
+    /**
+     * Internal lookup that may include sensitive fields (e.g. password).
+     * Never return this directly from a controller.
+     */
+    async findAuthById(id: number): Promise<User> {
+        const user: User | null = await this.userRepository.findAuthById(id);
+        if (!user) {
+            throw new AppError(Messages.DATA_NOT_FOUND);
+        }
+        return user;
+    }
+
     async hardDelete(id: number): Promise<void> {
         if (!await this.userRepository.hardDelete(id)) {
             throw new AppError(Messages.DELETE_FAILED);

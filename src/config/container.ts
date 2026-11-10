@@ -91,6 +91,7 @@ export const twoFactorAuthenticationService = new TwoFactorAuthenticationService
     dateUtil,
     settingService,
     mailService,
+    roleService,
 );
 
 export const passwordRecoveryService =

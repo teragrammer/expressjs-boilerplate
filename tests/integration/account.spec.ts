@@ -131,7 +131,7 @@ describe("User account", () => {
             );
 
             expect(newToken.uid).toBe(user.id);
-            expect(newToken.tfa).toBe(false);
+            expect(newToken.tfa).toBe(true);
             expect(newToken.tid).toBe(0);
         });
 

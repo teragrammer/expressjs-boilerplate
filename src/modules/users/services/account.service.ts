@@ -14,20 +14,20 @@ export class AccountService {
     ) {
     }
 
-    async information(id: number, data: UpdateUserDTO): Promise<string> {
+    async information(id: number, data: UpdateUserDTO, tfa = false): Promise<string> {
         const user: User | null = await this.userRepository.update(id, data, "Activated");
 
         if (!user) {throw new AppError(Messages.SERVER_ERROR);}
 
-        // generate a JWT token
+        // generate a JWT token, preserving the current TFA state
         return this.tokenService.generateToken({
             uid: user.id,
             tid: 0,
-            tfa: false,
+            tfa,
         });
     }
 
-    async password(user: User, data: SecurityAccountDTO) {
+    async password(user: User, data: SecurityAccountDTO, tfa = false) {
         // verify the current password
         if (!user.password || !await this.securityUtil.compare(user.password, data.current_password)) {
             throw new AppError(Messages.CREDENTIAL_DO_NOT_MATCH);

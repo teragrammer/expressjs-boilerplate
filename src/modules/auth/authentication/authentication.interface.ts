@@ -34,4 +34,6 @@ export interface JwtExtendedPayload extends JwtPayload {
     uid: number;
     tid: number;
     tfa: boolean; // if true continue without validation, false need 2fa validation
+    rol?: string; // role slug used for authorization
+    bpa?: number; // bypass authorization flag (1 = bypass)
 }
