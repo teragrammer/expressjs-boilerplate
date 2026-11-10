@@ -1,6 +1,5 @@
 // database/migrations/20250313141537_roles.ts
-import type {Kysely} from "kysely";
-import {sql} from "kysely";
+import {sql, type Kysely} from "kysely";
 
 export async function up(db: Kysely<any>): Promise<void> {
     await db.schema

@@ -1,6 +1,5 @@
 // database/migrations/20251023075024_route_guards.ts
-import type {Kysely} from "kysely";
-import {sql} from "kysely";
+import {sql, type Kysely} from "kysely";
 
 export async function up(db: Kysely<any>): Promise<void> {
     await db.schema

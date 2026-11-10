@@ -1,6 +1,5 @@
 // database/migrations/20250313141523_settings.ts
-import type {Kysely} from "kysely";
-import {sql} from "kysely";
+import {sql, type Kysely} from "kysely";
 import {DATA_TYPES} from "../../src/modules/system/settings/setting.model";
 
 const TYPE_CHECK_VALUES = DATA_TYPES.map((type) => `'${type}'`).join(", ");

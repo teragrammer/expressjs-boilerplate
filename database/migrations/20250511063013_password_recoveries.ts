@@ -1,6 +1,5 @@
 // database/migrations/20250511063013_password_recoveries.ts
-import type {Kysely} from "kysely";
-import {sql} from "kysely";
+import {sql, type Kysely} from "kysely";
 import {TYPES} from "../../src/modules/auth/password-recovery/password-recovery.interface";
 
 const TYPE_CHECK_VALUES = TYPES.map((type) => `'${type}'`).join(", ");

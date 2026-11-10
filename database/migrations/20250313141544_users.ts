@@ -1,6 +1,5 @@
 // database/migrations/20250313141544_users.ts
-import type {Kysely} from "kysely";
-import {sql} from "kysely";
+import {sql, type Kysely} from "kysely";
 import {GENDERS, STATUSES} from "../../src/modules/users/user.interface";
 
 const GENDER_CHECK_VALUES = GENDERS.map((gender) => `'${gender}'`).join(", ");
