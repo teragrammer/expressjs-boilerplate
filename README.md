@@ -124,6 +124,8 @@ Skills are sourced from open-source repositories via the `skills` CLI:
 - `addyosmani/agent-skills` — security-and-hardening, documentation-and-adrs, performance-optimization, ci-cd-and-automation, observability-and-instrumentation, api-and-interface-design, code-simplification, incremental-implementation
 - `anthropics/skills` — mcp-builder, skill-creator, doc-coauthoring
 - `mattpocock/skills` — improve-codebase-architecture, domain-modeling, grill-with-docs, pr
+- `wshobson/agents` — postgresql-table-design, typescript-advanced-types
+- `github/awesome-copilot` — postgresql-code-review
 - Local — auto-commit
 
 #### MCP Servers
