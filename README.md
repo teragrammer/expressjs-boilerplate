@@ -93,6 +93,19 @@ $ npm run build
 $ npm run start
 ```
 
+### Database Scripts
+
+Run these from the repository root (they resolve paths relative to the current working directory):
+
+- `npm run db:migrate` — apply all pending Kysely migrations.
+- `npm run db:seed` — run all seeders in dependency order.
+- `npm run db:reset` — run migrations followed by seeders.
+- `npm run make:migration -- <snake_case_name>` — scaffold a new migration file under `database/migrations/`.
+- `npm run make:seed -- <snake_case_name>` — scaffold a new seeder under `database/seeds/`.
+
+After scaffolding a migration, register it in `src/config/migrator.ts` in timestamp order.
+After scaffolding a seeder, wire it into `scripts/db/seed.ts` in dependency order.
+
 ### Example API Requests
 
 - Authentication
