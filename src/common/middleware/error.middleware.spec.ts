@@ -3,8 +3,8 @@ import {NextFunction, Request, Response} from "express";
 import Joi from "joi";
 import {errorHandler} from "./error.middleware";
 import {AppError} from "../utils/errors";
-import errors from "../utils/messages";
 import Messages from "../utils/messages";
+const errors = Messages;
 
 const {
     mockLoggerError,
