@@ -8,6 +8,8 @@
     "start": "node build/server.js",
     "test": "vitest --no-file-parallelism",
     "test:run": "vitest run --no-file-parallelism",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "db:migrate": "ts-node scripts/db/migrate.ts",
     "db:seed": "ts-node scripts/db/seed.ts",
     "db:reset": "npm run db:migrate && npm run db:seed",
@@ -45,6 +47,7 @@
     "xss": "^1.0.17"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/bcrypt": "^6.0.0",
     "@types/compression": "^1.8.1",
     "@types/cors": "^2.8.19",
@@ -61,6 +64,7 @@
     "@typescript-eslint/parser": "^8.72.2",
     "artillery": "^2.0.34",
     "eslint": "^10.14.0",
+    "globals": "^15.15.0",
     "nodemon": "^3.1.14",
     "rimraf": "^6.1.4",
     "ts-node": "^10.9.2",
