@@ -93,6 +93,64 @@ $ npm run build
 $ npm run start
 ```
 
+### OpenCode Integration
+
+This repository is configured for [OpenCode](https://opencode.ai) as the primary coding agent.
+
+- Project configuration: `opencode.json` (MCP servers, commands).
+- Project skills: `.agents/skills/` (OpenCode-compatible; `.opencode/` is gitignored).
+- Skills lock: `skills-lock.json` (reproducible skill installs).
+- MCP helper: `scripts/mcp/postgres.mjs`.
+
+#### Install / Initialize
+
+```sh
+npm install          # also runs "prepare" -> restores skills from skills-lock.json
+npm run setup        # manual skill restore
+npm run setup:check  # verify installed skills without changes
+```
+
+Manual skill install:
+
+```sh
+npx skills experimental_install
+```
+
+#### Installed Skills
+
+Skills are sourced from open-source repositories via the `skills` CLI:
+
+- `obra/superpowers` — brainstorming, systematic-debugging, test-driven-development, requesting/receiving-code-review, verification-before-completion, writing-plans, finishing-a-development-branch, using-git-worktrees, writing-skills
+- `addyosmani/agent-skills` — security-and-hardening, documentation-and-adrs, performance-optimization, ci-cd-and-automation, observability-and-instrumentation, api-and-interface-design, code-simplification, incremental-implementation
+- `anthropics/skills` — mcp-builder, skill-creator, doc-coauthoring
+- `mattpocock/skills` — improve-codebase-architecture, domain-modeling, grill-with-docs, pr
+- Local — auto-commit
+
+#### MCP Servers
+
+Configured in `opencode.json` (all free and open source):
+
+- `filesystem` — `@modelcontextprotocol/server-filesystem` — project file access
+- `memory` — `@modelcontextprotocol/server-memory` — persistent knowledge graph
+- `sequential-thinking` — `@modelcontextprotocol/server-sequential-thinking` — structured reasoning
+- `postgres` — `@modelcontextprotocol/server-postgres` (via `scripts/mcp/postgres.mjs`) — read-only PostgreSQL queries
+- `context7` — remote (https://mcp.context7.com/mcp) — up-to-date library documentation
+
+Verify MCP servers:
+
+```sh
+opencode mcp list
+```
+
+The Postgres MCP server reads `DB_*` values from `.env` (or `DATABASE_URL`). For self-signed PostgreSQL TLS it uses `sslmode=no-verify`; adjust `scripts/mcp/postgres.mjs` or set `DATABASE_URL` for stricter TLS.
+
+#### Troubleshooting
+
+- Missing skills: run `npm run setup`.
+- MCP server not connecting: ensure the package can be fetched (`npx -y ...`) and required env vars are set.
+- Postgres MCP: set `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASS`, `DB_NAME` (or `DATABASE_URL`).
+- `.opencode/` is gitignored; keep shared skills in `.agents/skills/` and config in `opencode.json`.
+
 ### Database Scripts
 
 Run these from the repository root (they resolve paths relative to the current working directory):
