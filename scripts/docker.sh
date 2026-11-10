@@ -38,7 +38,7 @@ case "$1" in
         docker container stop "$CONTAINER_NAME"
         ;;
     -d)
-        echo "Tearing down expressjs-boilerplate containers, images, networks, and volumes..."
+        echo "Tearing down ${CONTAINER_NAME} containers, images, networks, and volumes..."
         docker compose down --rmi all --volumes --remove-orphans
         echo "Cleanup complete! Your environment is spotless."
         ;;

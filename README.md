@@ -55,6 +55,7 @@ $ cd expressjs-boilerplate
 - Initialize Docker
 
 ```
+$ docker compose build --no-cache
 $ docker compose up -d
 $ sh scripts/docker.sh -r
 ```

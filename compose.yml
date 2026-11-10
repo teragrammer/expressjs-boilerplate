@@ -11,7 +11,10 @@ services:
       - "${PORT_EXPOSE}:${PORT}"
     networks:
       - expressjs-boilerplate-network
+
 networks:
   expressjs-boilerplate-network:
     name: expressjs-boilerplate-network
     driver: bridge
+    driver_opts:
+      com.docker.network.driver.mtu: "1280"
