@@ -243,6 +243,9 @@ describe("User account", () => {
 
             expect(loginResponse.body).toEqual({
                 token: expect.any(String),
+                access_token: expect.any(String),
+                expires_at: expect.any(String),
+                tfa_required: expect.any(Boolean),
                 tfaRequired: expect.any(Boolean),
             });
         });
@@ -325,6 +328,9 @@ describe("User account", () => {
 
             expect(loginResponse.body).toEqual({
                 token: expect.any(String),
+                access_token: expect.any(String),
+                expires_at: expect.any(String),
+                tfa_required: expect.any(Boolean),
                 tfaRequired: expect.any(Boolean),
             });
         });

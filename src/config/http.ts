@@ -1,12 +1,11 @@
 // src/config/http.ts
-import express, {NextFunction, Request, Response,} from "express";
+import express, {Request, Response,} from "express";
 import cors from "cors";
 import helmet from "helmet";
 import hpp from "hpp";
 import compression from "compression";
 import {express as useragent} from "express-useragent";
 
-import {logger} from "./logger";
 import {__ENV} from "./environment";
 
 export function configureMiddleware(
@@ -16,7 +15,6 @@ export function configureMiddleware(
     configureSecurity(app);
     configureProxy(app);
     configureCompression(app);
-    configureRequestLogging(app);
 }
 
 function configureBodyParsing(
@@ -118,23 +116,5 @@ function configureCompression(
                 );
             },
         }),
-    );
-}
-
-function configureRequestLogging(
-    app: express.Application,
-): void {
-    app.use(
-        (
-            req: Request,
-            _res: Response,
-            next: NextFunction,
-        ) => {
-            logger.info(
-                `${req.method} ${req.originalUrl}`,
-            );
-
-            next();
-        },
     );
 }

@@ -46,6 +46,7 @@ describe("AccountController", () => {
         login_tries: 0,
         failed_login_expired_at: null,
         comments: null,
+        authorization_version: 0,
         created_at: new Date(),
         updated_at: new Date(),
         deleted_at: null,

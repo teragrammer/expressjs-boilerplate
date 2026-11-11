@@ -110,6 +110,26 @@ export class PasswordRecoveryRepository {
         return Number(result.numDeletedRows) > 0;
     }
 
+    /**
+     * Deletes every recovery record for a user.
+     *
+     * Called when the password changes so a stale recovery code cannot
+     * be redeemed afterwards.
+     */
+    async deleteAllByUserId(
+        userId: number,
+        trx?: Transaction<Database>,
+    ): Promise<number> {
+        const executor: DatabaseExecutor = trx ?? this.db;
+
+        const result = await executor
+            .deleteFrom(PASSWORD_RECOVERIES_TABLE)
+            .where("user_id", "=", userId)
+            .executeTakeFirst();
+
+        return Number(result.numDeletedRows);
+    }
+
     async withTransaction<T>(
         callback: (trx: Transaction<Database>) => Promise<T>,
     ): Promise<T> {

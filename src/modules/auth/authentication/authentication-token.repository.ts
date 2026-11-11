@@ -19,9 +19,15 @@ export class AuthenticationTokenRepository {
 
     /**
      * Persists a new authentication token record in the database.
+     *
+     * An optional executor allows the caller to create the session row
+     * inside a surrounding transaction.
      */
-    public async create(data: CreateAuthenticationTokenInput): Promise<AuthenticationToken> {
-        return this.db
+    public async create(
+        data: CreateAuthenticationTokenInput,
+        executor: DatabaseExecutor = this.db,
+    ): Promise<AuthenticationToken> {
+        return executor
             .insertInto(AUTHENTICATION_TOKEN_TABLE)
             .values(data)
             .returningAll()
@@ -115,9 +121,13 @@ export class AuthenticationTokenRepository {
      * Revokes (deletes) all tokens linked to a specific user (including expired).
      * Also deletes associated 2FA records.
      */
-    public async deleteAllByUserId(userId: number, excludeTokenId?: number): Promise<number> {
+    public async deleteAllByUserId(
+        userId: number,
+        excludeTokenId?: number,
+        executor: DatabaseExecutor = this.db,
+    ): Promise<number> {
         // First delete all 2FA records for this user's tokens (excluding the excluded one)
-        let tokenQuery = this.db
+        let tokenQuery = executor
             .selectFrom(AUTHENTICATION_TOKEN_TABLE)
             .select("id")
             .where("user_id", "=", userId);
@@ -130,14 +140,14 @@ export class AuthenticationTokenRepository {
 
         if (tokens.length > 0) {
             const tokenIds = tokens.map(t => t.id);
-            await this.db
+            await executor
                 .deleteFrom(TWO_FACTOR_AUTHENTICATION_TABLE)
                 .where("token_id", "in", tokenIds)
                 .execute();
         }
 
         // Now delete the tokens
-        let deleteQuery = this.db
+        let deleteQuery = executor
             .deleteFrom(AUTHENTICATION_TOKEN_TABLE)
             .where("user_id", "=", userId);
 

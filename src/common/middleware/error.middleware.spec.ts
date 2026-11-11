@@ -432,17 +432,20 @@ describe("errorHandler", () => {
 
             invoke(error);
 
-            // Called multiple times due to additional debug logging
             expect(mockLoggerError).toHaveBeenCalled();
 
-            expect(mockLoggerError)
-                .toHaveBeenCalledWith(
-                    "Unhandled Application Exception:",
-                    error,
-                );
+            expect(mockLoggerError).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    err: expect.objectContaining({
+                        message: "Database connection failed",
+                        name: "Error",
+                    }),
+                }),
+                "Unhandled Application Exception",
+            );
         });
 
-        it("should log the exact error instance", () => {
+        it("should log the error details without leaking them in the response", () => {
             const error = new Error(
                 "Unexpected failure",
             );
@@ -453,8 +456,19 @@ describe("errorHandler", () => {
                 mockLoggerError as ReturnType<typeof vi.fn>
             ).mock.calls;
 
-            expect(calls[0][1])
-                .toBe(error);
+            const [context] = calls[0];
+
+            expect(context.err.message).toBe("Unexpected failure");
+            expect(context.err.stack).toBeTruthy();
+
+            // The response body must never contain the stack trace.
+            expectJsonResponse(
+                500,
+                {
+                    code: errors.SERVER_ERROR.code,
+                    message: errors.SERVER_ERROR.message,
+                },
+            );
         });
 
         it("should handle string errors", () => {
@@ -470,11 +484,14 @@ describe("errorHandler", () => {
                 },
             );
 
-            expect(mockLoggerError)
-                .toHaveBeenCalledWith(
-                    "Unhandled Application Exception:",
-                    error,
-                );
+            expect(mockLoggerError).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    err: expect.objectContaining({
+                        message: "Unexpected application failure",
+                    }),
+                }),
+                "Unhandled Application Exception",
+            );
         });
 
         it("should handle null errors", () => {
@@ -490,8 +507,10 @@ describe("errorHandler", () => {
 
             expect(mockLoggerError).toHaveBeenCalled();
             expect(mockLoggerError).toHaveBeenCalledWith(
-                "Unhandled Application Exception:",
-                null,
+                expect.objectContaining({
+                    err: expect.any(Object),
+                }),
+                "Unhandled Application Exception",
             );
         });
 
@@ -508,8 +527,10 @@ describe("errorHandler", () => {
 
             expect(mockLoggerError).toHaveBeenCalled();
             expect(mockLoggerError).toHaveBeenCalledWith(
-                "Unhandled Application Exception:",
-                undefined,
+                expect.objectContaining({
+                    err: expect.any(Object),
+                }),
+                "Unhandled Application Exception",
             );
         });
 

@@ -92,6 +92,7 @@ const passwordRecoveryValidateLimiter = new RateLimiter();
 const tfaSendLimiter = new RateLimiter();
 const tfaValidateLimiter = new RateLimiter();
 const logoutLimiter = new RateLimiter();
+const refreshLimiter = new RateLimiter();
 
 function makeRateLimiter(limiter: RateLimiter, options: RateLimitOptions) {
     const {
@@ -215,6 +216,13 @@ export const authRateLimiters = {
         maxRequests: 20,
         windowMs: 60 * 1000, // 20 per minute
         message: "Too many logout attempts.",
+    }),
+
+    refresh: makeRateLimiter(refreshLimiter, {
+        bucket: "auth:refresh",
+        maxRequests: 30,
+        windowMs: 60 * 1000, // 30 per minute
+        message: "Too many token refresh attempts, please try again later.",
     }),
 
     globalAuth: makeRateLimiter(globalAuthLimiter, {

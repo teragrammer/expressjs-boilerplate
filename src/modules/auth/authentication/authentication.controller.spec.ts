@@ -3,11 +3,26 @@ import {NextFunction, Request, Response} from "express";
 
 import {AuthenticationController} from "./authentication.controller";
 import {AuthenticationService} from "./authentication.service";
+import {SessionService} from "./session.service";
+import {RefreshTokenRepository} from "./refresh-token.repository";
+import {AuditService} from "../../audit/audit.service";
 
-const {mockLogin, mockLogout} = vi.hoisted(() => ({
-    mockLogin: vi.fn(),
-    mockLogout: vi.fn(),
-}));
+const {mockLogin, mockLogout, sessionService, refreshTokenRepository, auditService} =
+    vi.hoisted(() => ({
+        mockLogin: vi.fn(),
+        mockLogout: vi.fn(),
+        sessionService: {
+            rotate: vi.fn(),
+            revokeAllSessions: vi.fn(),
+        },
+        refreshTokenRepository: {
+            findActiveByUserId: vi.fn(),
+        },
+        auditService: {
+            success: vi.fn(),
+            failure: vi.fn(),
+        },
+    }));
 
 vi.mock("../../../../src/common/utils/catch-async", () => ({
     default: (fn: any) => (req: any, res: any, next: any) =>
@@ -33,13 +48,20 @@ describe("AuthenticationController", () => {
             logout: mockLogout,
         } as unknown as AuthenticationService;
 
-        controller = new AuthenticationController(authService);
+        controller = new AuthenticationController(
+            authService,
+            sessionService as unknown as SessionService,
+            refreshTokenRepository as unknown as RefreshTokenRepository,
+            auditService as unknown as AuditService,
+        );
 
         res = {
             status: vi.fn().mockReturnThis(),
             json: vi.fn().mockReturnThis(),
             send: vi.fn().mockReturnThis(),
             sendStatus: vi.fn().mockReturnThis(),
+            cookie: vi.fn().mockReturnThis(),
+            clearCookie: vi.fn().mockReturnThis(),
         };
 
         next = vi.fn();
@@ -80,12 +102,16 @@ describe("AuthenticationController", () => {
                 password: "password123",
             };
 
-            const mockToken = {
-                token: "eyMockJwtToken",
+            const mockResult = {
+                accessToken: "eyMockJwtToken",
+                refreshToken: "mock-refresh-token",
+                sessionId: 77,
+                expiresAt: new Date("2030-01-01T00:00:00.000Z"),
+                tfaRequired: false,
             };
 
             req.sanitize!.data = validatedData;
-            mockLogin.mockResolvedValue(mockToken);
+            mockLogin.mockResolvedValue(mockResult);
 
             await controller.login(
                 req as Request,
@@ -93,9 +119,26 @@ describe("AuthenticationController", () => {
                 next,
             );
 
-            expect(mockLogin).toHaveBeenCalledWith(validatedData);
+            expect(mockLogin).toHaveBeenCalledWith(
+                validatedData,
+                expect.any(Object),
+            );
             expect(res.status).toHaveBeenCalledWith(200);
-            expect(res.json).toHaveBeenCalledWith(mockToken);
+            expect(res.json).toHaveBeenCalledWith({
+                token: "eyMockJwtToken",
+                access_token: "eyMockJwtToken",
+                expires_at: mockResult.expiresAt,
+                tfa_required: false,
+                tfaRequired: false,
+            });
+
+            // The refresh token is delivered as an HttpOnly cookie.
+            expect(res.cookie).toHaveBeenCalledWith(
+                "refresh_token",
+                "mock-refresh-token",
+                expect.objectContaining({httpOnly: true}),
+            );
+
             expect(next).not.toHaveBeenCalled();
         });
 
@@ -116,7 +159,10 @@ describe("AuthenticationController", () => {
                 next,
             );
 
-            expect(mockLogin).toHaveBeenCalledWith(validatedData);
+            expect(mockLogin).toHaveBeenCalledWith(
+                validatedData,
+                expect.any(Object),
+            );
             expect(next).toHaveBeenCalledWith(authError);
             expect(res.status).not.toHaveBeenCalled();
         });

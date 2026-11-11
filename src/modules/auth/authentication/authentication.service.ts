@@ -5,7 +5,12 @@ import {UserService} from "../../users/services/user.service";
 import {TokenService} from "./authentication-token.service";
 import {SecurityUtil} from "../../../common/utils/security.util";
 import {DateUtil} from "../../../common/utils/date.util";
-import {AuthenticationToken, JwtExtendedPayload, LoginInput, RegisterInput} from "./authentication.interface";
+import {
+    AuthenticationToken,
+    JwtExtendedPayload,
+    LoginInput,
+    RegisterInput,
+} from "./authentication.interface";
 import {UserRepository} from "../../users/user.repository";
 import {AppError} from "../../../common/utils/errors";
 import Messages from "../../../common/utils/messages";
@@ -13,7 +18,14 @@ import {User} from "../../users/user.interface";
 import {AuthenticationTokenRepository} from "./authentication-token.repository";
 import {SettingService} from "../../system/settings/setting.service";
 import {TwoFactorAuthenticationService} from "../two-factor-authentication/two-factor-authentication.service";
+import {SessionService, IssuedTokens} from "./session.service";
+import {withTransaction} from "../../../config/database";
+import {authAttemptsTotal} from "../../../common/metrics/metrics";
 import {__ENV} from "../../../config/environment";
+
+export interface AuthenticatedResult extends IssuedTokens {
+    tfaRequired?: boolean;
+}
 
 export class AuthenticationService {
     constructor(
@@ -26,13 +38,21 @@ export class AuthenticationService {
         private readonly dateUtil: DateUtil,
         private readonly settingService: SettingService,
         private readonly tfaService: TwoFactorAuthenticationService,
+        private readonly sessionService: SessionService,
     ) {
     }
 
     /**
      * Executes the business workflow for registering a new customer.
+     *
+     * The user row and its session are created in a single transaction:
+     * a failed session insert must not leave a half-registered account
+     * that blocks a retry on the unique constraint.
      */
-    async register(data: RegisterInput): Promise<{ token: string }> {
+    async register(
+        data: RegisterInput,
+        metadata?: {ip?: string | null; browser?: string | null; os?: string | null; userAgent?: string | null},
+    ): Promise<AuthenticatedResult> {
         const role = await this.roleService.getRoleBySlug("customer");
         if (!role) {
             throw new AppError(
@@ -42,44 +62,74 @@ export class AuthenticationService {
         }
 
         const hashedPassword = await this.securityUtil.hash(data.password);
-        const createdAt = this.dateUtil.sql();
 
-        const newUser = await this.userService.registerUser({
-            ...data,
-            password: hashedPassword,
-            role_id: role.id,
-            created_at: createdAt,
+        const newUser = await withTransaction(async (trx) => {
+            const created = await this.userService.registerUser(
+                {
+                    ...data,
+                    password: hashedPassword,
+                    role_id: role.id,
+                    created_at: this.dateUtil.sql(),
+                },
+                trx,
+            );
+
+            const session = await this.authenticationTokenRepository.create(
+                {
+                    user_id: created.id,
+                    expired_at: this.dateUtil.expiredAt(
+                        Number(__ENV.JWT_REFRESH_TOKEN_DAYS || 7),
+                        "days",
+                    ),
+                    ip: metadata?.ip ?? null,
+                    browser: metadata?.browser ?? null,
+                    os: metadata?.os ?? null,
+                },
+                trx,
+            );
+
+            return {created, session};
         });
 
-        // Persist a revocable session row for this registration token.
-        const session = await this.authenticationTokenRepository.create({
-            user_id: newUser.id,
-            expired_at: this.dateUtil.expiredAt(
-                Number(__ENV.JWT_EXPIRATION_DAYS || 7),
-                "days",
-            ),
-            ip: null,
-            browser: null,
-            os: null,
-        });
+        /*
+         * The refresh token is issued after the transaction commits, so
+         * a failure cannot leave a session without a credential pair.
+         */
+        const issued = await this.sessionService.issueForSession(
+            newUser.session.id,
+            newUser.created,
+            role,
+            false,
+            {
+                includeRefreshToken: true,
+                metadata: {
+                    ip: metadata?.ip ?? null,
+                    userAgent: metadata?.userAgent ?? null,
+                },
+            },
+        );
 
-        const token = this.tokenService.generateToken({
-            uid: newUser.id,
-            tid: session.id,
-            tfa: false,
-            rol: role.slug,
-            bpa: role.is_bypass_authorization ? 1 : 0,
-            av: newUser.authorization_version || 0,
-        });
+        authAttemptsTotal.inc({event: "register", outcome: "success"});
 
-        return {token};
+        return {
+            accessToken: issued.accessToken,
+            refreshToken: issued.refreshToken,
+            sessionId: newUser.session.id,
+            expiresAt: issued.expiresAt,
+            tfaRequired: false,
+        };
     }
 
     /**
      * Executes the business workflow for user login.
      */
-    async login(data: LoginInput): Promise<{ token: string; tfaRequired?: boolean }> {
-        const user: User | null = await this.userRepository.findByUsername(data.username);
+    async login(
+        data: LoginInput,
+        metadata?: {ip?: string | null; browser?: string | null; os?: string | null; userAgent?: string | null},
+    ): Promise<AuthenticatedResult> {
+        const user: User | null = await this.userRepository.findByUsername(
+            data.username,
+        );
 
         // Mitigate Username Enumeration. If user is missing, skip to generic fail block.
         if (!user) {
@@ -88,11 +138,16 @@ export class AuthenticationService {
                 "$2b$12$00000000000000000000000000000000000000000000000000000",
                 data.password,
             );
+
+            authAttemptsTotal.inc({event: "login", outcome: "failure"});
+
             this.handleFailedLogin();
         }
 
         // Enforce account status - only Activated users can authenticate
         if (user.status !== "Activated") {
+            authAttemptsTotal.inc({event: "login", outcome: "failure"});
+
             // Don't reveal the specific status, use generic error
             this.handleFailedLogin();
         }
@@ -107,31 +162,45 @@ export class AuthenticationService {
             const isLockoutActive = !this.dateUtil.isPast(expiredAt);
 
             if (isLockoutActive) {
+                authAttemptsTotal.inc({event: "login", outcome: "locked"});
+
                 throw new AppError(Messages.TOO_MANY_ATTEMPTS);
             }
 
             // Lockout has expired: Reset tracking
             await this.userRepository.update(user.id, {
                 failed_login_expired_at: null,
-                login_tries: 0
+                login_tries: 0,
             });
         }
 
         // Perform constant-time hash comparison
-        const isPasswordMatch = await this.securityUtil.compare(user.password, data.password);
+        const isPasswordMatch = await this.securityUtil.compare(
+            user.password,
+            data.password,
+        );
 
         if (!isPasswordMatch) {
-            const updatedUser = await this.userRepository.incrementLoginTries(user.id);
+            const updatedUser = await this.userRepository.incrementLoginTries(
+                user.id,
+            );
             const settings = await this.settingService.getCache();
             const totalLoginTries = Number(updatedUser?.login_tries || 0);
 
             if (totalLoginTries >= settings.pri.mx_log_try) {
                 await this.userRepository.update(user.id, {
-                    failed_login_expired_at: this.dateUtil.expiredAt(settings.pri.lck_prd, "minutes"),
+                    failed_login_expired_at: this.dateUtil.expiredAt(
+                        settings.pri.lck_prd,
+                        "minutes",
+                    ),
                 });
+
+                authAttemptsTotal.inc({event: "login", outcome: "locked"});
 
                 throw new AppError(Messages.LOCKED_ACCOUNT);
             }
+
+            authAttemptsTotal.inc({event: "login", outcome: "failure"});
 
             this.handleFailedLogin();
         }
@@ -148,45 +217,41 @@ export class AuthenticationService {
         const tfaRequired = await this.tfaService.isTfaRequired(user);
 
         // purge expired tokens
-        await this.authenticationTokenRepository.purgeExpiredTokensByUserId(user.id);
+        await this.authenticationTokenRepository.purgeExpiredTokensByUserId(
+            user.id,
+        );
 
-        // Resolve the user's role so authorization claims can be embedded.
-        const role = await this.roleService.findById(user.role_id);
-
-        // Persist a revocable session row for this login.
-        const session = await this.authenticationTokenRepository.create({
-            user_id: user.id,
-            expired_at: this.dateUtil.expiredAt(
-                Number(__ENV.JWT_EXPIRATION_DAYS || 7),
-                "days",
-            ),
-            ip: null,
-            browser: null,
-            os: null,
+        /*
+         * Issue the credential pair through the single session
+         * authority so every token references a live session row.
+         */
+        const issued = await this.sessionService.issue(user.id, {
+            tfa: !tfaRequired,
+            metadata,
         });
 
-        // generate a JWT token - set tfa to false if TFA is required (user needs to complete TFA)
-        const token = this.tokenService.generateToken({
-            uid: user.id,
-            tid: session.id,
-            tfa: !tfaRequired, // false if TFA required, true if not required or disabled
-            rol: role.slug,
-            bpa: role.is_bypass_authorization ? 1 : 0,
-            av: user.authorization_version || 0,
-        });
+        authAttemptsTotal.inc({event: "login", outcome: "success"});
 
-        return {token, tfaRequired};
+        return {...issued, tfaRequired};
     }
 
     /**
      * Handles authentication session termination securely.
      */
     async logout(tid: number): Promise<void> {
-        const isDeleted = await this.authenticationTokenRepository.deleteById(tid);
+        const isDeleted =
+            await this.authenticationTokenRepository.deleteById(tid);
 
         if (!isDeleted) {
             throw new AppError(Messages.DELETE_FAILED);
         }
+    }
+
+    /**
+     * Revokes every session belonging to a user.
+     */
+    async logoutAll(userId: number): Promise<number> {
+        return this.sessionService.revokeAllSessions(userId);
     }
 
     /**
@@ -199,18 +264,60 @@ export class AuthenticationService {
         );
     }
 
-    async findAuthenticationToken(payload: JwtExtendedPayload): Promise<AuthenticationToken> {
-        const session = await this.authenticationTokenRepository.findById(payload.tid, payload.uid);
+    /**
+     * Resolves the session referenced by an access token.
+     *
+     * Fails when the session is gone, expired, or belongs to a
+     * different user.
+     */
+    async findAuthenticationToken(
+        payload: JwtExtendedPayload,
+    ): Promise<AuthenticationToken> {
+        const session = await this.authenticationTokenRepository.findById(
+            payload.tid,
+            payload.uid,
+        );
+
         if (!session) {
-            throw new AppError(Messages.SESSION_EXPIRED, "Active token session not found.");
+            throw new AppError(
+                Messages.SESSION_EXPIRED,
+                "Active token session not found.",
+            );
         }
-        
-        // Check if authorization_version matches (for fresh auth)
+
+        /*
+         * Check that the authorization version still matches.
+         *
+         * A role, status or permission change increments the user's
+         * authorization version, which invalidates tokens issued before
+         * the change without waiting for expiry.
+         */
         const user = await this.userRepository.findAuthById(payload.uid);
-        if (user && payload.av !== undefined && user.authorization_version !== payload.av) {
-            throw new AppError(Messages.SESSION_EXPIRED, "Authorization has changed. Please log in again.");
+
+        if (!user) {
+            throw new AppError(
+                Messages.SESSION_EXPIRED,
+                "Active token session not found.",
+            );
         }
-        
+
+        if (user.status !== "Activated") {
+            throw new AppError(
+                Messages.SESSION_EXPIRED,
+                "Active token session not found.",
+            );
+        }
+
+        if (
+            payload.av !== undefined &&
+            user.authorization_version !== payload.av
+        ) {
+            throw new AppError(
+                Messages.SESSION_EXPIRED,
+                "Authorization has changed. Please log in again.",
+            );
+        }
+
         return session;
     }
 }

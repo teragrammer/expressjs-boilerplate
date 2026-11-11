@@ -127,6 +127,7 @@ describe("UserService", () => {
             );
             expect(userRepository.create).toHaveBeenCalledWith(
                 createUserData,
+                undefined,
             );
         });
 
@@ -146,7 +147,7 @@ describe("UserService", () => {
             expect(userRepository.findByPhone).toHaveBeenCalledWith(
                 data.phone,
             );
-            expect(userRepository.create).toHaveBeenCalledWith(data);
+            expect(userRepository.create).toHaveBeenCalledWith(data, undefined);
         });
 
         it("should create a user without checking phone when phone is not provided", async () => {
@@ -165,7 +166,7 @@ describe("UserService", () => {
                 data.email,
             );
             expect(userRepository.findByPhone).not.toHaveBeenCalled();
-            expect(userRepository.create).toHaveBeenCalledWith(data);
+            expect(userRepository.create).toHaveBeenCalledWith(data, undefined);
         });
 
         it("should create a user without checking email or phone when neither is provided", async () => {
@@ -182,7 +183,7 @@ describe("UserService", () => {
             expect(result).toEqual(mockUser);
             expect(userRepository.findByEmail).not.toHaveBeenCalled();
             expect(userRepository.findByPhone).not.toHaveBeenCalled();
-            expect(userRepository.create).toHaveBeenCalledWith(data);
+            expect(userRepository.create).toHaveBeenCalledWith(data, undefined);
         });
 
         it("should throw a duplicate error when email already exists", async () => {

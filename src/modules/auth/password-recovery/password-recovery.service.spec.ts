@@ -8,6 +8,8 @@ import {DateUtil} from "../../../common/utils/date.util";
 import {RECOVERY_EMAIL, RECOVERY_PHONE} from "./password-recovery.interface";
 import {SettingService} from "../../system/settings/setting.service";
 import {MailService} from "../../../common/interfaces/mail.interface";
+import {OutboxRepository} from "../../jobs/outbox.repository";
+import {VerificationService} from "../verification/verification.service";
 
 describe("PasswordRecoveryService Unit Tests", () => {
     let service: PasswordRecoveryService;
@@ -18,6 +20,8 @@ describe("PasswordRecoveryService Unit Tests", () => {
     let mockMailService: MailService;
     let mockAuthTokenRepo: AuthenticationTokenRepository;
     let mockDateUtil: DateUtil;
+    let mockOutboxRepository: OutboxRepository;
+    let mockVerificationService: VerificationService;
     let mockTransaction: any;
 
     beforeEach(() => {
@@ -41,6 +45,7 @@ describe("PasswordRecoveryService Unit Tests", () => {
             findByEmail: vi.fn(),
             findByPhone: vi.fn(),
             updatePassword: vi.fn(),
+            update: vi.fn(),
         } as unknown as UserRepository;
 
         mockSettingService = {
@@ -66,6 +71,20 @@ describe("PasswordRecoveryService Unit Tests", () => {
             addMinutes: vi.fn().mockImplementation((date: Date, minutes: number) => new Date(date.getTime() + minutes * 60 * 1000)),
         } as unknown as DateUtil;
 
+        mockOutboxRepository = {
+            enqueue: vi.fn().mockResolvedValue({id: "1"}),
+        } as unknown as OutboxRepository;
+
+        mockVerificationService = {
+            getPolicy: vi.fn().mockResolvedValue({
+                emailTtlHours: 24,
+                phoneTtlMinutes: 10,
+                maxAttempts: 5,
+                requiredForRecovery: false,
+            }),
+            isTargetVerified: vi.fn().mockResolvedValue(true),
+        } as unknown as VerificationService;
+
         vi.mocked(mockRecoveryRepo.withTransaction).mockImplementation(
             async (callback: any) => callback(mockTransaction),
         );
@@ -88,6 +107,8 @@ describe("PasswordRecoveryService Unit Tests", () => {
             mockMailService,
             mockAuthTokenRepo,
             mockDateUtil,
+            mockOutboxRepository,
+            mockVerificationService,
         );
     });
 
@@ -107,11 +128,15 @@ describe("PasswordRecoveryService Unit Tests", () => {
             expect(mockRecoveryRepo.findBySendTo).not.toHaveBeenCalled();
             expect(mockRecoveryRepo.withTransaction).not.toHaveBeenCalled();
             expect(mockMailService.send).not.toHaveBeenCalled();
+            expect(mockOutboxRepository.enqueue).not.toHaveBeenCalled();
 
-            expect(result).toEqual({
-                sent: true,
-                nextResendAt: null,
-            });
+            /*
+             * The response shape and status are identical to the
+             * known-target case, so the endpoint cannot be used to
+             * probe for account existence.
+             */
+            expect(result.sent).toBe(true);
+            expect(result.nextResendAt).toBeInstanceOf(Date);
         });
 
         it("should throw AppError 429 if request is made within resend cooldown", async () => {
@@ -179,14 +204,20 @@ describe("PasswordRecoveryService Unit Tests", () => {
                 mockTransaction,
             );
 
-            expect(
-                mockMailService.send,
-            ).toHaveBeenCalledWith({
-                to: "user@example.com",
-                from: "no-reply@example.com",
-                subject: "Password Recovery",
-                text: "Recovery Code: 123456",
+            /*
+             * The email is queued through the outbox: no network call
+             * happens inside the request or the transaction.
+             */
+            expect(mockOutboxRepository.enqueue).toHaveBeenCalledWith({
+                type: "email.send",
+                payload: {
+                    to: "user@example.com",
+                    from: "no-reply@example.com",
+                    subject: "Password Recovery",
+                    text: "Recovery Code: 123456",
+                },
             });
+            expect(mockMailService.send).not.toHaveBeenCalled();
 
             expect(result.sent).toBe(true);
             expect(result.nextResendAt).toBeInstanceOf(Date);

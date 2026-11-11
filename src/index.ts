@@ -5,7 +5,11 @@ import cluster from "node:cluster";
 import app, {bootstrap} from "./app";
 import {logger} from "./config/logger";
 import {__ENV} from "./config/environment";
-import {checkDbConnection, closeDatabase} from "./config/database";
+import {
+    checkDbConnection,
+    closeDatabase,
+    validateConnectionBudget,
+} from "./config/database";
 import {disconnectRedis} from "./config/redis";
 
 const DEFAULT_CLUSTER_WORKERS = Math.max(1, os.cpus().length);
@@ -17,6 +21,36 @@ const clusterWorkers = Math.max(
 
 const isClusterEnabled =
     Boolean(__ENV.CLUSTER) && DEFAULT_CLUSTER_WORKERS > 1;
+
+/**
+ * Fails fast when the configured pool would exhaust the database's
+ * connection budget across all workers of this process.
+ */
+function assertConnectionBudget(): void {
+    const workers = isClusterEnabled ? clusterWorkers : 1;
+
+    const budget = validateConnectionBudget({
+        poolMax: Number(__ENV.DB_POOL_MAX),
+        workers,
+        maxConnections: Number(__ENV.DB_MAX_CONNECTIONS_TOTAL),
+    });
+
+    if (!budget.valid) {
+        logger.warn(
+            `Connection budget exceeded: ${workers} worker(s) x ` +
+            `DB_POOL_MAX=${__ENV.DB_POOL_MAX} projects to ` +
+            `${budget.projected} connections against a limit of ` +
+            `${__ENV.DB_MAX_CONNECTIONS_TOTAL}. ` +
+            `Recommended DB_POOL_MAX is ${budget.recommended}.`,
+        );
+        return;
+    }
+
+    logger.info(
+        `Connection budget OK: ${budget.projected} of ` +
+        `${__ENV.DB_MAX_CONNECTIONS_TOTAL} connections reserved.`,
+    );
+}
 
 /**
  * Application entry point.
@@ -50,6 +84,86 @@ function startPrimary(): void {
     }
 
     cluster.on("exit", handleWorkerExit);
+
+    registerPrimaryShutdown();
+}
+
+/**
+ * Registers graceful shutdown for the cluster primary.
+ *
+ * The primary forwards the signal to every worker, waits for them to
+ * exit, and only then terminates. Without this an orchestrator restart
+ * would kill workers abruptly.
+ */
+function registerPrimaryShutdown(): void {
+    let isShuttingDown = false;
+
+    const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
+        if (isShuttingDown) {
+            return;
+        }
+
+        isShuttingDown = true;
+
+        logger.info(
+            `[Primary ${process.pid}] Received ${signal}. Forwarding to workers...`,
+        );
+
+        const workers = Object.values(cluster.workers ?? {});
+
+        for (const worker of workers) {
+            if (!worker?.process) {
+                continue;
+            }
+
+            try {
+                worker.process.kill(signal);
+            } catch {
+                // The worker may already be gone; nothing to do.
+            }
+        }
+
+        const forceTimer = setTimeout(() => {
+            logger.error(
+                `[Primary ${process.pid}] Workers did not exit in time. Forcing termination.`,
+            );
+            process.exit(1);
+        }, 15_000);
+
+        forceTimer.unref();
+
+        let remaining = workers.length;
+
+        if (remaining === 0) {
+            clearTimeout(forceTimer);
+            process.exit(0);
+            return;
+        }
+
+        const onWorkerExit = (): void => {
+            remaining -= 1;
+
+            if (remaining > 0) {
+                return;
+            }
+
+            clearTimeout(forceTimer);
+            logger.info(
+                `[Primary ${process.pid}] All workers exited. Shutting down.`,
+            );
+            process.exit(0);
+        };
+
+        cluster.on("exit", onWorkerExit);
+    };
+
+    process.once("SIGTERM", () => {
+        void shutdown("SIGTERM");
+    });
+
+    process.once("SIGINT", () => {
+        void shutdown("SIGINT");
+    });
 }
 
 /**
@@ -101,11 +215,21 @@ async function startWorker(): Promise<void> {
             process.exit(1);
         }
 
+        assertConnectionBudget();
+
         const server = app.listen(__ENV.PORT, () => {
             logger.info(
                 `[Worker ${process.pid}] Server online on port ${__ENV.PORT}`,
             );
         });
+
+        /*
+         * Server-level timeouts protect against slowloris and keep the
+         * shutdown drain bounded.
+         */
+        server.headersTimeout = 65_000;
+        server.requestTimeout = 60_000;
+        server.keepAliveTimeout = 61_000;
 
         registerGracefulShutdown(server);
     } catch (error) {

@@ -18,6 +18,15 @@ import * as changeFkRouteGuards from "../../database/migrations/20261111042618_c
 import * as addAuthVersion from "../../database/migrations/20261111042626_add_authorization_version_to_users";
 import * as makeExpiredAtNotNull from "../../database/migrations/20261111042635_make_expired_at_not_null_auth_tokens";
 import * as addRateLimitTable from "../../database/migrations/20261111050942_add_rate_limit_table";
+import * as addRefreshTokens from "../../database/migrations/20261112000001_add_refresh_tokens";
+import * as addVerificationTokens from "../../database/migrations/20261112000002_add_verification_tokens";
+import * as addAuditLogs from "../../database/migrations/20261112000003_add_audit_logs";
+import * as addOutboxEvents from "../../database/migrations/20261112000004_add_outbox_events";
+import * as addIdempotencyKeys from "../../database/migrations/20261112000005_add_idempotency_keys";
+import * as addRouteGuardIntegrity from "../../database/migrations/20261112000006_add_route_guards_integrity";
+import * as addTrigramIndexes from "../../database/migrations/20261112000007_add_trigram_search_indexes";
+import * as addBrowseIndexes from "../../database/migrations/20261112000008_add_settings_roles_browse_indexes";
+import * as addRecoveryUserId from "../../database/migrations/20261112000009_add_user_id_to_password_recoveries";
 
 /**
  * Ordered migration registry.
@@ -44,6 +53,15 @@ const MIGRATIONS: Array<[string, Migration]> = [
     ["20261111042626_add_authorization_version_to_users", addAuthVersion],
     ["20261111042635_make_expired_at_not_null_auth_tokens", makeExpiredAtNotNull],
     ["20261111050942_add_rate_limit_table", addRateLimitTable],
+    ["20261112000001_add_refresh_tokens", addRefreshTokens],
+    ["20261112000002_add_verification_tokens", addVerificationTokens],
+    ["20261112000003_add_audit_logs", addAuditLogs],
+    ["20261112000004_add_outbox_events", addOutboxEvents],
+    ["20261112000005_add_idempotency_keys", addIdempotencyKeys],
+    ["20261112000006_add_route_guards_integrity", addRouteGuardIntegrity],
+    ["20261112000007_add_trigram_search_indexes", addTrigramIndexes],
+    ["20261112000008_add_settings_roles_browse_indexes", addBrowseIndexes],
+    ["20261112000009_add_user_id_to_password_recoveries", addRecoveryUserId],
 ];
 
 class StaticMigrationProvider implements MigrationProvider {

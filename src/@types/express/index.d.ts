@@ -3,6 +3,7 @@ import "express-useragent";
 import {AuthenticationToken} from "../../modules/auth/authentication/authentication.interface";
 import {JwtExtendedPayload} from "../../modules/auth/authentication/authentication.interface";
 import {User} from "../../modules/users/user.interface";
+import type {RequestContext} from "../../common/context/request-context";
 
 export interface RequestCredentials {
     jwt: JwtExtendedPayload;
@@ -88,6 +89,13 @@ declare global {
              * Cursor pagination.
              */
             cursorPagination: RequestCursorPagination;
+
+            /**
+             * Per-request correlation context (request id, ip, user id).
+             *
+             * Populated by the request-context middleware.
+             */
+            context?: RequestContext;
         }
 
         interface Response {

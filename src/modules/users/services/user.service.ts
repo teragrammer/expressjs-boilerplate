@@ -4,6 +4,7 @@ import {BrowseUsersQuery, BrowseUsersResult, CreateUserDTO, UpdateUserDTO, User}
 import {AppError} from "../../../common/utils/errors";
 import Messages from "../../../common/utils/messages";
 import {SecurityUtil} from "../../../common/utils/security.util";
+import type {DatabaseExecutor} from "../../../config/database";
 
 export class UserService {
     // Dependency injection allows passing a mock repository during testing
@@ -15,8 +16,15 @@ export class UserService {
 
     /**
      * Handles business logic for creating a user under registration form
+     *
+     * An optional executor allows the caller to run the insert inside a
+     * surrounding transaction (registration creates a user and a session
+     * atomically).
      */
-    async registerUser(data: CreateUserDTO): Promise<User> {
+    async registerUser(
+        data: CreateUserDTO,
+        executor?: DatabaseExecutor,
+    ): Promise<User> {
         // Check if email already exists
         if (data.email) {
             const existingEmail = await this.userRepository.findByEmail(data.email);
@@ -40,7 +48,7 @@ export class UserService {
         }
 
         // Create and return the user
-        return this.userRepository.create(data);
+        return this.userRepository.create(data, executor);
     }
 
     async createUser(data: CreateUserDTO): Promise<User> {

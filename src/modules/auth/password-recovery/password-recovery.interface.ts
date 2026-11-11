@@ -14,6 +14,7 @@ export interface PasswordRecovery {
     expired_at: Date | string;
     tries: number;
     next_try_at: Date | string | null;
+    user_id: number | null;
     created_at: Date | string | null;
     updated_at: Date | string | null;
 }
@@ -26,6 +27,7 @@ export interface PasswordRecoveryCreateData {
     expired_at: Date;
     tries?: number;
     next_try_at?: Date | null;
+    user_id?: number | null;
 }
 
 export interface PasswordRecoveryResult {

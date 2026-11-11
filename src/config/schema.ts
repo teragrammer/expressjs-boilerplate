@@ -115,6 +115,7 @@ export interface PasswordRecoveriesTable {
     expired_at: RequiredTimestamp;
     tries: number;
     next_try_at: NullableTimestamp;
+    user_id: number | null;
     created_at: GeneratedTimestamp;
     updated_at: GeneratedTimestamp;
 }
@@ -141,6 +142,78 @@ export interface RateLimitsTable {
     updated_at: GeneratedTimestamp;
 }
 
+export interface RefreshTokensTable {
+    id: Generated<string>;
+    session_id: number;
+    user_id: number;
+    token_hash: string;
+    family_id: string;
+    expires_at: RequiredTimestamp;
+    revoked_at: NullableTimestamp;
+    replaced_by: string | null;
+    ip: string | null;
+    user_agent: string | null;
+    created_at: GeneratedTimestamp;
+    updated_at: GeneratedTimestamp;
+}
+
+export interface VerificationTokensTable {
+    id: Generated<string>;
+    user_id: number;
+    channel: "email" | "phone";
+    target: string;
+    token_hash: string;
+    expires_at: RequiredTimestamp;
+    consumed_at: NullableTimestamp;
+    attempts: Generated<number>;
+    created_at: GeneratedTimestamp;
+    updated_at: GeneratedTimestamp;
+}
+
+export interface AuditLogsTable {
+    id: Generated<string>;
+    occurred_at: GeneratedTimestamp;
+    actor_user_id: number | null;
+    actor_type: string;
+    action: string;
+    target_type: string | null;
+    target_id: string | null;
+    outcome: "success" | "failure";
+    request_id: string | null;
+    ip: string | null;
+    user_agent: string | null;
+    metadata: Generated<Record<string, unknown>>;
+}
+
+export interface OutboxEventsTable {
+    id: Generated<string>;
+    type: string;
+    payload: Generated<Record<string, unknown>>;
+    status: "pending" | "processing" | "done" | "failed";
+    attempts: Generated<number>;
+    available_at: GeneratedTimestamp;
+    locked_at: NullableTimestamp;
+    locked_by: string | null;
+    last_error: string | null;
+    created_at: GeneratedTimestamp;
+    updated_at: GeneratedTimestamp;
+    processed_at: NullableTimestamp;
+}
+
+export interface IdempotencyKeysTable {
+    id: Generated<string>;
+    key: string;
+    user_id: number | null;
+    route: string;
+    request_hash: string;
+    status: "in_progress" | "completed";
+    response_status: number | null;
+    response_body: Record<string, unknown> | null;
+    locked_at: NullableTimestamp;
+    created_at: GeneratedTimestamp;
+    expires_at: RequiredTimestamp;
+}
+
 /**
  * Kysely database schema.
  *
@@ -156,4 +229,9 @@ export interface Database {
     password_recoveries: PasswordRecoveriesTable;
     two_factor_authentications: TwoFactorAuthenticationsTable;
     rate_limits: RateLimitsTable;
+    refresh_tokens: RefreshTokensTable;
+    verification_tokens: VerificationTokensTable;
+    audit_logs: AuditLogsTable;
+    outbox_events: OutboxEventsTable;
+    idempotency_keys: IdempotencyKeysTable;
 }

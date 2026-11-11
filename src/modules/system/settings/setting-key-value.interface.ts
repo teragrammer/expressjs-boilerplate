@@ -11,4 +11,11 @@ export interface SettingKeyValue {
 
     psr_eml_snd: string;        // Password Recovery Email Sender
     psr_eml_sbj: string;        // Password Recovery Email Subject
+
+    ver_eml_snd: string;        // Verification Email Sender
+    ver_eml_sbj: string;        // Verification Email Subject
+    ver_eml_ttl: number;        // Email verification lifetime (hours)
+    ver_phn_ttl: number;        // Phone verification lifetime (minutes)
+    ver_max_try: number;        // Max verification attempts
+    ver_req_rcv: number;        // Require a verified contact for recovery
 }

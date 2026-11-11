@@ -32,6 +32,15 @@ export function buildPoolConfig(): PoolConfig {
         idleTimeoutMillis: 30_000,
         connectionTimeoutMillis: 5_000,
         application_name: "express-api",
+        /*
+         * Server-side timeouts protect the pool: a runaway query or a
+         * long-held lock cannot occupy a connection indefinitely.
+         */
+        statement_timeout: Number(__ENV.DB_STATEMENT_TIMEOUT_MS),
+        lock_timeout: Number(__ENV.DB_LOCK_TIMEOUT_MS),
+        idle_in_transaction_session_timeout: Number(
+            __ENV.DB_IDLE_IN_TRANSACTION_TIMEOUT_MS,
+        ),
     };
 
     if (__ENV.DB_SSL) {
@@ -97,6 +106,51 @@ function createDatabaseInstance(): Kysely<Database> {
  * Shared Kysely instance (PostgreSQL).
  */
 export const db = createDatabaseInstance();
+
+/**
+ * Runs `callback` inside a database transaction.
+ *
+ * The transaction is committed when the callback resolves and rolled
+ * back when it throws. This is the application-level unit of work used
+ * by multi-step writes such as registration and password reset.
+ */
+export async function withTransaction<T>(
+    callback: (trx: Transaction<Database>) => Promise<T>,
+    dbInstance: Kysely<Database> = db,
+): Promise<T> {
+    return dbInstance.transaction().execute(callback);
+}
+
+/**
+ * Validates the connection budget for the current process topology.
+ *
+ * Each cluster worker opens its own pool, so the per-worker maximum
+ * multiplied by the worker count must stay below the server's total
+ * connection limit.
+ */
+export function validateConnectionBudget(
+    options: {
+        poolMax: number;
+        workers: number;
+        maxConnections: number;
+        reserve?: number;
+    },
+): {valid: boolean; projected: number; recommended: number} {
+    const reserve = options.reserve ?? 20;
+    const projected = options.poolMax * options.workers;
+    const recommended = Math.max(
+        1,
+        Math.floor(
+            (options.maxConnections - reserve) / Math.max(1, options.workers),
+        ),
+    );
+
+    return {
+        valid: projected + reserve <= options.maxConnections,
+        projected,
+        recommended,
+    };
+}
 
 /**
  * Health check used on boot to fail fast when PostgreSQL is down.

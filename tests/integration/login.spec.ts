@@ -47,9 +47,26 @@ describe("POST /api/v1/auth/login", () => {
 
         expect(response.body).toEqual({
             token: expect.any(String),
+            access_token: expect.any(String),
+            expires_at: expect.any(String),
+            tfa_required: expect.any(Boolean),
             tfaRequired: expect.any(Boolean),
         });
 
         expect(response.body.token).toBeTruthy();
+
+        /*
+         * The refresh token is delivered in an HttpOnly cookie, never
+         * in the response body.
+         */
+        const cookies = response.headers["set-cookie"] ?? [];
+        const refreshCookie = (Array.isArray(cookies)
+            ? cookies
+            : [cookies]
+        ).find((cookie) => cookie.startsWith("refresh_token="));
+
+        expect(refreshCookie).toBeDefined();
+        expect(refreshCookie).toContain("HttpOnly");
+        expect(refreshCookie).toContain("SameSite=Strict");
     });
 });

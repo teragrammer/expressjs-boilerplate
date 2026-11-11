@@ -1,11 +1,12 @@
 // tests/integration/password-recovery.spec.ts
-import {afterEach, describe, expect, it, vi} from "vitest";
+import {afterEach, beforeEach, describe, expect, it, vi} from "vitest";
 import request from "supertest";
 import sgMail from "@sendgrid/mail";
 
 import app from "../../src/app";
 import {db} from "../../src/config/database";
 import {securityUtil} from "../../src/config/container";
+import {drainOutbox} from "./helpers";
 
 const createTestUser = async () => {
     const username = securityUtil.randomString(8);
@@ -64,6 +65,12 @@ const getSentMail = (
 };
 
 describe("Password recovery", () => {
+    beforeEach(async () => {
+        // Start from an empty queue so one test cannot observe the
+        // email of another test.
+        await db.deleteFrom("outbox_events").execute();
+    });
+
     afterEach(async () => {
         vi.restoreAllMocks();
 
@@ -71,6 +78,7 @@ describe("Password recovery", () => {
         // a test intentionally exercises an unsuccessful workflow.
         await db.deleteFrom("two_factor_authentications").execute();
         await db.deleteFrom("password_recoveries").execute();
+        await db.deleteFrom("outbox_events").execute();
     });
 
     it("should send a password recovery code to an existing user's email", async () => {
@@ -97,6 +105,9 @@ describe("Password recovery", () => {
                 next_resend_at: expect.any(String),
             },
         });
+
+        // The email is delivered by the outbox worker, not inline.
+        await drainOutbox();
 
         expect(sendMailSpy).toHaveBeenCalledTimes(1);
 
@@ -154,6 +165,9 @@ describe("Password recovery", () => {
             });
 
         expect(sendResponse.status).toBe(200);
+
+        // The email is delivered by the outbox worker, not inline.
+        await drainOutbox();
 
         const mail = getSentMail(sendMailSpy);
 
@@ -221,6 +235,9 @@ describe("Password recovery", () => {
 
         expect(newPasswordResponse.body).toEqual({
             token: expect.any(String),
+            access_token: expect.any(String),
+            expires_at: expect.any(String),
+            tfa_required: expect.any(Boolean),
             tfaRequired: expect.any(Boolean),
         });
 
@@ -242,6 +259,9 @@ describe("Password recovery", () => {
             });
 
         expect(sendResponse.status).toBe(200);
+
+        await drainOutbox();
+
         expect(sendMailSpy).toHaveBeenCalledTimes(1);
 
         const recovery = await db
@@ -297,12 +317,21 @@ describe("Password recovery", () => {
 
         expect(response.status).toBe(200);
 
+        /*
+         * The response shape is identical to the known-account case,
+         * so the endpoint cannot be used to discover which addresses
+         * are registered.
+         */
         expect(response.body).toEqual({
             status: "success",
             message:
                 "If an account matches those credentials, a reset code has been sent.",
-            data: null,
+            data: {
+                next_resend_at: expect.any(String),
+            },
         });
+
+        await drainOutbox();
 
         expect(sendMailSpy).not.toHaveBeenCalled();
 

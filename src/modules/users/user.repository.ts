@@ -108,8 +108,8 @@ export class UserRepository {
         return row ? this.mapToUser(row) : null;
     }
 
-    async create(data: CreateUserDTO): Promise<User> {
-        const newRow = await this.db
+    async create(data: CreateUserDTO, executor: DatabaseExecutor = this.db): Promise<User> {
+        const newRow = await executor
             .insertInto(USER_TABLE)
             .values({
                 first_name: data.first_name || null,
@@ -140,17 +140,20 @@ export class UserRepository {
         id: number,
         data: UpdateUserDTO,
         status?: Status,
+        executor: DatabaseExecutor = this.db,
     ): Promise<User | null> {
-        const existingRow = await this.activeUsers()
+        const existingRow = await executor
+            .selectFrom(USER_TABLE)
             .select("id")
             .where("id", "=", id)
+            .where("deleted_at", "is", null)
             .executeTakeFirst();
 
         if (!existingRow) {
             return null;
         }
 
-        let query = this.db
+        let query = executor
             .updateTable(USER_TABLE)
             .set({
                 ...(data.first_name !== undefined && {

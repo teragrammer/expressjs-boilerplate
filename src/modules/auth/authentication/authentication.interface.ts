@@ -37,4 +37,7 @@ export interface JwtExtendedPayload extends JwtPayload {
     rol?: string; // role slug used for authorization
     bpa?: number; // bypass authorization flag (1 = bypass)
     av?: number; // authorization_version for fresh auth checks
+    jti?: string; // unique token id for traceability
+    iss?: string; // issuer
+    aud?: string; // audience
 }

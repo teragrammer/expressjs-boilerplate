@@ -32,6 +32,9 @@ describe("POST /api/v1/auth/register", () => {
 
         expect(response.body).toEqual({
             token: expect.any(String),
+            access_token: expect.any(String),
+            expires_at: expect.any(String),
+            tfa_required: false,
         });
 
         const user = await db

@@ -35,6 +35,11 @@ export const Messages = {
         status: 500,
         message: "Whoops something went wrong",
     },
+    SERVICE_UNAVAILABLE: {
+        code: "SERVICE_UNAVAILABLE",
+        status: 503,
+        message: "The service is temporarily unavailable, please retry shortly",
+    },
     UNAUTHORIZED: {
         code: "UNAUTHORIZED",
         status: 401,

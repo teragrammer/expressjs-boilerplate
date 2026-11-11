@@ -410,6 +410,10 @@ describe("Two-factor authentication", () => {
                 tfa: true,
                 rol: "customer",
                 bpa: 0,
+                av: 0,
+                jti: expect.any(String),
+                iss: expect.any(String),
+                aud: expect.any(String),
             });
 
             const deletedTfa = await db
