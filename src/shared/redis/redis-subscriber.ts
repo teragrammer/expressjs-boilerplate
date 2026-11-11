@@ -12,10 +12,16 @@ export class RedisSubscriber {
 
     constructor(
         dbRedis: DBRedisInterface,
-        private readonly logger: { info: (msg: string) => void; error: (msg: string) => void }
+        private readonly logger: {
+            info: (msg: string) => void;
+            error: (msg: string) => void;
+            warn?: (msg: string) => void;
+        }
     ) {
         this.subscriber = dbRedis.subscriber;
         this.isEnabled = dbRedis.subscriber !== undefined;
+
+        this.attachReconnectHandlers();
     }
 
     isConnected(): boolean {
@@ -24,14 +30,55 @@ export class RedisSubscriber {
     }
 
     /**
+     * Re-subscribes to every registered channel when Redis reconnects.
+     *
+     * Without this, a Redis restart silently disables cache
+     * invalidation for the lifetime of the process, leaving stale
+     * authorization data in the local caches.
+     */
+    private attachReconnectHandlers(): void {
+        if (!this.subscriber) {return;}
+
+        this.subscriber.on("ready", () => {
+            void this.resubscribeAll();
+        });
+
+        this.subscriber.on("reconnecting", () => {
+            this.logger.warn?.(
+                "Redis subscriber reconnecting; subscriptions will be restored.",
+            );
+        });
+    }
+
+    /**
+     * Re-issues the subscription for every registered channel.
+     */
+    async resubscribeAll(): Promise<void> {
+        const channels = Array.from(this.handlers.keys());
+
+        if (channels.length === 0) {return;}
+
+        if (!this.subscriber) {return;}
+
+        try {
+            for (const channel of channels) {
+                await this.subscriber.subscribe(channel);
+            }
+
+            this.logger.info(
+                `Restored ${channels.length} Redis subscription(s): ${channels.join(", ")}`,
+            );
+        } catch (err: any) {
+            this.logger.error(
+                `Failed to restore Redis subscriptions: ${err.message}`,
+            );
+        }
+    }
+
+    /**
      * Subscribes to a channel and registers a handler to process the events.
      */
     async subscribe(channel: string, onMessage: MessageHandler): Promise<void> {
-        if (!this.isConnected() || !this.subscriber) {
-            this.logger.error(`Cannot subscribe to channel ${channel}: Redis subscriber client is disconnected.`);
-            return;
-        }
-
         // 1. Register handler callback to the channel map
         if (!this.handlers.has(channel)) {
             this.handlers.set(channel, new Set());
@@ -41,9 +88,14 @@ export class RedisSubscriber {
         // 2. Initialize global ioredis 'message' listener once
         this.setupGlobalMessageListener();
 
+        if (!this.isConnected() || !this.subscriber) {
+            this.logger.error(`Cannot subscribe to channel ${channel}: Redis subscriber client is disconnected.`);
+            return;
+        }
+
         try {
             // 3. Issue subscription command to Redis
-            await (this.subscriber as any).subscribe(channel);
+            await this.subscriber.subscribe(channel);
             this.logger.info(`Successfully subscribed to channel: ${channel}`);
         } catch (err: any) {
             this.logger.error(`Failed to register Redis subscription for channel ${channel}: ${err.message}`);

@@ -2,22 +2,42 @@
 import {Router} from "express";
 
 import {TwoFactorAuthenticationController} from "./two-factor-authentication.controller";
-import {verifyOtpSchema} from "./two-factor-authentication.schema";
+import {
+    disableTfaSchema,
+    verifyOtpSchema,
+} from "./two-factor-authentication.schema";
 
 import {AuthenticationMiddleware} from "../../../common/middleware/authentication.middleware";
 import {validate} from "../../../common/middleware/validate.middleware";
 import {authRateLimiters} from "../../../common/middleware/rate-limiter.middleware";
 
-import {twoFactorAuthenticationService} from "../../../config/container";
+import {
+    auditService,
+    twoFactorAuthenticationService,
+} from "../../../config/container";
 
 const twoFactorAuthenticationController =
     new TwoFactorAuthenticationController(
         twoFactorAuthenticationService,
+        auditService,
     );
 
 export default () => {
     const router = Router();
 
+    /*
+     * Sending an OTP is a state-changing operation, so it uses POST.
+     */
+    router.post(
+        "/tfa/send",
+        authRateLimiters.tfaSend,
+        AuthenticationMiddleware(),
+        twoFactorAuthenticationController.send,
+    );
+
+    /*
+     * Deprecated alias for the pre-1.0 `GET /auth/tfa/send`.
+     */
     router.get(
         "/tfa/send",
         authRateLimiters.tfaSend,
@@ -50,8 +70,9 @@ export default () => {
     router.post(
         "/tfa/disable",
         [
+            authRateLimiters.tfaValidate,
             AuthenticationMiddleware(),
-            // Rate limit disable attempts
+            validate(disableTfaSchema, ["password"]),
         ],
         twoFactorAuthenticationController.disable,
     );

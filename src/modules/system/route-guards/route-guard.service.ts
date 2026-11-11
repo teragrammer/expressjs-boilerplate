@@ -16,6 +16,7 @@ export class RouteGuardService {
     public static readonly CACHE_KEY = "app:route_guards";
 
     private localCache: RouteGuardCachePayload | null = null;
+    private localCacheExpiresAt = 0;
     private readonly DEFAULT_TTL = 3600; // 1 Hour
 
     constructor(
@@ -26,6 +27,7 @@ export class RouteGuardService {
 
     updateLocalMemory(guards: any): void { // Replace 'any' with your actual Route Guard type if applicable
         this.localCache = guards;
+        this.localCacheExpiresAt = Date.now() + this.DEFAULT_TTL * 1000;
     }
 
     /**
@@ -34,9 +36,13 @@ export class RouteGuardService {
      */
     async getCache(): Promise<Readonly<RouteGuardCachePayload>> {
         // 1. Check Local Memory Cache (L1)
-        if (this.localCache) {
+        if (this.localCache && this.localCacheExpiresAt > Date.now()) {
             return Object.freeze(this.localCache);
         }
+
+        // The L1 entry expired: fall through to L2/L3.
+        this.localCache = null;
+        this.localCacheExpiresAt = 0;
 
         // 2. If Redis is connected, attempt to fetch from Redis (L2)
         if (this.redisCache.isConnected()) {
@@ -44,6 +50,7 @@ export class RouteGuardService {
                 const cached = await this.redisCache.get<RouteGuardCachePayload>(RouteGuardService.CACHE_KEY);
                 if (cached) {
                     this.localCache = cached;
+                    this.localCacheExpiresAt = Date.now() + this.DEFAULT_TTL * 1000;
                     return Object.freeze(this.localCache);
                 }
             } catch (error) {
@@ -63,6 +70,7 @@ export class RouteGuardService {
 
         // Warm L1 Cache
         this.localCache = freshGuards;
+        this.localCacheExpiresAt = Date.now() + this.DEFAULT_TTL * 1000;
 
         // Warm L2 Cache asynchronously to optimize performance
         if (this.redisCache.isConnected()) {
@@ -101,9 +109,30 @@ export class RouteGuardService {
         this.localCache = null;
     }
 
+    /**
+     * Creates a route guard.
+     *
+     * The `(role_id, route)` pair is unique, so a duplicate grant is
+     * rejected with a 409 rather than silently creating a second row.
+     */
     async createRouteGuard(data: CreateRouteGuardDTO): Promise<RouteGuard> {
-        const routeGuard: RouteGuard = await this.routeGuardRepository.create(data);
+        const existing = await this.routeGuardRepository.findByRoleAndRoute(
+            data.role_id,
+            data.route,
+        );
+
+        if (existing) {
+            throw new AppError(
+                Messages.DUPLICATE_DATA,
+                "This route is already granted to the role.",
+            );
+        }
+
+        const routeGuard: RouteGuard =
+            await this.routeGuardRepository.create(data);
+
         await this.boot();
+
         return routeGuard;
     }
 

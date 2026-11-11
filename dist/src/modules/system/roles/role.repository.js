@@ -133,6 +133,37 @@ class RoleRepository {
             return rows.map(row => this.mapToRole(row));
         });
     }
+    /**
+     * Counts the users assigned to a role.
+     *
+     * Used to block a role deletion while users still reference it.
+     */
+    countUsers(roleId) {
+        return __awaiter(this, void 0, void 0, function* () {
+            var _a;
+            const row = yield this.db
+                .selectFrom("users")
+                .select((eb) => eb.fn.countAll().as("count"))
+                .where("role_id", "=", roleId)
+                .where("deleted_at", "is", null)
+                .executeTakeFirst();
+            return Number((_a = row === null || row === void 0 ? void 0 : row.count) !== null && _a !== void 0 ? _a : 0);
+        });
+    }
+    /**
+     * Counts the route guards that reference a role.
+     */
+    countRouteGuards(roleId) {
+        return __awaiter(this, void 0, void 0, function* () {
+            var _a;
+            const row = yield this.db
+                .selectFrom("route_guards")
+                .select((eb) => eb.fn.countAll().as("count"))
+                .where("role_id", "=", roleId)
+                .executeTakeFirst();
+            return Number((_a = row === null || row === void 0 ? void 0 : row.count) !== null && _a !== void 0 ? _a : 0);
+        });
+    }
     delete(id) {
         return __awaiter(this, void 0, void 0, function* () {
             const result = yield this.db

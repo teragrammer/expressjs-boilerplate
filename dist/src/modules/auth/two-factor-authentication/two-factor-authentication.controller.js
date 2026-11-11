@@ -15,9 +15,12 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.TwoFactorAuthenticationController = void 0;
 const catch_async_1 = __importDefault(require("../../../common/utils/catch-async"));
 const request_credentials_1 = require("../../../common/utils/request-credentials");
+const request_info_1 = require("../../../common/utils/request-info");
+const audit_interface_1 = require("../../audit/audit.interface");
 class TwoFactorAuthenticationController {
-    constructor(tfaService) {
+    constructor(tfaService, auditService) {
         this.tfaService = tfaService;
+        this.auditService = auditService;
         this.send = (0, catch_async_1.default)((req, res) => __awaiter(this, void 0, void 0, function* () {
             (0, request_credentials_1.assertCredentials)(req);
             const { jwt } = req.credentials;
@@ -33,20 +36,28 @@ class TwoFactorAuthenticationController {
             });
         }));
         this.validate = (0, catch_async_1.default)((req, res) => __awaiter(this, void 0, void 0, function* () {
-            var _a, _b;
+            var _a, _b, _c, _d;
             (0, request_credentials_1.assertCredentials)(req);
             const { jwt } = req.credentials;
             const user = yield req.credentials.user();
+            /*
+             * The code comes from the validated payload, never straight
+             * from the request body.
+             */
+            const { code } = req.sanitize.data;
             const token = yield this.tfaService.verifyOtp({
                 tokenId: jwt.tid,
-                code: req.body.code,
+                code,
                 user,
                 meta: {
-                    ip: req.ip || null,
-                    browser: ((_a = req.useragent) === null || _a === void 0 ? void 0 : _a.browser) || null,
-                    os: ((_b = req.useragent) === null || _b === void 0 ? void 0 : _b.os) || null,
+                    ip: (0, request_info_1.getClientIp)(req),
+                    browser: (_b = (_a = req.useragent) === null || _a === void 0 ? void 0 : _a.browser) !== null && _b !== void 0 ? _b : null,
+                    os: (_d = (_c = req.useragent) === null || _c === void 0 ? void 0 : _c.os) !== null && _d !== void 0 ? _d : null,
                 },
                 tfaCleared: jwt.tfa,
+            });
+            yield this.auditService.success(audit_interface_1.AUDIT_ACTIONS.AUTH_TFA_VERIFIED, {
+                request: req,
             });
             res.status(200).json({ token });
         }));
@@ -54,10 +65,14 @@ class TwoFactorAuthenticationController {
             (0, request_credentials_1.assertCredentials)(req);
             const { jwt } = req.credentials;
             const user = yield req.credentials.user();
+            const { code } = req.sanitize.data;
             const result = yield this.tfaService.enrollTfa({
                 userId: user.id,
                 tokenId: jwt.tid,
-                code: req.body.code,
+                code,
+            });
+            yield this.auditService.success(audit_interface_1.AUDIT_ACTIONS.AUTH_TFA_ENABLED, {
+                request: req,
             });
             if (result.enrolled && result.recoveryCodes) {
                 res.status(200).json({
@@ -73,7 +88,11 @@ class TwoFactorAuthenticationController {
         this.disable = (0, catch_async_1.default)((req, res) => __awaiter(this, void 0, void 0, function* () {
             (0, request_credentials_1.assertCredentials)(req);
             const user = yield req.credentials.user();
-            yield this.tfaService.disableTfa(user.id, req.body.password);
+            const { password } = req.sanitize.data;
+            yield this.tfaService.disableTfa(user.id, password);
+            yield this.auditService.success(audit_interface_1.AUDIT_ACTIONS.AUTH_TFA_DISABLED, {
+                request: req,
+            });
             res.status(200).json({
                 disabled: true,
                 message: "Two-factor authentication disabled successfully.",

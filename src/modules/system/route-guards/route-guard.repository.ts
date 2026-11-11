@@ -93,6 +93,23 @@ export class RouteGuardRepository {
         return row ?? null;
     }
 
+    /**
+     * Finds a guard by its role and route pair.
+     */
+    async findByRoleAndRoute(
+        roleId: number,
+        route: string,
+    ): Promise<RouteGuard | null> {
+        const row = await this.db
+            .selectFrom(ROUTE_GUARD_TABLE)
+            .selectAll()
+            .where("role_id", "=", roleId)
+            .where("route", "=", route)
+            .executeTakeFirst();
+
+        return row ?? null;
+    }
+
     async delete(id: number): Promise<boolean> {
         const result = await this.db
             .deleteFrom(ROUTE_GUARD_TABLE)

@@ -133,7 +133,7 @@ describe("SecurityUtil Edge Cases & Functional Tests", () => {
             const sensitiveData = "Confidential Information";
             const validCipherText = secureUtilWithConfig.encrypt(sensitiveData);
 
-            const [iv, authTag, content] = validCipherText.split(":");
+            const [, iv, authTag, content] = validCipherText.split(":");
 
             // Alter a character in the ciphertext buffer representation to simulate tampering
             const tamperedContent = content.slice(0, -1) + (content.endsWith("a") ? "b" : "a");
@@ -156,7 +156,7 @@ describe("SecurityUtil Edge Cases & Functional Tests", () => {
             const sensitiveData = "Confidential Payroll Data";
             const cipherText = secureUtilWithConfig.encrypt(sensitiveData);
 
-            const [iv, authTag, content] = cipherText.split(":");
+            const [, iv, authTag, content] = cipherText.split(":");
 
             // Attack scenario: Truncate the 16-byte auth tag down to 2 bytes (4 hex chars)
             const truncatedTag = authTag.substring(0, 4);
@@ -185,29 +185,51 @@ describe("SecurityUtil Edge Cases & Functional Tests", () => {
         it("should securely package complex payloads and restore them with exact structure", async () => {
             const shielded = await secureUtilWithConfig.shield(complexJSON);
 
-            // Check that it returned a valid base64url string (no slashes/plus signs)
-            expect(shielded).not.toContain("/");
-            expect(shielded).not.toContain("+");
+            // The payload is a versioned AES-256-GCM envelope.
+            expect(shielded.startsWith("v1:")).toBe(true);
+            expect(shielded.split(":")).toHaveLength(4);
 
             const unshielded = await secureUtilWithConfig.unshield(shielded);
             expect(unshielded).toBe(complexJSON);
         });
 
-        it("should fail integrity check if shielded envelope JSON was modified to simulate attacker tampering", async () => {
+        it("should not use a password hash for cache payloads", async () => {
+            /*
+             * Regression test: the cache path used to run bcrypt on
+             * every read and write, which cost hundreds of
+             * milliseconds per operation.
+             */
             const shielded = await secureUtilWithConfig.shield("PlainPayload");
 
-            // Unpack envelope structure, tamper hash validation mapping, repack
-            const rawDecoded = secureUtilWithoutConfig.decodeUrlBase64(shielded);
-            const parsedEnvelope = JSON.parse(rawDecoded);
+            // A bcrypt hash would start with the bcrypt prefix.
+            expect(shielded.startsWith("$2")).toBe(false);
+            expect(shielded.startsWith("v1:")).toBe(true);
+        });
 
-            // Swapping validation hash to another arbitrary valid bcrypt payload format
-            parsedEnvelope.hashed = await secureUtilWithConfig.hash("ACompletelyDifferentString");
+        it("should fail integrity check if the encrypted payload was modified", async () => {
+            const shielded = await secureUtilWithConfig.shield("PlainPayload");
 
-            const tamperedShielded = secureUtilWithoutConfig.encodeUrlBase64(JSON.stringify(parsedEnvelope));
+            const [version, iv, authTag, content] = shielded.split(":");
+
+            // Tamper with the ciphertext.
+            const tamperedContent =
+                content.slice(0, -1) + (content.endsWith("a") ? "b" : "a");
+
+            const tamperedShielded = `${version}:${iv}:${authTag}:${tamperedContent}`;
 
             await expect(secureUtilWithConfig.unshield(tamperedShielded))
                 .rejects
-                .toThrow("Data integrity check failed");
+                .toThrow(Error);
+        });
+
+        it("should reject an envelope with an unknown version", async () => {
+            const shielded = await secureUtilWithConfig.shield("PlainPayload");
+
+            const [, iv, authTag, content] = shielded.split(":");
+
+            await expect(
+                secureUtilWithConfig.unshield(`v9:${iv}:${authTag}:${content}`),
+            ).rejects.toThrow("Invalid encrypted payload structure");
         });
     });
 });

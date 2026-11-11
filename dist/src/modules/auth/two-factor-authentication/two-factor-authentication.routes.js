@@ -8,9 +8,16 @@ const authentication_middleware_1 = require("../../../common/middleware/authenti
 const validate_middleware_1 = require("../../../common/middleware/validate.middleware");
 const rate_limiter_middleware_1 = require("../../../common/middleware/rate-limiter.middleware");
 const container_1 = require("../../../config/container");
-const twoFactorAuthenticationController = new two_factor_authentication_controller_1.TwoFactorAuthenticationController(container_1.twoFactorAuthenticationService);
+const twoFactorAuthenticationController = new two_factor_authentication_controller_1.TwoFactorAuthenticationController(container_1.twoFactorAuthenticationService, container_1.auditService);
 exports.default = () => {
     const router = (0, express_1.Router)();
+    /*
+     * Sending an OTP is a state-changing operation, so it uses POST.
+     */
+    router.post("/tfa/send", rate_limiter_middleware_1.authRateLimiters.tfaSend, (0, authentication_middleware_1.AuthenticationMiddleware)(), twoFactorAuthenticationController.send);
+    /*
+     * Deprecated alias for the pre-1.0 `GET /auth/tfa/send`.
+     */
     router.get("/tfa/send", rate_limiter_middleware_1.authRateLimiters.tfaSend, (0, authentication_middleware_1.AuthenticationMiddleware)(), twoFactorAuthenticationController.send);
     router.post("/tfa/validate", [
         rate_limiter_middleware_1.authRateLimiters.tfaValidate,
@@ -25,8 +32,9 @@ exports.default = () => {
     ], twoFactorAuthenticationController.enroll);
     // TFA Disable - requires authentication and password verification
     router.post("/tfa/disable", [
+        rate_limiter_middleware_1.authRateLimiters.tfaValidate,
         (0, authentication_middleware_1.AuthenticationMiddleware)(),
-        // Rate limit disable attempts
+        (0, validate_middleware_1.validate)(two_factor_authentication_schema_1.disableTfaSchema, ["password"]),
     ], twoFactorAuthenticationController.disable);
     return router;
 };

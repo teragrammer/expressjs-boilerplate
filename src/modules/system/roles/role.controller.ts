@@ -10,6 +10,10 @@ import {
     UpdateRoleDTO,
 } from "./role.interface";
 import {AppError} from "../../../common/utils/errors";
+import {
+    parseOptionalBoolean,
+    parseOptionalSearch,
+} from "../../../common/utils/query-parser";
 
 export class RoleController {
     constructor(
@@ -41,27 +45,25 @@ export class RoleController {
     });
 
     browse = catchAsync(async (req: Request, res: Response): Promise<void> => {
-        const isPublic = req.sanitize.query.numeric("is_public");
-        const search: string = req.sanitize.query.get("search");
+        /*
+         * Absent parameters must stay absent: a missing filter is not
+         * the same as `is_public=false`.
+         */
+        const isPublic = parseOptionalBoolean(
+            req.sanitize.query.get("is_public"),
+            "is_public",
+        );
 
+        const search = parseOptionalSearch(req.sanitize.query.get("search"));
+
+        const paginate = req.pagination ?? req.app?.get?.("paginate");
+        if (!paginate) {throw new TypeError("Missing pagination context");}
 
         const filters: BrowseRoleQuery = {
-            page: (() => {
-                const paginate = req.pagination ?? req.app?.get?.("paginate");
-                if (!paginate) {throw new TypeError("Missing pagination context");}
-                return Math.max(1, paginate.page ?? 1);
-            })(),
-            perPage: (() => {
-                const paginate = req.pagination ?? req.app?.get?.("paginate");
-                if (!paginate) {throw new TypeError("Missing pagination context");}
-                return Math.min(100, Math.max(1, paginate.perPage ?? 20));
-            })(),
-            ...(isPublic !== null && {
-                is_public: isPublic === 1,
-            }),
-            ...(search !== null && {
-                search: search.trim(),
-            }),
+            page: Math.max(1, paginate.page ?? 1),
+            perPage: Math.min(100, Math.max(1, paginate.perPage ?? 20)),
+            ...(isPublic !== undefined && {is_public: isPublic}),
+            ...(search !== undefined && {search}),
         };
 
         const roles: Role[] = await this.roleService.browseRoles(filters);

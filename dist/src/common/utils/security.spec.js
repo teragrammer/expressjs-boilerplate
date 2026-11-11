@@ -118,7 +118,7 @@ const security_util_1 = require("./security.util");
         (0, vitest_1.it)("should strictly throw error (MAC/Tag verification failure) if cipher payload or IV is tampered with", () => {
             const sensitiveData = "Confidential Information";
             const validCipherText = secureUtilWithConfig.encrypt(sensitiveData);
-            const [iv, authTag, content] = validCipherText.split(":");
+            const [, iv, authTag, content] = validCipherText.split(":");
             // Alter a character in the ciphertext buffer representation to simulate tampering
             const tamperedContent = content.slice(0, -1) + (content.endsWith("a") ? "b" : "a");
             const tamperedPayload = `${iv}:${authTag}:${tamperedContent}`;
@@ -135,7 +135,7 @@ const security_util_1 = require("./security.util");
         (0, vitest_1.it)("should reject decryption if the GCM auth tag has been truncated (Short-Tag Forgery Prevention)", () => {
             const sensitiveData = "Confidential Payroll Data";
             const cipherText = secureUtilWithConfig.encrypt(sensitiveData);
-            const [iv, authTag, content] = cipherText.split(":");
+            const [, iv, authTag, content] = cipherText.split(":");
             // Attack scenario: Truncate the 16-byte auth tag down to 2 bytes (4 hex chars)
             const truncatedTag = authTag.substring(0, 4);
             const tamperedPayload = `${iv}:${truncatedTag}:${content}`;
@@ -157,23 +157,37 @@ const security_util_1 = require("./security.util");
         const complexJSON = JSON.stringify({ userId: 101, scopes: ["admin", "write"] });
         (0, vitest_1.it)("should securely package complex payloads and restore them with exact structure", () => __awaiter(void 0, void 0, void 0, function* () {
             const shielded = yield secureUtilWithConfig.shield(complexJSON);
-            // Check that it returned a valid base64url string (no slashes/plus signs)
-            (0, vitest_1.expect)(shielded).not.toContain("/");
-            (0, vitest_1.expect)(shielded).not.toContain("+");
+            // The payload is a versioned AES-256-GCM envelope.
+            (0, vitest_1.expect)(shielded.startsWith("v1:")).toBe(true);
+            (0, vitest_1.expect)(shielded.split(":")).toHaveLength(4);
             const unshielded = yield secureUtilWithConfig.unshield(shielded);
             (0, vitest_1.expect)(unshielded).toBe(complexJSON);
         }));
-        (0, vitest_1.it)("should fail integrity check if shielded envelope JSON was modified to simulate attacker tampering", () => __awaiter(void 0, void 0, void 0, function* () {
+        (0, vitest_1.it)("should not use a password hash for cache payloads", () => __awaiter(void 0, void 0, void 0, function* () {
+            /*
+             * Regression test: the cache path used to run bcrypt on
+             * every read and write, which cost hundreds of
+             * milliseconds per operation.
+             */
             const shielded = yield secureUtilWithConfig.shield("PlainPayload");
-            // Unpack envelope structure, tamper hash validation mapping, repack
-            const rawDecoded = secureUtilWithoutConfig.decodeUrlBase64(shielded);
-            const parsedEnvelope = JSON.parse(rawDecoded);
-            // Swapping validation hash to another arbitrary valid bcrypt payload format
-            parsedEnvelope.hashed = yield secureUtilWithConfig.hash("ACompletelyDifferentString");
-            const tamperedShielded = secureUtilWithoutConfig.encodeUrlBase64(JSON.stringify(parsedEnvelope));
+            // A bcrypt hash would start with the bcrypt prefix.
+            (0, vitest_1.expect)(shielded.startsWith("$2")).toBe(false);
+            (0, vitest_1.expect)(shielded.startsWith("v1:")).toBe(true);
+        }));
+        (0, vitest_1.it)("should fail integrity check if the encrypted payload was modified", () => __awaiter(void 0, void 0, void 0, function* () {
+            const shielded = yield secureUtilWithConfig.shield("PlainPayload");
+            const [version, iv, authTag, content] = shielded.split(":");
+            // Tamper with the ciphertext.
+            const tamperedContent = content.slice(0, -1) + (content.endsWith("a") ? "b" : "a");
+            const tamperedShielded = `${version}:${iv}:${authTag}:${tamperedContent}`;
             yield (0, vitest_1.expect)(secureUtilWithConfig.unshield(tamperedShielded))
                 .rejects
-                .toThrow("Data integrity check failed");
+                .toThrow(Error);
+        }));
+        (0, vitest_1.it)("should reject an envelope with an unknown version", () => __awaiter(void 0, void 0, void 0, function* () {
+            const shielded = yield secureUtilWithConfig.shield("PlainPayload");
+            const [, iv, authTag, content] = shielded.split(":");
+            yield (0, vitest_1.expect)(secureUtilWithConfig.unshield(`v9:${iv}:${authTag}:${content}`)).rejects.toThrow("Invalid encrypted payload structure");
         }));
     });
 });

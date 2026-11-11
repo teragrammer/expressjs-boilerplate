@@ -298,11 +298,11 @@ describe("RouteGuardController", () => {
         });
 
         it("should include role_id when provided", async () => {
-            req.sanitize!.query.numeric
+            req.sanitize!.query.get
                 .mockImplementation(
                     (key: string) => {
                         if (key === "role_id") {
-                            return 10;
+                            return "10";
                         }
 
                         return null;
@@ -315,7 +315,7 @@ describe("RouteGuardController", () => {
             await invoke("browse");
 
             expect(
-                req.sanitize!.query.numeric,
+                req.sanitize!.query.get,
             ).toHaveBeenCalledWith("role_id");
 
             expect(mockBrowseRouteGuards)
@@ -331,9 +331,13 @@ describe("RouteGuardController", () => {
             );
         });
 
-        it("should omit role_id when sanitized value is null", async () => {
-            req.sanitize!.query.numeric
-                .mockReturnValue(null);
+        it("should omit role_id when the parameter is absent", async () => {
+            /*
+             * Regression test: an absent `role_id` used to become
+             * `role_id = 0`, which returned an empty page.
+             */
+            req.sanitize!.query.get
+                .mockReturnValue(undefined);
 
             mockBrowseRouteGuards
                 .mockResolvedValue(browseResult);

@@ -16,6 +16,7 @@ exports.RouteGuardController = void 0;
 const messages_1 = require("../../../common/utils/messages");
 const catch_async_1 = __importDefault(require("../../../common/utils/catch-async"));
 const errors_1 = require("../../../common/utils/errors");
+const query_parser_1 = require("../../../common/utils/query-parser");
 class RouteGuardController {
     constructor(routeGuardService) {
         this.routeGuardService = routeGuardService;
@@ -24,24 +25,17 @@ class RouteGuardController {
             res.status(200).json({ id: routeGuard.id });
         }));
         this.browse = (0, catch_async_1.default)((req, res) => __awaiter(this, void 0, void 0, function* () {
-            const roleId = req.sanitize.query.numeric("role_id");
-            const filters = Object.assign({ page: (() => {
-                    var _a, _b, _c, _d;
-                    const paginate = (_a = req.pagination) !== null && _a !== void 0 ? _a : (_c = (_b = req.app) === null || _b === void 0 ? void 0 : _b.get) === null || _c === void 0 ? void 0 : _c.call(_b, "paginate");
-                    if (!paginate) {
-                        throw new TypeError("Missing pagination context");
-                    }
-                    return Math.max(1, (_d = paginate.page) !== null && _d !== void 0 ? _d : 1);
-                })(), perPage: (() => {
-                    var _a, _b, _c, _d;
-                    const paginate = (_a = req.pagination) !== null && _a !== void 0 ? _a : (_c = (_b = req.app) === null || _b === void 0 ? void 0 : _b.get) === null || _c === void 0 ? void 0 : _c.call(_b, "paginate");
-                    if (!paginate) {
-                        throw new TypeError("Missing pagination context");
-                    }
-                    return Math.min(100, Math.max(1, (_d = paginate.perPage) !== null && _d !== void 0 ? _d : 20));
-                })() }, (roleId !== null && {
-                role_id: roleId,
-            }));
+            var _a, _b, _c, _d, _e;
+            /*
+             * An absent `role_id` must not become `role_id = 0`, which
+             * would silently return an empty page instead of all guards.
+             */
+            const roleId = (0, query_parser_1.parseOptionalId)(req.sanitize.query.get("role_id"), "role_id");
+            const paginate = (_a = req.pagination) !== null && _a !== void 0 ? _a : (_c = (_b = req.app) === null || _b === void 0 ? void 0 : _b.get) === null || _c === void 0 ? void 0 : _c.call(_b, "paginate");
+            if (!paginate) {
+                throw new TypeError("Missing pagination context");
+            }
+            const filters = Object.assign({ page: Math.max(1, (_d = paginate.page) !== null && _d !== void 0 ? _d : 1), perPage: Math.min(100, Math.max(1, (_e = paginate.perPage) !== null && _e !== void 0 ? _e : 20)) }, (roleId !== undefined && { role_id: roleId }));
             const routeGuards = yield this.routeGuardService.browseRouteGuards(filters);
             res.status(200).json(routeGuards);
         }));

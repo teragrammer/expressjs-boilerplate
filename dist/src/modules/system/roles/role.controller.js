@@ -16,6 +16,7 @@ exports.RoleController = void 0;
 const messages_1 = require("../../../common/utils/messages");
 const catch_async_1 = __importDefault(require("../../../common/utils/catch-async"));
 const errors_1 = require("../../../common/utils/errors");
+const query_parser_1 = require("../../../common/utils/query-parser");
 class RoleController {
     constructor(roleService) {
         this.roleService = roleService;
@@ -32,27 +33,18 @@ class RoleController {
             res.status(200).json({ id: role.id });
         }));
         this.browse = (0, catch_async_1.default)((req, res) => __awaiter(this, void 0, void 0, function* () {
-            const isPublic = req.sanitize.query.numeric("is_public");
-            const search = req.sanitize.query.get("search");
-            const filters = Object.assign(Object.assign({ page: (() => {
-                    var _a, _b, _c, _d;
-                    const paginate = (_a = req.pagination) !== null && _a !== void 0 ? _a : (_c = (_b = req.app) === null || _b === void 0 ? void 0 : _b.get) === null || _c === void 0 ? void 0 : _c.call(_b, "paginate");
-                    if (!paginate) {
-                        throw new TypeError("Missing pagination context");
-                    }
-                    return Math.max(1, (_d = paginate.page) !== null && _d !== void 0 ? _d : 1);
-                })(), perPage: (() => {
-                    var _a, _b, _c, _d;
-                    const paginate = (_a = req.pagination) !== null && _a !== void 0 ? _a : (_c = (_b = req.app) === null || _b === void 0 ? void 0 : _b.get) === null || _c === void 0 ? void 0 : _c.call(_b, "paginate");
-                    if (!paginate) {
-                        throw new TypeError("Missing pagination context");
-                    }
-                    return Math.min(100, Math.max(1, (_d = paginate.perPage) !== null && _d !== void 0 ? _d : 20));
-                })() }, (isPublic !== null && {
-                is_public: isPublic === 1,
-            })), (search !== null && {
-                search: search.trim(),
-            }));
+            var _a, _b, _c, _d, _e;
+            /*
+             * Absent parameters must stay absent: a missing filter is not
+             * the same as `is_public=false`.
+             */
+            const isPublic = (0, query_parser_1.parseOptionalBoolean)(req.sanitize.query.get("is_public"), "is_public");
+            const search = (0, query_parser_1.parseOptionalSearch)(req.sanitize.query.get("search"));
+            const paginate = (_a = req.pagination) !== null && _a !== void 0 ? _a : (_c = (_b = req.app) === null || _b === void 0 ? void 0 : _b.get) === null || _c === void 0 ? void 0 : _c.call(_b, "paginate");
+            if (!paginate) {
+                throw new TypeError("Missing pagination context");
+            }
+            const filters = Object.assign(Object.assign({ page: Math.max(1, (_d = paginate.page) !== null && _d !== void 0 ? _d : 1), perPage: Math.min(100, Math.max(1, (_e = paginate.perPage) !== null && _e !== void 0 ? _e : 20)) }, (isPublic !== undefined && { is_public: isPublic })), (search !== undefined && { search }));
             const roles = yield this.roleService.browseRoles(filters);
             res.status(200).json(roles);
         }));

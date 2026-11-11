@@ -17,6 +17,7 @@ export class SettingService {
     public static readonly CACHE_KEY = "app:settings";
 
     private localCache: InitializerSetting | null = null;
+    private localCacheExpiresAt = 0;
     private readonly DEFAULT_TTL = 3600; // 1 hour
 
     constructor(
@@ -27,6 +28,7 @@ export class SettingService {
 
     updateLocalMemory(settings: InitializerSetting): void {
         this.localCache = settings;
+        this.localCacheExpiresAt = Date.now() + this.DEFAULT_TTL * 1000;
     }
 
     /**
@@ -35,9 +37,13 @@ export class SettingService {
      */
     async getCache(): Promise<Readonly<InitializerSetting>> {
         // Check Local Memory Cache (L1)
-        if (this.localCache) {
+        if (this.localCache && this.localCacheExpiresAt > Date.now()) {
             return Object.freeze(this.localCache);
         }
+
+        // The L1 entry expired: fall through to L2/L3.
+        this.localCache = null;
+        this.localCacheExpiresAt = 0;
 
         // If Redis is connected, attempt to fetch from Redis (L2)
         if (this.redisCache.isConnected()) {
@@ -45,6 +51,7 @@ export class SettingService {
                 const cachedData = await this.redisCache.get<InitializerSetting>(SettingService.CACHE_KEY);
                 if (cachedData) {
                     this.localCache = cachedData;
+                    this.localCacheExpiresAt = Date.now() + this.DEFAULT_TTL * 1000;
                     return Object.freeze(this.localCache);
                 }
             } catch (error) {
@@ -64,6 +71,7 @@ export class SettingService {
 
         // Warm L1 Cache
         this.localCache = freshSettings;
+        this.localCacheExpiresAt = Date.now() + this.DEFAULT_TTL * 1000;
 
         // Warm L2 Cache asynchronously to optimize thread performance
         if (this.redisCache.isConnected()) {

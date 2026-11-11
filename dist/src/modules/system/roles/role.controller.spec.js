@@ -301,19 +301,12 @@ vitest_1.vi.mock("../../../../src/common/utils/catch-async", () => ({
                 .mockReturnValue(null);
         });
         (0, vitest_1.it)("should browse roles using sanitized filters and pagination", () => __awaiter(void 0, void 0, void 0, function* () {
-            req.sanitize.query.numeric
-                .mockImplementation((key) => {
-                var _a;
-                const values = {
-                    is_public: 1,
-                };
-                return (_a = values[key]) !== null && _a !== void 0 ? _a : null;
-            });
             req.sanitize.query.get
                 .mockImplementation((key) => {
                 var _a;
                 const values = {
                     search: "  administrator  ",
+                    is_public: "1",
                 };
                 return (_a = values[key]) !== null && _a !== void 0 ? _a : null;
             });
@@ -359,16 +352,14 @@ vitest_1.vi.mock("../../../../src/common/utils/catch-async", () => ({
             });
             expectJsonResponse(200, browseResult);
         }));
-        (0, vitest_1.it)("should convert numeric is_public filter to boolean true", () => __awaiter(void 0, void 0, void 0, function* () {
-            req.sanitize.query.numeric
+        (0, vitest_1.it)("should convert the is_public filter to boolean true", () => __awaiter(void 0, void 0, void 0, function* () {
+            req.sanitize.query.get
                 .mockImplementation((key) => {
                 if (key === "is_public") {
-                    return 1;
+                    return "1";
                 }
                 return null;
             });
-            req.sanitize.query.get
-                .mockReturnValue(null);
             mockBrowseRoles
                 .mockResolvedValue(browseResult);
             yield invoke("browse");
@@ -380,16 +371,14 @@ vitest_1.vi.mock("../../../../src/common/utils/catch-async", () => ({
             });
             expectJsonResponse(200, browseResult);
         }));
-        (0, vitest_1.it)("should convert numeric is_public filter to boolean false", () => __awaiter(void 0, void 0, void 0, function* () {
-            req.sanitize.query.numeric
+        (0, vitest_1.it)("should convert the is_public filter to boolean false", () => __awaiter(void 0, void 0, void 0, function* () {
+            req.sanitize.query.get
                 .mockImplementation((key) => {
                 if (key === "is_public") {
-                    return 0;
+                    return "0";
                 }
                 return null;
             });
-            req.sanitize.query.get
-                .mockReturnValue(null);
             mockBrowseRoles
                 .mockResolvedValue(browseResult);
             yield invoke("browse");
@@ -422,9 +411,11 @@ vitest_1.vi.mock("../../../../src/common/utils/catch-async", () => ({
             });
             expectJsonResponse(200, browseResult);
         }));
-        (0, vitest_1.it)("should preserve an empty search string after trimming", () => __awaiter(void 0, void 0, void 0, function* () {
-            req.sanitize.query.numeric
-                .mockReturnValue(null);
+        (0, vitest_1.it)("should drop a blank search string instead of filtering on it", () => __awaiter(void 0, void 0, void 0, function* () {
+            /*
+             * Regression test: a blank search used to become
+             * `search: ""`, which produced a `LIKE '%%'` predicate.
+             */
             req.sanitize.query.get
                 .mockImplementation((key) => {
                 if (key === "search") {
@@ -439,9 +430,30 @@ vitest_1.vi.mock("../../../../src/common/utils/catch-async", () => ({
                 .toHaveBeenCalledWith({
                 page: 1,
                 perPage: 20,
-                search: "",
             });
             expectJsonResponse(200, browseResult);
+        }));
+        (0, vitest_1.it)("should not apply a filter when the parameter is absent", () => __awaiter(void 0, void 0, void 0, function* () {
+            req.sanitize.query.get
+                .mockReturnValue(undefined);
+            mockBrowseRoles
+                .mockResolvedValue(browseResult);
+            yield invoke("browse");
+            (0, vitest_1.expect)(mockBrowseRoles)
+                .toHaveBeenCalledWith({
+                page: 1,
+                perPage: 20,
+            });
+        }));
+        (0, vitest_1.it)("should reject an invalid is_public filter", () => __awaiter(void 0, void 0, void 0, function* () {
+            req.sanitize.query.get
+                .mockImplementation((key) => key === "is_public" ? "maybe" : null);
+            yield invoke("browse");
+            (0, vitest_1.expect)(mockBrowseRoles)
+                .not.toHaveBeenCalled();
+            expectErrorForwarded(vitest_1.expect.objectContaining({
+                statusCode: 400,
+            }));
         }));
         (0, vitest_1.it)("should clamp pagination to the controller limits", () => __awaiter(void 0, void 0, void 0, function* () {
             req.app.get = vitest_1.vi.fn()

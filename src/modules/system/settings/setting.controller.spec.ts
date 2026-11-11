@@ -17,6 +17,7 @@ const {
     mockUpdateSetting,
     mockBrowseSettings,
     mockInitializer,
+    mockGetCache,
     mockFindById,
     mockHardDelete,
 } = vi.hoisted(() => ({
@@ -24,6 +25,7 @@ const {
     mockUpdateSetting: vi.fn(),
     mockBrowseSettings: vi.fn(),
     mockInitializer: vi.fn(),
+    mockGetCache: vi.fn(),
     mockFindById: vi.fn(),
     mockHardDelete: vi.fn(),
 }));
@@ -125,6 +127,7 @@ describe("SettingController", () => {
             updateSetting: mockUpdateSetting,
             browseSettings: mockBrowseSettings,
             initializer: mockInitializer,
+            getCache: mockGetCache,
             findById: mockFindById,
             hardDelete: mockHardDelete,
         } as unknown as SettingService;
@@ -475,21 +478,6 @@ describe("SettingController", () => {
         });
 
         it("should browse settings using sanitized filters and pagination", async () => {
-            req.sanitize!.query.numeric
-                .mockImplementation(
-                    (key: string) => {
-                        const values: Record<
-                            string,
-                            number | null
-                        > = {
-                            is_disabled: 1,
-                            is_public: 0,
-                        };
-
-                        return values[key] ?? null;
-                    },
-                );
-
             req.sanitize!.query.get
                 .mockImplementation(
                     (key: string) => {
@@ -499,6 +487,8 @@ describe("SettingController", () => {
                         > = {
                             type: "integer",
                             search: "  login  ",
+                            is_disabled: "1",
+                            is_public: "0",
                         };
 
                         return values[key] ?? null;
@@ -535,6 +525,64 @@ describe("SettingController", () => {
             );
         });
 
+        it("should not apply a filter when the parameter is absent", async () => {
+            /*
+             * Regression test: an absent filter must not become
+             * `is_disabled=false`, which silently hid every enabled
+             * setting.
+             */
+            req.sanitize!.query.get
+                .mockReturnValue(undefined);
+
+            mockBrowseSettings
+                .mockResolvedValue(browseResult);
+
+            await invoke("browse");
+
+            expect(mockBrowseSettings)
+                .toHaveBeenCalledWith({
+                    page: 1,
+                    perPage: 20,
+                });
+        });
+
+        it("should reject an invalid boolean filter", async () => {
+            req.sanitize!.query.get
+                .mockImplementation(
+                    (key: string) =>
+                        key === "is_public" ? "maybe" : null,
+                );
+
+            await invoke("browse");
+
+            expect(mockBrowseSettings)
+                .not.toHaveBeenCalled();
+
+            expectErrorForwarded(
+                expect.objectContaining({
+                    statusCode: 400,
+                }),
+            );
+        });
+
+        it("should reject an unknown setting type", async () => {
+            req.sanitize!.query.get
+                .mockImplementation(
+                    (key: string) => (key === "type" ? "blob" : null),
+                );
+
+            await invoke("browse");
+
+            expect(mockBrowseSettings)
+                .not.toHaveBeenCalled();
+
+            expectErrorForwarded(
+                expect.objectContaining({
+                    statusCode: 400,
+                }),
+            );
+        });
+
         it("should omit optional filters when sanitized values are null", async () => {
             req.sanitize!.query.numeric
                 .mockReturnValue(null);
@@ -568,24 +616,21 @@ describe("SettingController", () => {
             );
         });
 
-        it("should convert numeric visibility filters to booleans", async () => {
-            req.sanitize!.query.numeric
+        it("should convert visibility filters to booleans", async () => {
+            req.sanitize!.query.get
                 .mockImplementation(
                     (key: string) => {
                         if (key === "is_disabled") {
-                            return 0;
+                            return "0";
                         }
 
                         if (key === "is_public") {
-                            return 1;
+                            return "1";
                         }
 
                         return null;
                     },
                 );
-
-            req.sanitize!.query.get
-                .mockReturnValue(null);
 
             mockBrowseSettings
                 .mockResolvedValue(browseResult);
@@ -698,17 +743,21 @@ describe("SettingController", () => {
             },
         };
 
-        it("should return public initialized settings", async () => {
-            mockInitializer
+        it("should return the public settings from the cache", async () => {
+            /*
+             * The endpoint is served from the shared cache, so a
+             * request no longer runs two database queries.
+             */
+            mockGetCache
                 .mockResolvedValue(initializerResult);
 
             await invoke("values");
 
-            expect(mockInitializer)
+            expect(mockGetCache)
                 .toHaveBeenCalledTimes(1);
 
             expect(mockInitializer)
-                .toHaveBeenCalledWith();
+                .not.toHaveBeenCalled();
 
             expectJsonResponse(
                 200,
@@ -721,11 +770,11 @@ describe("SettingController", () => {
                 "Failed to initialize settings",
             );
 
-            mockInitializer.mockRejectedValue(serviceError);
+            mockGetCache.mockRejectedValue(serviceError);
 
             await invoke("values");
 
-            expect(mockInitializer)
+            expect(mockGetCache)
                 .toHaveBeenCalledTimes(1);
 
             expect(next)
@@ -734,11 +783,12 @@ describe("SettingController", () => {
             expect(next)
                 .toHaveBeenCalledWith(serviceError);
 
+            /*
+             * An error is forwarded to the error middleware; the
+             * controller must not write a response itself.
+             */
             expect(res.status)
-                .toHaveBeenCalledTimes(1);
-
-            expect(res.status)
-                .toHaveBeenCalledWith(200);
+                .not.toHaveBeenCalled();
 
             expect(res.json)
                 .not.toHaveBeenCalled();

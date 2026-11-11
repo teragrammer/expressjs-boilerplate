@@ -3,6 +3,7 @@ import {Response} from "express";
 import {TwoFactorAuthenticationController,} from "./two-factor-authentication.controller";
 import {AppError} from "../../../common/utils/errors";
 import {TwoFactorAuthenticationService} from "./two-factor-authentication.service";
+import {AuditService} from "../../audit/audit.service";
 import Messages from "../../../common/utils/messages";
 
 describe("TwoFactorAuthenticationController Unit Tests", () => {
@@ -18,6 +19,11 @@ describe("TwoFactorAuthenticationController Unit Tests", () => {
     };
 
     let controller: TwoFactorAuthenticationController;
+
+    let auditService: {
+        success: ReturnType<typeof vi.fn>;
+        failure: ReturnType<typeof vi.fn>;
+    };
 
     const expectAppError = (
         error: unknown,
@@ -53,8 +59,14 @@ describe("TwoFactorAuthenticationController Unit Tests", () => {
             verifyOtp: vi.fn(),
         };
 
+        auditService = {
+            success: vi.fn(),
+            failure: vi.fn(),
+        };
+
         controller = new TwoFactorAuthenticationController(
             tfaService as unknown as TwoFactorAuthenticationService,
+            auditService as unknown as AuditService,
         );
 
         jsonMock = vi.fn();
@@ -91,6 +103,24 @@ describe("TwoFactorAuthenticationController Unit Tests", () => {
 
             body: {
                 code: "123456",
+            },
+
+            /*
+             * The controller reads the validated payload, never the
+             * raw request body.
+             */
+            sanitize: {
+                data: {
+                    code: "123456",
+                },
+                body: {
+                    only: vi.fn(),
+                },
+                query: {
+                    get: vi.fn(),
+                    numeric: vi.fn(),
+                    only: vi.fn(),
+                },
             },
 
             ip: "127.0.0.1",

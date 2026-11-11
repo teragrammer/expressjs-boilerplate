@@ -490,20 +490,6 @@ describe("RoleController", () => {
         });
 
         it("should browse roles using sanitized filters and pagination", async () => {
-            req.sanitize!.query.numeric
-                .mockImplementation(
-                    (key: string) => {
-                        const values: Record<
-                            string,
-                            number | null
-                        > = {
-                            is_public: 1,
-                        };
-
-                        return values[key] ?? null;
-                    },
-                );
-
             req.sanitize!.query.get
                 .mockImplementation(
                     (key: string) => {
@@ -512,6 +498,7 @@ describe("RoleController", () => {
                             string | null
                         > = {
                             search: "  administrator  ",
+                            is_public: "1",
                         };
 
                         return values[key] ?? null;
@@ -581,20 +568,17 @@ describe("RoleController", () => {
             );
         });
 
-        it("should convert numeric is_public filter to boolean true", async () => {
-            req.sanitize!.query.numeric
+        it("should convert the is_public filter to boolean true", async () => {
+            req.sanitize!.query.get
                 .mockImplementation(
                     (key: string) => {
                         if (key === "is_public") {
-                            return 1;
+                            return "1";
                         }
 
                         return null;
                     },
                 );
-
-            req.sanitize!.query.get
-                .mockReturnValue(null);
 
             mockBrowseRoles
                 .mockResolvedValue(browseResult);
@@ -614,20 +598,17 @@ describe("RoleController", () => {
             );
         });
 
-        it("should convert numeric is_public filter to boolean false", async () => {
-            req.sanitize!.query.numeric
+        it("should convert the is_public filter to boolean false", async () => {
+            req.sanitize!.query.get
                 .mockImplementation(
                     (key: string) => {
                         if (key === "is_public") {
-                            return 0;
+                            return "0";
                         }
 
                         return null;
                     },
                 );
-
-            req.sanitize!.query.get
-                .mockReturnValue(null);
 
             mockBrowseRoles
                 .mockResolvedValue(browseResult);
@@ -680,10 +661,11 @@ describe("RoleController", () => {
             );
         });
 
-        it("should preserve an empty search string after trimming", async () => {
-            req.sanitize!.query.numeric
-                .mockReturnValue(null);
-
+        it("should drop a blank search string instead of filtering on it", async () => {
+            /*
+             * Regression test: a blank search used to become
+             * `search: ""`, which produced a `LIKE '%%'` predicate.
+             */
             req.sanitize!.query.get
                 .mockImplementation(
                     (key: string) => {
@@ -704,12 +686,46 @@ describe("RoleController", () => {
                 .toHaveBeenCalledWith({
                     page: 1,
                     perPage: 20,
-                    search: "",
                 });
 
             expectJsonResponse(
                 200,
                 browseResult,
+            );
+        });
+
+        it("should not apply a filter when the parameter is absent", async () => {
+            req.sanitize!.query.get
+                .mockReturnValue(undefined);
+
+            mockBrowseRoles
+                .mockResolvedValue(browseResult);
+
+            await invoke("browse");
+
+            expect(mockBrowseRoles)
+                .toHaveBeenCalledWith({
+                    page: 1,
+                    perPage: 20,
+                });
+        });
+
+        it("should reject an invalid is_public filter", async () => {
+            req.sanitize!.query.get
+                .mockImplementation(
+                    (key: string) =>
+                        key === "is_public" ? "maybe" : null,
+                );
+
+            await invoke("browse");
+
+            expect(mockBrowseRoles)
+                .not.toHaveBeenCalled();
+
+            expectErrorForwarded(
+                expect.objectContaining({
+                    statusCode: 400,
+                }),
             );
         });
 

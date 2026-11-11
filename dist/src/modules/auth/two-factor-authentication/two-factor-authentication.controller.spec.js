@@ -24,6 +24,7 @@ const messages_1 = __importDefault(require("../../../common/utils/messages"));
     let statusMock;
     let tfaService;
     let controller;
+    let auditService;
     const expectAppError = (error, expected) => {
         (0, vitest_1.expect)(error).toBeInstanceOf(errors_1.AppError);
         (0, vitest_1.expect)(error).toMatchObject(expected);
@@ -39,7 +40,11 @@ const messages_1 = __importDefault(require("../../../common/utils/messages"));
             sendOtp: vitest_1.vi.fn(),
             verifyOtp: vitest_1.vi.fn(),
         };
-        controller = new two_factor_authentication_controller_1.TwoFactorAuthenticationController(tfaService);
+        auditService = {
+            success: vitest_1.vi.fn(),
+            failure: vitest_1.vi.fn(),
+        };
+        controller = new two_factor_authentication_controller_1.TwoFactorAuthenticationController(tfaService, auditService);
         jsonMock = vitest_1.vi.fn();
         statusMock = vitest_1.vi.fn().mockReturnValue({
             json: jsonMock,
@@ -67,6 +72,23 @@ const messages_1 = __importDefault(require("../../../common/utils/messages"));
             },
             body: {
                 code: "123456",
+            },
+            /*
+             * The controller reads the validated payload, never the
+             * raw request body.
+             */
+            sanitize: {
+                data: {
+                    code: "123456",
+                },
+                body: {
+                    only: vitest_1.vi.fn(),
+                },
+                query: {
+                    get: vitest_1.vi.fn(),
+                    numeric: vitest_1.vi.fn(),
+                    only: vitest_1.vi.fn(),
+                },
             },
             ip: "127.0.0.1",
             useragent: {

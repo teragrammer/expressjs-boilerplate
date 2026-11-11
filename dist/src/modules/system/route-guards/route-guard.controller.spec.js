@@ -189,17 +189,17 @@ vitest_1.vi.mock("../../../../src/common/utils/catch-async", () => ({
             expectJsonResponse(200, browseResult);
         }));
         (0, vitest_1.it)("should include role_id when provided", () => __awaiter(void 0, void 0, void 0, function* () {
-            req.sanitize.query.numeric
+            req.sanitize.query.get
                 .mockImplementation((key) => {
                 if (key === "role_id") {
-                    return 10;
+                    return "10";
                 }
                 return null;
             });
             mockBrowseRouteGuards
                 .mockResolvedValue(browseResult);
             yield invoke("browse");
-            (0, vitest_1.expect)(req.sanitize.query.numeric).toHaveBeenCalledWith("role_id");
+            (0, vitest_1.expect)(req.sanitize.query.get).toHaveBeenCalledWith("role_id");
             (0, vitest_1.expect)(mockBrowseRouteGuards)
                 .toHaveBeenCalledWith({
                 page: 1,
@@ -208,9 +208,13 @@ vitest_1.vi.mock("../../../../src/common/utils/catch-async", () => ({
             });
             expectJsonResponse(200, browseResult);
         }));
-        (0, vitest_1.it)("should omit role_id when sanitized value is null", () => __awaiter(void 0, void 0, void 0, function* () {
-            req.sanitize.query.numeric
-                .mockReturnValue(null);
+        (0, vitest_1.it)("should omit role_id when the parameter is absent", () => __awaiter(void 0, void 0, void 0, function* () {
+            /*
+             * Regression test: an absent `role_id` used to become
+             * `role_id = 0`, which returned an empty page.
+             */
+            req.sanitize.query.get
+                .mockReturnValue(undefined);
             mockBrowseRouteGuards
                 .mockResolvedValue(browseResult);
             yield invoke("browse");

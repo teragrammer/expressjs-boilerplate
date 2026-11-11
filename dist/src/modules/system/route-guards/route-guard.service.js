@@ -20,10 +20,12 @@ class RouteGuardService {
         this.routeGuardRepository = routeGuardRepository;
         this.redisCache = redisCache;
         this.localCache = null;
+        this.localCacheExpiresAt = 0;
         this.DEFAULT_TTL = 3600; // 1 Hour
     }
     updateLocalMemory(guards) {
         this.localCache = guards;
+        this.localCacheExpiresAt = Date.now() + this.DEFAULT_TTL * 1000;
     }
     /**
      * Safe getter: Returns deep-frozen route mappings.
@@ -32,15 +34,19 @@ class RouteGuardService {
     getCache() {
         return __awaiter(this, void 0, void 0, function* () {
             // 1. Check Local Memory Cache (L1)
-            if (this.localCache) {
+            if (this.localCache && this.localCacheExpiresAt > Date.now()) {
                 return Object.freeze(this.localCache);
             }
+            // The L1 entry expired: fall through to L2/L3.
+            this.localCache = null;
+            this.localCacheExpiresAt = 0;
             // 2. If Redis is connected, attempt to fetch from Redis (L2)
             if (this.redisCache.isConnected()) {
                 try {
                     const cached = yield this.redisCache.get(RouteGuardService.CACHE_KEY);
                     if (cached) {
                         this.localCache = cached;
+                        this.localCacheExpiresAt = Date.now() + this.DEFAULT_TTL * 1000;
                         return Object.freeze(this.localCache);
                     }
                 }
@@ -60,6 +66,7 @@ class RouteGuardService {
             const freshGuards = yield this.initializer();
             // Warm L1 Cache
             this.localCache = freshGuards;
+            this.localCacheExpiresAt = Date.now() + this.DEFAULT_TTL * 1000;
             // Warm L2 Cache asynchronously to optimize performance
             if (this.redisCache.isConnected()) {
                 this.redisCache.set(RouteGuardService.CACHE_KEY, freshGuards, this.DEFAULT_TTL).catch((err) => {
@@ -95,8 +102,18 @@ class RouteGuardService {
     clearLocalCache() {
         this.localCache = null;
     }
+    /**
+     * Creates a route guard.
+     *
+     * The `(role_id, route)` pair is unique, so a duplicate grant is
+     * rejected with a 409 rather than silently creating a second row.
+     */
     createRouteGuard(data) {
         return __awaiter(this, void 0, void 0, function* () {
+            const existing = yield this.routeGuardRepository.findByRoleAndRoute(data.role_id, data.route);
+            if (existing) {
+                throw new errors_1.AppError(messages_1.default.DUPLICATE_DATA, "This route is already granted to the role.");
+            }
             const routeGuard = yield this.routeGuardRepository.create(data);
             yield this.boot();
             return routeGuard;

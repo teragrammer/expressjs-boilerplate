@@ -13,11 +13,12 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const vitest_1 = require("vitest");
 const setting_controller_1 = require("./setting.controller");
 const errors_1 = require("../../../common/utils/errors");
-const { mockCreateSetting, mockUpdateSetting, mockBrowseSettings, mockInitializer, mockFindById, mockHardDelete, } = vitest_1.vi.hoisted(() => ({
+const { mockCreateSetting, mockUpdateSetting, mockBrowseSettings, mockInitializer, mockGetCache, mockFindById, mockHardDelete, } = vitest_1.vi.hoisted(() => ({
     mockCreateSetting: vitest_1.vi.fn(),
     mockUpdateSetting: vitest_1.vi.fn(),
     mockBrowseSettings: vitest_1.vi.fn(),
     mockInitializer: vitest_1.vi.fn(),
+    mockGetCache: vitest_1.vi.fn(),
     mockFindById: vitest_1.vi.fn(),
     mockHardDelete: vitest_1.vi.fn(),
 }));
@@ -74,6 +75,7 @@ vitest_1.vi.mock("../../../../src/common/utils/catch-async", () => ({
             updateSetting: mockUpdateSetting,
             browseSettings: mockBrowseSettings,
             initializer: mockInitializer,
+            getCache: mockGetCache,
             findById: mockFindById,
             hardDelete: mockHardDelete,
         };
@@ -296,21 +298,14 @@ vitest_1.vi.mock("../../../../src/common/utils/catch-async", () => ({
                 .mockReturnValue(null);
         });
         (0, vitest_1.it)("should browse settings using sanitized filters and pagination", () => __awaiter(void 0, void 0, void 0, function* () {
-            req.sanitize.query.numeric
-                .mockImplementation((key) => {
-                var _a;
-                const values = {
-                    is_disabled: 1,
-                    is_public: 0,
-                };
-                return (_a = values[key]) !== null && _a !== void 0 ? _a : null;
-            });
             req.sanitize.query.get
                 .mockImplementation((key) => {
                 var _a;
                 const values = {
                     type: "integer",
                     search: "  login  ",
+                    is_disabled: "1",
+                    is_public: "0",
                 };
                 return (_a = values[key]) !== null && _a !== void 0 ? _a : null;
             });
@@ -335,6 +330,43 @@ vitest_1.vi.mock("../../../../src/common/utils/catch-async", () => ({
             });
             expectJsonResponse(200, browseResult);
         }));
+        (0, vitest_1.it)("should not apply a filter when the parameter is absent", () => __awaiter(void 0, void 0, void 0, function* () {
+            /*
+             * Regression test: an absent filter must not become
+             * `is_disabled=false`, which silently hid every enabled
+             * setting.
+             */
+            req.sanitize.query.get
+                .mockReturnValue(undefined);
+            mockBrowseSettings
+                .mockResolvedValue(browseResult);
+            yield invoke("browse");
+            (0, vitest_1.expect)(mockBrowseSettings)
+                .toHaveBeenCalledWith({
+                page: 1,
+                perPage: 20,
+            });
+        }));
+        (0, vitest_1.it)("should reject an invalid boolean filter", () => __awaiter(void 0, void 0, void 0, function* () {
+            req.sanitize.query.get
+                .mockImplementation((key) => key === "is_public" ? "maybe" : null);
+            yield invoke("browse");
+            (0, vitest_1.expect)(mockBrowseSettings)
+                .not.toHaveBeenCalled();
+            expectErrorForwarded(vitest_1.expect.objectContaining({
+                statusCode: 400,
+            }));
+        }));
+        (0, vitest_1.it)("should reject an unknown setting type", () => __awaiter(void 0, void 0, void 0, function* () {
+            req.sanitize.query.get
+                .mockImplementation((key) => (key === "type" ? "blob" : null));
+            yield invoke("browse");
+            (0, vitest_1.expect)(mockBrowseSettings)
+                .not.toHaveBeenCalled();
+            expectErrorForwarded(vitest_1.expect.objectContaining({
+                statusCode: 400,
+            }));
+        }));
         (0, vitest_1.it)("should omit optional filters when sanitized values are null", () => __awaiter(void 0, void 0, void 0, function* () {
             req.sanitize.query.numeric
                 .mockReturnValue(null);
@@ -357,19 +389,17 @@ vitest_1.vi.mock("../../../../src/common/utils/catch-async", () => ({
             });
             expectJsonResponse(200, browseResult);
         }));
-        (0, vitest_1.it)("should convert numeric visibility filters to booleans", () => __awaiter(void 0, void 0, void 0, function* () {
-            req.sanitize.query.numeric
+        (0, vitest_1.it)("should convert visibility filters to booleans", () => __awaiter(void 0, void 0, void 0, function* () {
+            req.sanitize.query.get
                 .mockImplementation((key) => {
                 if (key === "is_disabled") {
-                    return 0;
+                    return "0";
                 }
                 if (key === "is_public") {
-                    return 1;
+                    return "1";
                 }
                 return null;
             });
-            req.sanitize.query.get
-                .mockReturnValue(null);
             mockBrowseSettings
                 .mockResolvedValue(browseResult);
             yield invoke("browse");
@@ -445,30 +475,36 @@ vitest_1.vi.mock("../../../../src/common/utils/catch-async", () => ({
                 psr_eml_sbj: "Password recovery",
             },
         };
-        (0, vitest_1.it)("should return public initialized settings", () => __awaiter(void 0, void 0, void 0, function* () {
-            mockInitializer
+        (0, vitest_1.it)("should return the public settings from the cache", () => __awaiter(void 0, void 0, void 0, function* () {
+            /*
+             * The endpoint is served from the shared cache, so a
+             * request no longer runs two database queries.
+             */
+            mockGetCache
                 .mockResolvedValue(initializerResult);
             yield invoke("values");
-            (0, vitest_1.expect)(mockInitializer)
+            (0, vitest_1.expect)(mockGetCache)
                 .toHaveBeenCalledTimes(1);
             (0, vitest_1.expect)(mockInitializer)
-                .toHaveBeenCalledWith();
+                .not.toHaveBeenCalled();
             expectJsonResponse(200, initializerResult.pub);
         }));
         (0, vitest_1.it)("should forward service errors to the next middleware", () => __awaiter(void 0, void 0, void 0, function* () {
             const serviceError = new Error("Failed to initialize settings");
-            mockInitializer.mockRejectedValue(serviceError);
+            mockGetCache.mockRejectedValue(serviceError);
             yield invoke("values");
-            (0, vitest_1.expect)(mockInitializer)
+            (0, vitest_1.expect)(mockGetCache)
                 .toHaveBeenCalledTimes(1);
             (0, vitest_1.expect)(next)
                 .toHaveBeenCalledTimes(1);
             (0, vitest_1.expect)(next)
                 .toHaveBeenCalledWith(serviceError);
+            /*
+             * An error is forwarded to the error middleware; the
+             * controller must not write a response itself.
+             */
             (0, vitest_1.expect)(res.status)
-                .toHaveBeenCalledTimes(1);
-            (0, vitest_1.expect)(res.status)
-                .toHaveBeenCalledWith(200);
+                .not.toHaveBeenCalled();
             (0, vitest_1.expect)(res.json)
                 .not.toHaveBeenCalled();
             (0, vitest_1.expect)(res.send)

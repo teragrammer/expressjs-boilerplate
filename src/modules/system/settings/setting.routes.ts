@@ -35,7 +35,14 @@ export default () => {
 
     router.get("/", [AuthenticationMiddleware(), AuthorizationMiddleware("settings:browse")], settingController.browse);
 
-    router.get("/values", [AuthenticationMiddleware()], settingController.values);
+    /*
+     * Public settings values.
+     *
+     * The response only contains settings flagged `is_public=true` and
+     * `is_disabled=false`, so it is safe to expose without
+     * authentication. It is served from the shared cache.
+     */
+    router.get("/values", settingController.values);
 
     router.get("/:id", [AuthenticationMiddleware(), AuthorizationMiddleware("settings:view")], settingController.view);
 

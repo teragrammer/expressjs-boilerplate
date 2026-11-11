@@ -83,6 +83,20 @@ class RouteGuardRepository {
             return row !== null && row !== void 0 ? row : null;
         });
     }
+    /**
+     * Finds a guard by its role and route pair.
+     */
+    findByRoleAndRoute(roleId, route) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const row = yield this.db
+                .selectFrom(exports.ROUTE_GUARD_TABLE)
+                .selectAll()
+                .where("role_id", "=", roleId)
+                .where("route", "=", route)
+                .executeTakeFirst();
+            return row !== null && row !== void 0 ? row : null;
+        });
+    }
     delete(id) {
         return __awaiter(this, void 0, void 0, function* () {
             const result = yield this.db

@@ -11,6 +11,11 @@ import {
     UpdateSettingDTO
 } from "./setting.interface";
 import {AppError} from "../../../common/utils/errors";
+import {
+    parseOptionalBoolean,
+    parseOptionalEnum,
+    parseOptionalSearch,
+} from "../../../common/utils/query-parser";
 
 export class SettingController {
     constructor(
@@ -34,36 +39,37 @@ export class SettingController {
     });
 
     browse = catchAsync(async (req: Request, res: Response): Promise<void> => {
-        const isDisabled = req.sanitize.query.numeric("is_disabled",);
-        const isPublic = req.sanitize.query.numeric("is_public",);
+        /*
+         * Absent parameters must stay absent: a missing filter is not
+         * the same as `is_disabled=false`.
+         */
+        const isDisabled = parseOptionalBoolean(
+            req.sanitize.query.get("is_disabled"),
+            "is_disabled",
+        );
+        const isPublic = parseOptionalBoolean(
+            req.sanitize.query.get("is_public"),
+            "is_public",
+        );
 
-        const type = req.sanitize.query.get("type");
-        const search: string = req.sanitize.query.get("search");
+        const type = parseOptionalEnum(
+            req.sanitize.query.get("type"),
+            ["string", "integer", "float", "boolean", "array"] as const,
+            "type",
+        );
 
+        const search = parseOptionalSearch(req.sanitize.query.get("search"));
+
+        const paginate = req.pagination ?? req.app?.get?.("paginate");
+        if (!paginate) {throw new TypeError("Missing pagination context");}
 
         const filters: BrowseSettingQuery = {
-            page: (() => {
-                const paginate = req.pagination ?? req.app?.get?.("paginate");
-                if (!paginate) {throw new TypeError("Missing pagination context");}
-                return Math.max(1, paginate.page ?? 1);
-            })(),
-            perPage: (() => {
-                const paginate = req.pagination ?? req.app?.get?.("paginate");
-                if (!paginate) {throw new TypeError("Missing pagination context");}
-                return Math.min(100, Math.max(1, paginate.perPage ?? 20));
-            })(),
-            ...(isDisabled !== null && {
-                is_disabled: isDisabled === 1,
-            }),
-            ...(isPublic !== null && {
-                is_public: isPublic === 1,
-            }),
-            ...(type !== null && {
-                type: type as SettingDataType,
-            }),
-            ...(search !== null && {
-                search: search.trim(),
-            }),
+            page: Math.max(1, paginate.page ?? 1),
+            perPage: Math.min(100, Math.max(1, paginate.perPage ?? 20)),
+            ...(isDisabled !== undefined && {is_disabled: isDisabled}),
+            ...(isPublic !== undefined && {is_public: isPublic}),
+            ...(type !== undefined && {type}),
+            ...(search !== undefined && {search}),
         };
 
         const settings: Setting[] = await this.settingService.browseSettings(filters);
@@ -71,8 +77,16 @@ export class SettingController {
     });
 
 
+    /**
+     * Public settings values.
+     *
+     * Served from the same cache the application uses internally, so
+     * a request does not run two database queries.
+     */
     values = catchAsync(async (req: Request, res: Response): Promise<any> => {
-        res.status(200).json((await this.settingService.initializer()).pub);
+        const settings = await this.settingService.getCache();
+
+        res.status(200).json(settings.pub);
     });
 
     view = catchAsync(async (req: Request, res: Response): Promise<void> => {

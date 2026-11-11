@@ -28,7 +28,14 @@ exports.default = () => {
         ])
     ], settingController.update);
     router.get("/", [(0, authentication_middleware_1.AuthenticationMiddleware)(), (0, authorization_middleware_1.AuthorizationMiddleware)("settings:browse")], settingController.browse);
-    router.get("/values", [(0, authentication_middleware_1.AuthenticationMiddleware)()], settingController.values);
+    /*
+     * Public settings values.
+     *
+     * The response only contains settings flagged `is_public=true` and
+     * `is_disabled=false`, so it is safe to expose without
+     * authentication. It is served from the shared cache.
+     */
+    router.get("/values", settingController.values);
     router.get("/:id", [(0, authentication_middleware_1.AuthenticationMiddleware)(), (0, authorization_middleware_1.AuthorizationMiddleware)("settings:view")], settingController.view);
     router.delete("/:id", [(0, authentication_middleware_1.AuthenticationMiddleware)(), (0, authorization_middleware_1.AuthorizationMiddleware)("settings:delete")], settingController.delete);
     return router;

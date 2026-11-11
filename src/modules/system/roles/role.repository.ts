@@ -170,6 +170,35 @@ export class RoleRepository {
         return rows.map(row => this.mapToRole(row));
     }
 
+    /**
+     * Counts the users assigned to a role.
+     *
+     * Used to block a role deletion while users still reference it.
+     */
+    async countUsers(roleId: number): Promise<number> {
+        const row = await this.db
+            .selectFrom("users")
+            .select((eb) => eb.fn.countAll<number>().as("count"))
+            .where("role_id", "=", roleId)
+            .where("deleted_at", "is", null)
+            .executeTakeFirst();
+
+        return Number(row?.count ?? 0);
+    }
+
+    /**
+     * Counts the route guards that reference a role.
+     */
+    async countRouteGuards(roleId: number): Promise<number> {
+        const row = await this.db
+            .selectFrom("route_guards")
+            .select((eb) => eb.fn.countAll<number>().as("count"))
+            .where("role_id", "=", roleId)
+            .executeTakeFirst();
+
+        return Number(row?.count ?? 0);
+    }
+
     async delete(id: number): Promise<boolean> {
         const result = await this.db
             .deleteFrom(ROLE_TABLE)

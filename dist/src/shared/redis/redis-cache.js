@@ -10,6 +10,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.RedisCache = void 0;
+const metrics_1 = require("../../common/metrics/metrics");
 class RedisCache {
     constructor(dbRedis, securityUtil, logger) {
         this.securityUtil = securityUtil;
@@ -38,12 +39,19 @@ class RedisCache {
                 }
                 const securedData = yield this.publisher.get(key);
                 if (!securedData) {
+                    metrics_1.cacheOperationsTotal.inc({ operation: "get", result: "miss" });
                     return null;
                 }
                 const decryptedData = yield this.securityUtil.unshield(securedData);
+                metrics_1.cacheOperationsTotal.inc({ operation: "get", result: "hit" });
                 return JSON.parse(decryptedData);
             }
             catch (err) {
+                /*
+                 * A malformed or tampered entry must not break the request:
+                 * the caller falls back to the database.
+                 */
+                metrics_1.cacheOperationsTotal.inc({ operation: "get", result: "error" });
                 this.logger.error(`Redis secure read failed for key ${key}: ${err.message}`);
                 return null;
             }
@@ -69,10 +77,30 @@ class RedisCache {
                 }
                 // Notify subscriber processes of the change (Pub/Sub)
                 yield this.publisher.publish(key, "updated");
+                metrics_1.cacheOperationsTotal.inc({ operation: "set", result: "success" });
                 this.logger.info(`Redis secure write & publish successful for key: ${key}`);
             }
             catch (err) {
+                metrics_1.cacheOperationsTotal.inc({ operation: "set", result: "error" });
                 this.logger.error(`Redis secure write failed for key ${key}: ${err.message}`);
+            }
+        });
+    }
+    /**
+     * Removes a key from Redis.
+     */
+    del(key) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                if (!this.isConnected() || !this.publisher) {
+                    return;
+                }
+                yield this.publisher.del(key);
+                metrics_1.cacheOperationsTotal.inc({ operation: "del", result: "success" });
+            }
+            catch (err) {
+                metrics_1.cacheOperationsTotal.inc({ operation: "del", result: "error" });
+                this.logger.error(`Redis delete failed for key ${key}: ${err.message}`);
             }
         });
     }

@@ -16,6 +16,17 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.SecurityUtil = void 0;
 const crypto_1 = __importDefault(require("crypto"));
 const bcrypt_1 = __importDefault(require("bcrypt"));
+/**
+ * Context string for the HKDF key derivation.
+ *
+ * Binds the derived key to its purpose so the same secret cannot be
+ * reused for a different primitive by accident.
+ */
+const HKDF_CONTEXT = "express-api:cache:v1";
+/**
+ * Length of the derived AES-256 key in bytes.
+ */
+const AES_KEY_LENGTH = 32;
 class SecurityUtil {
     // Defaults to empty object if no config is injected
     constructor(config = {}) {
@@ -34,7 +45,7 @@ class SecurityUtil {
             .slice(0, size);
     }
     /**
-     * NO CONFIG REQUIRED: Generates a cryptographically SECURE random numeric string.
+     * NO CONFIG REQUIRED: Generates a CRYPTOGRAPHICALLY SECURE random numeric string.
      */
     randomNumber(length = 6) {
         if (length <= 0) {
@@ -43,7 +54,7 @@ class SecurityUtil {
         let result = "";
         while (result.length < length) {
             const byte = crypto_1.default.randomBytes(1)[0];
-            if (byte < 250) { // Ensures uniform distribution (250 is multiple of 10)
+            if (byte < 250) { // Keep uniform distribution
                 result += (byte % 10).toString();
             }
         }
@@ -101,71 +112,79 @@ class SecurityUtil {
         });
     }
     /**
-     * CONFIG OPTIONAL: Authenticated Encryption using AES-256-GCM.
+     * Derives the 32-byte AES-256 key from the configured secret.
+     *
+     * HKDF-SHA-256 lets the deployment secret be any length >= 32
+     * characters while still producing a key of the exact length
+     * AES-256 requires.
      */
-    encrypt(data, secret) {
-        var _a;
+    deriveKey(secret) {
         const encryptionSecret = secret !== null && secret !== void 0 ? secret : this.config.cryptoSecret;
         if (!encryptionSecret) {
             throw new Error("SecurityUtil Error: A crypto secret must be provided via constructor or function parameter.");
         }
-        const cipherAlgorithm = (_a = this.config.cryptoCipher) !== null && _a !== void 0 ? _a : "aes-256-gcm";
-        const iv = crypto_1.default.randomBytes(12); // GCM standard IV size is 12 bytes
-        const cipher = crypto_1.default.createCipheriv(cipherAlgorithm, Buffer.from(encryptionSecret, "utf-8"), iv);
-        const encrypted = Buffer.concat([cipher.update(data, "utf8"), cipher.final()]);
-        const authTag = cipher.getAuthTag();
-        // Format: iv_hex:auth_tag_hex:encrypted_payload_hex
-        return `${iv.toString("hex")}:${authTag.toString("hex")}:${encrypted.toString("hex")}`;
+        if (encryptionSecret.length < 32) {
+            throw new Error("SecurityUtil Error: The crypto secret must be at least 32 characters.");
+        }
+        return Buffer.from(crypto_1.default.hkdfSync("sha256", Buffer.from(encryptionSecret, "utf-8"), Buffer.alloc(0), Buffer.from(HKDF_CONTEXT, "utf-8"), AES_KEY_LENGTH));
     }
     /**
-     * CONFIG OPTIONAL: Decrypts AES-256-GCM encrypted payload and verifies integrity.
+     * CONFIG OPTIONAL (Requires method parameter if constructor config missing)
+     *
+     * Authenticated encryption using AES-256-GCM.
+     */
+    encrypt(data, secret) {
+        var _a;
+        const key = this.deriveKey(secret);
+        const cipherAlgorithm = (_a = this.config.cryptoCipher) !== null && _a !== void 0 ? _a : "aes-256-gcm";
+        const iv = crypto_1.default.randomBytes(12); // GCM standard IV size is 12 bytes
+        const cipher = crypto_1.default.createCipheriv(cipherAlgorithm, key, iv);
+        const encrypted = Buffer.concat([cipher.update(data, "utf8"), cipher.final()]);
+        const authTag = cipher.getAuthTag();
+        // Format: version:iv_hex:auth_tag_hex:encrypted_payload_hex
+        return `v1:${iv.toString("hex")}:${authTag.toString("hex")}:${encrypted.toString("hex")}`;
+    }
+    /**
+     * CONFIG OPTIONAL (Requires method parameter if constructor config missing)
+     *
+     * Decrypts an AES-256-GCM encrypted payload and verifies integrity.
      */
     decrypt(encryptedPayload, secret) {
         var _a;
-        const decryptionSecret = secret !== null && secret !== void 0 ? secret : this.config.cryptoSecret;
-        if (!decryptionSecret) {
-            throw new Error("SecurityUtil Error: A crypto secret must be provided via constructor or function parameter.");
-        }
-        const [ivHex, authTagHex, encryptedTextHex] = encryptedPayload.split(":");
-        if (!ivHex || !authTagHex || !encryptedTextHex) {
+        const key = this.deriveKey(secret);
+        const cipherAlgorithm = (_a = this.config.cryptoCipher) !== null && _a !== void 0 ? _a : "aes-256-gcm";
+        const parts = encryptedPayload.split(":");
+        if (parts.length !== 4 || parts[0] !== "v1") {
             throw new Error("Invalid encrypted payload structure");
         }
-        const iv = Buffer.from(ivHex, "hex");
-        const authTag = Buffer.from(authTagHex, "hex");
-        const encryptedText = Buffer.from(encryptedTextHex, "hex");
-        const cipherAlgorithm = (_a = this.config.cryptoCipher) !== null && _a !== void 0 ? _a : "aes-256-gcm";
-        const decipher = crypto_1.default.createDecipheriv(cipherAlgorithm, Buffer.from(decryptionSecret, "utf-8"), iv);
+        const iv = Buffer.from(parts[1], "hex");
+        const authTag = Buffer.from(parts[2], "hex");
+        const encryptedText = Buffer.from(parts[3], "hex");
+        const decipher = crypto_1.default.createDecipheriv(cipherAlgorithm, key, iv);
         decipher.setAuthTag(authTag);
         const decrypted = Buffer.concat([decipher.update(encryptedText), decipher.final()]);
         return decrypted.toString("utf8");
     }
     /**
-     * CONFIG REQUIRED (Unless local parameters are handled inside individual steps)
+     * Encrypts a payload for the cache.
+     *
+     * AES-256-GCM already provides confidentiality and integrity, so
+     * no additional password hashing is performed. The previous
+     * implementation ran bcrypt on every cache read and write, which
+     * cost hundreds of milliseconds per operation and made the cache
+     * slower than the database.
      */
     shield(data) {
         return __awaiter(this, void 0, void 0, function* () {
-            const hashedData = yield this.hash(data);
-            const encryptedData = this.encrypt(data);
-            const payload = JSON.stringify({
-                data: encryptedData,
-                hashed: hashedData,
-            });
-            return this.encodeUrlBase64(payload);
+            return this.encrypt(data);
         });
     }
     /**
-     * CONFIG REQUIRED (Unless local parameters are handled inside individual steps)
+     * Decrypts and verifies a cache payload.
      */
     unshield(message) {
         return __awaiter(this, void 0, void 0, function* () {
-            const decodedMessage = this.decodeUrlBase64(message);
-            const parsedPayload = JSON.parse(decodedMessage);
-            const decryptedData = this.decrypt(parsedPayload.data);
-            const isValid = yield this.compare(parsedPayload.hashed, decryptedData);
-            if (!isValid) {
-                throw new Error("Data integrity check failed");
-            }
-            return decryptedData;
+            return this.decrypt(message);
         });
     }
 }

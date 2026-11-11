@@ -16,6 +16,7 @@ exports.SettingController = void 0;
 const messages_1 = require("../../../common/utils/messages");
 const catch_async_1 = __importDefault(require("../../../common/utils/catch-async"));
 const errors_1 = require("../../../common/utils/errors");
+const query_parser_1 = require("../../../common/utils/query-parser");
 class SettingController {
     constructor(settingService) {
         this.settingService = settingService;
@@ -32,38 +33,32 @@ class SettingController {
             res.status(200).json({ id: setting.id });
         }));
         this.browse = (0, catch_async_1.default)((req, res) => __awaiter(this, void 0, void 0, function* () {
-            const isDisabled = req.sanitize.query.numeric("is_disabled");
-            const isPublic = req.sanitize.query.numeric("is_public");
-            const type = req.sanitize.query.get("type");
-            const search = req.sanitize.query.get("search");
-            const filters = Object.assign(Object.assign(Object.assign(Object.assign({ page: (() => {
-                    var _a, _b, _c, _d;
-                    const paginate = (_a = req.pagination) !== null && _a !== void 0 ? _a : (_c = (_b = req.app) === null || _b === void 0 ? void 0 : _b.get) === null || _c === void 0 ? void 0 : _c.call(_b, "paginate");
-                    if (!paginate) {
-                        throw new TypeError("Missing pagination context");
-                    }
-                    return Math.max(1, (_d = paginate.page) !== null && _d !== void 0 ? _d : 1);
-                })(), perPage: (() => {
-                    var _a, _b, _c, _d;
-                    const paginate = (_a = req.pagination) !== null && _a !== void 0 ? _a : (_c = (_b = req.app) === null || _b === void 0 ? void 0 : _b.get) === null || _c === void 0 ? void 0 : _c.call(_b, "paginate");
-                    if (!paginate) {
-                        throw new TypeError("Missing pagination context");
-                    }
-                    return Math.min(100, Math.max(1, (_d = paginate.perPage) !== null && _d !== void 0 ? _d : 20));
-                })() }, (isDisabled !== null && {
-                is_disabled: isDisabled === 1,
-            })), (isPublic !== null && {
-                is_public: isPublic === 1,
-            })), (type !== null && {
-                type: type,
-            })), (search !== null && {
-                search: search.trim(),
-            }));
+            var _a, _b, _c, _d, _e;
+            /*
+             * Absent parameters must stay absent: a missing filter is not
+             * the same as `is_disabled=false`.
+             */
+            const isDisabled = (0, query_parser_1.parseOptionalBoolean)(req.sanitize.query.get("is_disabled"), "is_disabled");
+            const isPublic = (0, query_parser_1.parseOptionalBoolean)(req.sanitize.query.get("is_public"), "is_public");
+            const type = (0, query_parser_1.parseOptionalEnum)(req.sanitize.query.get("type"), ["string", "integer", "float", "boolean", "array"], "type");
+            const search = (0, query_parser_1.parseOptionalSearch)(req.sanitize.query.get("search"));
+            const paginate = (_a = req.pagination) !== null && _a !== void 0 ? _a : (_c = (_b = req.app) === null || _b === void 0 ? void 0 : _b.get) === null || _c === void 0 ? void 0 : _c.call(_b, "paginate");
+            if (!paginate) {
+                throw new TypeError("Missing pagination context");
+            }
+            const filters = Object.assign(Object.assign(Object.assign(Object.assign({ page: Math.max(1, (_d = paginate.page) !== null && _d !== void 0 ? _d : 1), perPage: Math.min(100, Math.max(1, (_e = paginate.perPage) !== null && _e !== void 0 ? _e : 20)) }, (isDisabled !== undefined && { is_disabled: isDisabled })), (isPublic !== undefined && { is_public: isPublic })), (type !== undefined && { type })), (search !== undefined && { search }));
             const settings = yield this.settingService.browseSettings(filters);
             res.status(200).json(settings);
         }));
+        /**
+         * Public settings values.
+         *
+         * Served from the same cache the application uses internally, so
+         * a request does not run two database queries.
+         */
         this.values = (0, catch_async_1.default)((req, res) => __awaiter(this, void 0, void 0, function* () {
-            res.status(200).json((yield this.settingService.initializer()).pub);
+            const settings = yield this.settingService.getCache();
+            res.status(200).json(settings.pub);
         }));
         this.view = (0, catch_async_1.default)((req, res) => __awaiter(this, void 0, void 0, function* () {
             const id = Number(req.params.id);

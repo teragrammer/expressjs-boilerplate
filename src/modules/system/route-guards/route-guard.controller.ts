@@ -5,6 +5,7 @@ import {CreateRouteGuardDTO, RouteGuard, RouteGuardRow} from "./route-guard.inte
 import catchAsync from "../../../common/utils/catch-async";
 import {RouteGuardService} from "./route-guard.service";
 import {AppError} from "../../../common/utils/errors";
+import {parseOptionalId} from "../../../common/utils/query-parser";
 
 export class RouteGuardController {
     constructor(
@@ -18,22 +19,22 @@ export class RouteGuardController {
     });
 
     browse = catchAsync(async (req: Request, res: Response): Promise<void> => {
-        const roleId = req.sanitize.query.numeric("role_id");
+        /*
+         * An absent `role_id` must not become `role_id = 0`, which
+         * would silently return an empty page instead of all guards.
+         */
+        const roleId = parseOptionalId(
+            req.sanitize.query.get("role_id"),
+            "role_id",
+        );
+
+        const paginate = req.pagination ?? req.app?.get?.("paginate");
+        if (!paginate) {throw new TypeError("Missing pagination context");}
 
         const filters = {
-            page: (() => {
-                const paginate = req.pagination ?? req.app?.get?.("paginate");
-                if (!paginate) {throw new TypeError("Missing pagination context");}
-                return Math.max(1, paginate.page ?? 1);
-            })(),
-            perPage: (() => {
-                const paginate = req.pagination ?? req.app?.get?.("paginate");
-                if (!paginate) {throw new TypeError("Missing pagination context");}
-                return Math.min(100, Math.max(1, paginate.perPage ?? 20));
-            })(),
-            ...(roleId !== null && {
-                role_id: roleId,
-            }),
+            page: Math.max(1, paginate.page ?? 1),
+            perPage: Math.min(100, Math.max(1, paginate.perPage ?? 20)),
+            ...(roleId !== undefined && {role_id: roleId}),
         };
 
         const routeGuards = await this.routeGuardService.browseRouteGuards(filters);

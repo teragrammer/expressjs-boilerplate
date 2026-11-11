@@ -109,12 +109,20 @@ class TwoFactorAuthenticationRepository {
                     new Date(existing.next_send_at) > new Date()) {
                     throw new errors_1.AppError(messages_1.default.RESEND_OTP_NOT_POSSIBLE);
                 }
+                /*
+                 * Issuing a new OTP resets the attempt counter and clears
+                 * any lockout: the user has just requested a fresh code, so
+                 * the previous code's failed attempts must not carry over
+                 * and lock them out permanently.
+                 */
                 return trx
                     .updateTable(exports.TWO_FACTOR_AUTHENTICATION_TABLE)
                     .set({
                     code: data.code,
                     expired_at: data.expired_at,
                     next_send_at: data.next_send_at,
+                    tries: 0,
+                    expired_tries_at: null,
                     updated_at: (0, kysely_1.sql) `now()`,
                 })
                     .where("id", "=", existing.id)

@@ -20,10 +20,12 @@ class SettingService {
         this.settingRepository = settingRepository;
         this.redisCache = redisCache;
         this.localCache = null;
+        this.localCacheExpiresAt = 0;
         this.DEFAULT_TTL = 3600; // 1 hour
     }
     updateLocalMemory(settings) {
         this.localCache = settings;
+        this.localCacheExpiresAt = Date.now() + this.DEFAULT_TTL * 1000;
     }
     /**
      * Safe getter: Returns deeply frozen settings.
@@ -32,15 +34,19 @@ class SettingService {
     getCache() {
         return __awaiter(this, void 0, void 0, function* () {
             // Check Local Memory Cache (L1)
-            if (this.localCache) {
+            if (this.localCache && this.localCacheExpiresAt > Date.now()) {
                 return Object.freeze(this.localCache);
             }
+            // The L1 entry expired: fall through to L2/L3.
+            this.localCache = null;
+            this.localCacheExpiresAt = 0;
             // If Redis is connected, attempt to fetch from Redis (L2)
             if (this.redisCache.isConnected()) {
                 try {
                     const cachedData = yield this.redisCache.get(SettingService.CACHE_KEY);
                     if (cachedData) {
                         this.localCache = cachedData;
+                        this.localCacheExpiresAt = Date.now() + this.DEFAULT_TTL * 1000;
                         return Object.freeze(this.localCache);
                     }
                 }
@@ -60,6 +66,7 @@ class SettingService {
             const freshSettings = yield this.initializer();
             // Warm L1 Cache
             this.localCache = freshSettings;
+            this.localCacheExpiresAt = Date.now() + this.DEFAULT_TTL * 1000;
             // Warm L2 Cache asynchronously to optimize thread performance
             if (this.redisCache.isConnected()) {
                 this.redisCache.set(SettingService.CACHE_KEY, freshSettings, this.DEFAULT_TTL).catch((err) => {
