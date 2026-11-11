@@ -9,6 +9,7 @@ import {
     RouteGuardRow
 } from "./route-guard.interface";
 import {AppError} from "../../../common/utils/errors";
+import {SingleFlight} from "../../../common/utils/single-flight";
 import {logger} from "../../../config/logger";
 import Messages from "../../../common/utils/messages";
 
@@ -18,6 +19,12 @@ export class RouteGuardService {
 
     private localCache: RouteGuardCachePayload | null = null;
     private localCacheExpiresAt = 0;
+
+    /**
+     * Coalesces concurrent cache rebuilds so a cold start does not
+     * make every worker query the database at once.
+     */
+    private readonly singleFlight = new SingleFlight();
     private readonly DEFAULT_TTL = 3600; // 1 Hour
 
     constructor(
@@ -70,20 +77,32 @@ export class RouteGuardService {
      * Boots/rebuilds L1 and L2 cache from the DB.
      */
     async boot(): Promise<RouteGuardCachePayload> {
-        const freshGuards = await this.initializer();
+        return this.singleFlight.run("route_guards", async () => {
+            const freshGuards = await this.initializer();
 
-        // Warm L1 Cache
-        this.localCache = freshGuards;
-        this.localCacheExpiresAt = Date.now() + this.DEFAULT_TTL * 1000;
+            // Warm L1 Cache
+            this.localCache = freshGuards;
+            this.localCacheExpiresAt =
+                Date.now() + this.DEFAULT_TTL * 1000;
 
-        // Warm L2 Cache asynchronously to optimize performance
-        if (this.redisCache.isConnected()) {
-            this.redisCache.set(RouteGuardService.CACHE_KEY, freshGuards, this.DEFAULT_TTL).catch((err) => {
-                logger.error("Failed to update route guards in Redis:", err);
-            });
-        }
+            // Warm L2 Cache asynchronously to optimize performance
+            if (this.redisCache.isConnected()) {
+                this.redisCache
+                    .set(
+                        RouteGuardService.CACHE_KEY,
+                        freshGuards,
+                        this.DEFAULT_TTL,
+                    )
+                    .catch((err) => {
+                        logger.error(
+                            {message: (err as Error).message},
+                            "Failed to update route guards in Redis",
+                        );
+                    });
+            }
 
-        return freshGuards;
+            return freshGuards;
+        });
     }
 
     /**

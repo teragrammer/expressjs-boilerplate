@@ -2,6 +2,7 @@
 import {Request, Response} from "express";
 import catchAsync from "../../../common/utils/catch-async";
 import {UserService} from "../services/user.service";
+import {UserPurgeService} from "../services/user-purge.service";
 import {BrowseUsersResult, CreateUserDTO, UpdateUserDTO, User} from "../user.interface";
 import {AppError} from "../../../common/utils/errors";
 import Messages from "../../../common/utils/messages";
@@ -10,6 +11,7 @@ import {resolveActor} from "../../../common/utils/actor";
 export class UserController {
     constructor(
         private readonly userService: UserService,
+        private readonly userPurgeService: UserPurgeService,
     ) {
     }
 
@@ -41,7 +43,7 @@ export class UserController {
          * Cursor-based pagination
          *
          * First request:
-         *   GET /users?limit=20
+         *   GET /users?per_page=20
          *
          * The response contains:
          *   {
@@ -50,7 +52,7 @@ export class UserController {
          *   }
          *
          * To fetch the next page, send the returned cursor:
-         *   GET /users?limit=20&cursor=481
+         *   GET /users?per_page=20&cursor=481
          *
          * IMPORTANT:
          * - The cursor must come from the previous response's `nextCursor`.
@@ -58,10 +60,10 @@ export class UserController {
          * - When using a cursor, keep the same filters/search parameters.
          *
          * Example:
-         *   GET /users?role_id=2&status=Activated&limit=20
+         *   GET /users?role_id=2&status=Activated&per_page=20
          *
          * Next page:
-         *   GET /users?role_id=2&status=Activated&limit=20&cursor=481
+         *   GET /users?role_id=2&status=Activated&per_page=20&cursor=481
          *
          * When `hasMore` is false, `nextCursor` will be null and there
          * are no more records to fetch.
@@ -101,6 +103,29 @@ export class UserController {
         }
 
         await this.userService.softDelete(id);
+        res.status(200).send();
+    });
+
+    /**
+     * Permanently removes a user.
+     *
+     * The reason is required and is recorded in the audit trail.
+     */
+    purge = catchAsync(async (req: Request, res: Response): Promise<any> => {
+        const id = Number(req.params.id);
+        if (!Number.isSafeInteger(id) || id <= 0) {
+            throw new AppError(Messages.INVALID_PATH_PARAM);
+        }
+
+        const reason = req.get("X-Deletion-Reason") ?? "";
+
+        await this.userPurgeService.purge(
+            id,
+            resolveActor(req),
+            reason,
+            req,
+        );
+
         res.status(200).send();
     });
 }

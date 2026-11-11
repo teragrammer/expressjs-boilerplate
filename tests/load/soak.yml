@@ -35,6 +35,7 @@ config:
     thresholds:
       - http.response_time.p95: 1000
       - http.response_time.p99: 2000
+      - http.codes.2xx: 95
 
   payload:
     path: "data/users.csv"

@@ -14,6 +14,8 @@
 #   TARGET_URL    - Target URL (default: http://localhost:4000)
 #   OUTPUT_DIR    - Report output directory (default: tests/load/reports)
 #   WORKERS       - Number of artillery workers (default: auto)
+#   SEED_USERNAME - Seeded account used for the run (default: admin)
+#   SEED_PASSWORD - Password of the seeded account (required)
 # ─────────────────────────────────────────────────────────────────────────────
 
 set -euo pipefail
@@ -59,11 +61,23 @@ check_prerequisites() {
         npm install -g artillery@latest
     fi
 
+    # The seeded password is random unless it is configured, so the
+    # run cannot proceed without it.
+    if [[ -z "${SEED_PASSWORD:-}" ]]; then
+        log_error "SEED_PASSWORD is not set."
+        log_info "Set SEED_PASSWORD in .env (or export it) and re-run."
+        log_info "The seeder logs the generated password when SEED_PASSWORD is unset."
+        exit 1
+    fi
+
+    export SEED_USERNAME="${SEED_USERNAME:-admin}"
+    export SEED_PASSWORD
+
     # Check if target is reachable
     local target_url="${TARGET_URL:-http://localhost:4000}"
     log_info "Checking target: ${target_url}"
 
-    if ! curl -s -o /dev/null -w "%{http_code}" "${target_url}/api/v1/auth/login" -X POST -H "Content-Type: application/json" -d '{"username":"admin","password":"pass1234"}' &> /dev/null; then
+    if ! curl -s -o /dev/null -w "%{http_code}" "${target_url}/api/v1/auth/login" -X POST -H "Content-Type: application/json" -d "{\"username\":\"${SEED_USERNAME}\",\"password\":\"${SEED_PASSWORD}\"}" &> /dev/null; then
         log_warning "Target ${target_url} may not be reachable. Ensure the server is running."
         log_info "Start the server with: npm run dev"
     fi

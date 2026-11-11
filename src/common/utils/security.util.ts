@@ -2,6 +2,7 @@
 
 import crypto from "crypto";
 import bcrypt from "bcrypt";
+import {createHash} from "crypto";
 
 export interface SecurityConfig {
     bcryptSecret?: string;
@@ -22,6 +23,14 @@ const HKDF_CONTEXT = "express-api:cache:v1";
  * Length of the derived AES-256 key in bytes.
  */
 const AES_KEY_LENGTH = 32;
+
+/**
+ * The maximum number of bytes bcrypt reads from its input.
+ *
+ * Anything beyond this is silently ignored, so a longer password is
+ * folded into a digest first.
+ */
+const BCRYPT_MAX_INPUT_BYTES = 72;
 
 export class SecurityUtil {
     private readonly config: SecurityConfig;
@@ -89,6 +98,27 @@ export class SecurityUtil {
     }
 
     /**
+     * The material that is actually hashed.
+     *
+     * bcrypt ignores everything past 72 bytes, so a longer password
+     * would silently lose its tail. Such a password is folded into a
+     * SHA-256 digest first; the digest is 64 characters, so the whole
+     * secret still fits.
+     *
+     * The rule depends only on the plaintext, so a hash created with
+     * one rule verifies with the other.
+     */
+    private hashMaterial(plain: string): string {
+        const byteLength = Buffer.byteLength(plain, "utf8");
+
+        if (byteLength <= BCRYPT_MAX_INPUT_BYTES) {
+            return plain;
+        }
+
+        return `sha256:${createHash("sha256").update(plain).digest("hex")}`;
+    }
+
+    /**
      * CONFIG OPTIONAL (Requires method parameter if constructor config missing)
      */
     public async hash(plain: string, secret?: string): Promise<string> {
@@ -98,7 +128,7 @@ export class SecurityUtil {
         }
         const saltRounds = this.config.bcryptSaltRounds ?? 10;
         const salt = await bcrypt.genSalt(saltRounds);
-        return bcrypt.hash(`${plain}.${pepper}`, salt);
+        return bcrypt.hash(`${this.hashMaterial(plain)}.${pepper}`, salt);
     }
 
     /**
@@ -109,7 +139,7 @@ export class SecurityUtil {
         if (!pepper) {
             throw new Error("SecurityUtil Error: A bcrypt secret must be provided via constructor or function parameter.");
         }
-        return bcrypt.compare(`${plain}.${pepper}`, hashed);
+        return bcrypt.compare(`${this.hashMaterial(plain)}.${pepper}`, hashed);
     }
 
     /**

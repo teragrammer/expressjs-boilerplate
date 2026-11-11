@@ -10,6 +10,7 @@ import {SettingRepository} from "./setting.repository";
 import {RedisCache} from "../../../shared/redis/redis-cache";
 import {SettingKeyValue} from "./setting-key-value.interface";
 import {logger} from "../../../config/logger";
+import {SingleFlight} from "../../../common/utils/single-flight";
 import {AppError} from "../../../common/utils/errors";
 import Messages from "../../../common/utils/messages";
 
@@ -19,6 +20,12 @@ export class SettingService {
 
     private localCache: InitializerSetting | null = null;
     private localCacheExpiresAt = 0;
+
+    /**
+     * Coalesces concurrent cache rebuilds so a cold start does not
+     * make every worker query the database at once.
+     */
+    private readonly singleFlight = new SingleFlight();
     private readonly DEFAULT_TTL = 3600; // 1 hour
 
     constructor(
@@ -71,23 +78,32 @@ export class SettingService {
      * Rebuilds the cache from the database and updates both Local and Redis layers.
      */
     async boot(): Promise<InitializerSetting> {
-        const freshSettings = await this.initializer();
+        return this.singleFlight.run("settings", async () => {
+            const freshSettings = await this.initializer();
 
-        // Warm L1 Cache
-        this.localCache = freshSettings;
-        this.localCacheExpiresAt = Date.now() + this.DEFAULT_TTL * 1000;
+            // Warm L1 Cache
+            this.localCache = freshSettings;
+            this.localCacheExpiresAt =
+                Date.now() + this.DEFAULT_TTL * 1000;
 
-        // Warm L2 Cache asynchronously to optimize thread performance
-        if (this.redisCache.isConnected()) {
-            this.redisCache.set(SettingService.CACHE_KEY, freshSettings, this.DEFAULT_TTL).catch((err) => {
-                logger.error(
-                    {message: (err as Error).message},
-                    "Failed to sync fresh settings to Redis",
-                );
-            });
-        }
+            // Warm L2 Cache asynchronously to optimize thread performance
+            if (this.redisCache.isConnected()) {
+                this.redisCache
+                    .set(
+                        SettingService.CACHE_KEY,
+                        freshSettings,
+                        this.DEFAULT_TTL,
+                    )
+                    .catch((err) => {
+                        logger.error(
+                            {message: (err as Error).message},
+                            "Failed to sync fresh settings to Redis",
+                        );
+                    });
+            }
 
-        return freshSettings;
+            return freshSettings;
+        });
     }
 
     /**

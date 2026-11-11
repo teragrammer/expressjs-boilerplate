@@ -4,6 +4,7 @@ import {NextFunction, Request, Response} from "express";
 
 import {UserController} from "./user.controller";
 import {UserService} from "../services/user.service";
+import {UserPurgeService} from "../services/user-purge.service";
 import {BrowseUsersResult, CreateUserDTO, UpdateUserDTO, User,} from "../user.interface";
 
 const {
@@ -12,12 +13,14 @@ const {
     mockBrowseUsers,
     mockFindById,
     mockSoftDelete,
+    mockPurge,
 } = vi.hoisted(() => ({
     mockCreateUser: vi.fn(),
     mockUpdateUser: vi.fn(),
     mockBrowseUsers: vi.fn(),
     mockFindById: vi.fn(),
     mockSoftDelete: vi.fn(),
+    mockPurge: vi.fn(),
 }));
 
 vi.mock("../../../../src/common/utils/catch-async", () => ({
@@ -112,7 +115,14 @@ describe("UserController", () => {
             softDelete: mockSoftDelete,
         } as unknown as UserService;
 
-        controller = new UserController(userService);
+        const userPurgeService = {
+            purge: mockPurge,
+        } as unknown as UserPurgeService;
+
+        controller = new UserController(
+            userService,
+            userPurgeService,
+        );
 
         res = {
             status: vi.fn().mockReturnThis(),

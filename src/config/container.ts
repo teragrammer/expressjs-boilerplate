@@ -34,6 +34,7 @@ import {TwoFactorAuthenticationService} from "../modules/auth/two-factor-authent
 import {PasswordRecoveryService} from "../modules/auth/password-recovery/password-recovery.service";
 import {RoleService} from "../modules/system/roles/role.service";
 import {AccountService} from "../modules/users/services/account.service";
+import {UserPurgeService} from "../modules/users/services/user-purge.service";
 import {VerificationService} from "../modules/auth/verification/verification.service";
 import {AuditService} from "../modules/audit/audit.service";
 
@@ -178,6 +179,12 @@ export const accountService = new AccountService(
     sessionService,
     verificationService,
     passwordRecoveryRepository,
+);
+
+export const userPurgeService = new UserPurgeService(
+    userRepository,
+    authenticationTokenRepository,
+    auditService,
 );
 
 export const systemEventHandler = new SystemEventHandler(

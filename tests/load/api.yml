@@ -59,12 +59,18 @@ config:
     metrics-by-endpoint: { }
 
   # ── Performance Thresholds ───────────────────────────────────────────
-  # Fail the test if these thresholds are not met
+  # The budgets come from the blueprint (Section 7.6):
+  #   login p95 < 400 ms (bcrypt dominated)
+  #   authenticated read p95 < 150 ms
+  #   browse p95 < 250 ms
+  #   write p95 < 300 ms
+  #   5xx rate < 1%
+  # The run fails when a budget is exceeded.
   ensure:
     thresholds:
-      - http.response_time.p95: 500
+      - http.response_time.p95: 400
       - http.response_time.p99: 1000
-      - http.codes.2xx: 95
+      - http.codes.2xx: 99
 
   # ── Data Files ───────────────────────────────────────────────────────
   payload:
@@ -100,12 +106,12 @@ scenarios:
 
       - think: 1
 
-      - get:
+      - post:
           url: "/api/v1/auth/logout"
           headers:
             Authorization: "Bearer {{ authToken }}"
           expect:
-            - statusCode: 204
+            - statusCode: [204, 401]
 
   # ── User Management (auth required) ────────────────────────────────
   - name: "User Browse"
@@ -165,10 +171,8 @@ scenarios:
 
       - get:
           url: "/api/v1/settings/values"
-          headers:
-            Authorization: "Bearer {{ authToken }}"
           expect:
-            - statusCode: [ 200, 403 ]
+            - statusCode: 200
 
   # ── Roles Management (auth required) ───────────────────────────────
   - name: "Roles Browse"

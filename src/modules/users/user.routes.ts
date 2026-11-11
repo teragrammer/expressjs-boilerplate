@@ -7,19 +7,28 @@ import {userCreateSchema} from "./validations/user-create.schema";
 import {userUpdateSchema} from "./validations/user-update.schema";
 import {UserController} from "./controllers/user.controller";
 import {UserService} from "./services/user.service";
+import {UserPurgeService} from "./services/user-purge.service";
 import {UserRepository} from "./user.repository";
 import {AuthenticationTokenRepository} from "../auth/authentication/authentication-token.repository";
 import {SecurityUtil} from "../../common/utils/security.util";
 import {__ENV} from "../../config/environment";
+import {auditService} from "../../config/container";
 
-const userController = new UserController(new UserService(
-    new UserRepository(),
-    new SecurityUtil({
-        bcryptSecret: __ENV.BCRYPT_SECRET,
-        bcryptSaltRounds: Number(__ENV.BCRYPT_SALT_ROUND || 10),
-    }),
-    new AuthenticationTokenRepository(),
-));
+const userController = new UserController(
+    new UserService(
+        new UserRepository(),
+        new SecurityUtil({
+            bcryptSecret: __ENV.BCRYPT_SECRET,
+            bcryptSaltRounds: Number(__ENV.BCRYPT_SALT_ROUND || 10),
+        }),
+        new AuthenticationTokenRepository(),
+    ),
+    new UserPurgeService(
+        new UserRepository(),
+        new AuthenticationTokenRepository(),
+        auditService,
+    ),
+);
 
 export default () => {
     const router = Router();
@@ -49,6 +58,18 @@ export default () => {
     router.get("/:id", [AuthenticationMiddleware(), AuthorizationMiddleware("users:view")], userController.view);
 
     router.delete("/:id", [AuthenticationMiddleware(), AuthorizationMiddleware("users:delete")], userController.delete);
+
+    /*
+     * Permanent removal.
+     *
+     * Destructive: it requires a privileged role, a stated reason and
+     * it produces an audit event. The reason travels in the
+     * `X-Deletion-Reason` header.
+     */
+    router.post("/:id/purge", [
+        AuthenticationMiddleware(),
+        AuthorizationMiddleware("users:delete"),
+    ], userController.purge);
 
     return router;
 }

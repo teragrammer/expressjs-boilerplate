@@ -674,6 +674,40 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /users/{id}/purge:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+      - name: X-Deletion-Reason
+        in: header
+        required: true
+        description: |
+          Why the account is being removed permanently. At least 10
+          characters. The reason is recorded in the audit trail.
+        schema:
+          type: string
+          minLength: 10
+    post:
+      tags: [Users]
+      summary: Permanently remove a user
+      description: |
+        Destructive and restricted to an administrator. The standard
+        delete endpoint performs a soft delete; this operation removes
+        the row and always produces an audit event.
+      responses:
+        "200":
+          description: The user was removed
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
   /settings:
     get:
       tags: [Settings]

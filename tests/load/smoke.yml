@@ -1,6 +1,16 @@
 # Smoke Test Configuration
-# Quick validation that the API is responding correctly
+# Quick validation that the API is responding correctly.
+#
 # Usage: npm run load:test:smoke
+#
+# Environment variables:
+#   TARGET_URL     - Base URL (default: http://localhost:4000)
+#   SEED_USERNAME  - Seeded account used for the run
+#   SEED_PASSWORD  - Password of the seeded account
+#
+# The seeded password is never a fixed default: the seeder generates a
+# random one when SEED_PASSWORD is unset, so the load test must be
+# given the value that was logged.
 
 config:
   target: "{{ $processEnvironment.TARGET_URL }}"
@@ -18,9 +28,14 @@ config:
   plugins:
     expect: {}
 
+  # ── Performance Thresholds ───────────────────────────────────────────
+  # The smoke profile is the CI gate: it verifies that the wiring works
+  # and that the login budget from the blueprint (Section 7.6) holds.
   ensure:
     thresholds:
       - http.response_time.p95: 1000
+      - http.response_time.max: 5000
+      - http.codes.2xx: 90
 
 scenarios:
   - name: "Login"
@@ -29,8 +44,8 @@ scenarios:
       - post:
           url: "/api/v1/auth/login"
           json:
-            username: "admin"
-            password: "pass1234"
+            username: "{{ $processEnvironment.SEED_USERNAME }}"
+            password: "{{ $processEnvironment.SEED_PASSWORD }}"
           expect:
             - statusCode: 200
             - hasProperty: token
@@ -41,15 +56,23 @@ scenarios:
       - post:
           url: "/api/v1/auth/login"
           json:
-            username: "admin"
-            password: "pass1234"
+            username: "{{ $processEnvironment.SEED_USERNAME }}"
+            password: "{{ $processEnvironment.SEED_PASSWORD }}"
           capture:
             - json: "$.token"
               as: "authToken"
 
       - get:
-          url: "/api/v1/users"
+          url: "/api/v1/users?per_page=20"
           headers:
             Authorization: "Bearer {{ authToken }}"
           expect:
             - statusCode: [200, 403]
+
+  - name: "Read the public settings"
+    weight: 30
+    flow:
+      - get:
+          url: "/api/v1/settings/values"
+          expect:
+            - statusCode: 200

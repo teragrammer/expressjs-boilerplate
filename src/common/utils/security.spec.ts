@@ -232,4 +232,54 @@ describe("SecurityUtil Edge Cases & Functional Tests", () => {
             ).rejects.toThrow("Invalid encrypted payload structure");
         });
     });
+    describe("Long password handling", () => {
+        it("hashes and verifies a password longer than the bcrypt limit", async () => {
+            const longPassword = "a".repeat(100);
+
+            const hashed = await secureUtilWithConfig.hash(longPassword);
+
+            expect(
+                await secureUtilWithConfig.compare(hashed, longPassword),
+            ).toBe(true);
+        });
+
+        it("does not truncate the tail of a long password", async () => {
+            const base = "a".repeat(100);
+
+            const hashed = await secureUtilWithConfig.hash(base);
+
+            // A password that shares the first 72 bytes must not match.
+            expect(
+                await secureUtilWithConfig.compare(
+                    hashed,
+                    `${"a".repeat(72)}different`,
+                ),
+            ).toBe(false);
+        });
+
+        it("verifies a password with multi-byte characters", async () => {
+            const password = "こんにちは🌟🧑‍💻 Cryptographic Test 🚀";
+
+            const hashed = await secureUtilWithConfig.hash(password);
+
+            expect(
+                await secureUtilWithConfig.compare(hashed, password),
+            ).toBe(true);
+        });
+
+        it("still verifies a password created under the previous policy", async () => {
+            /*
+             * A password at or below the bcrypt limit keeps the same
+             * material, so hashes created before the change still
+             * verify.
+             */
+            const password = "Short1!";
+
+            const hashed = await secureUtilWithConfig.hash(password);
+
+            expect(
+                await secureUtilWithConfig.compare(hashed, password),
+            ).toBe(true);
+        });
+    });
 });
