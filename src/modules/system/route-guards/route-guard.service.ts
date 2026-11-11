@@ -9,6 +9,7 @@ import {
     RouteGuardRow
 } from "./route-guard.interface";
 import {AppError} from "../../../common/utils/errors";
+import {logger} from "../../../config/logger";
 import Messages from "../../../common/utils/messages";
 
 export class RouteGuardService {
@@ -54,7 +55,10 @@ export class RouteGuardService {
                     return Object.freeze(this.localCache);
                 }
             } catch (error) {
-                console.error("Redis error reading route guards, falling back to DB:", error);
+                logger.error(
+                    {message: (error as Error).message},
+                    "Redis error reading route guards, falling back to DB",
+                );
             }
         }
 
@@ -75,7 +79,7 @@ export class RouteGuardService {
         // Warm L2 Cache asynchronously to optimize performance
         if (this.redisCache.isConnected()) {
             this.redisCache.set(RouteGuardService.CACHE_KEY, freshGuards, this.DEFAULT_TTL).catch((err) => {
-                console.error("Failed to update route guards in Redis:", err);
+                logger.error("Failed to update route guards in Redis:", err);
             });
         }
 

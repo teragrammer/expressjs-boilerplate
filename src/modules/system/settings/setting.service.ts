@@ -9,6 +9,7 @@ import {
 import {SettingRepository} from "./setting.repository";
 import {RedisCache} from "../../../shared/redis/redis-cache";
 import {SettingKeyValue} from "./setting-key-value.interface";
+import {logger} from "../../../config/logger";
 import {AppError} from "../../../common/utils/errors";
 import Messages from "../../../common/utils/messages";
 
@@ -55,7 +56,10 @@ export class SettingService {
                     return Object.freeze(this.localCache);
                 }
             } catch (error) {
-                console.error("Failed to read from Redis cache, falling back to DB:", error);
+                logger.error(
+                    {message: (error as Error).message},
+                    "Failed to read from Redis cache, falling back to DB",
+                );
             }
         }
 
@@ -76,7 +80,10 @@ export class SettingService {
         // Warm L2 Cache asynchronously to optimize thread performance
         if (this.redisCache.isConnected()) {
             this.redisCache.set(SettingService.CACHE_KEY, freshSettings, this.DEFAULT_TTL).catch((err) => {
-                console.error("Failed to sync fresh settings to Redis:", err);
+                logger.error(
+                    {message: (err as Error).message},
+                    "Failed to sync fresh settings to Redis",
+                );
             });
         }
 
@@ -106,7 +113,10 @@ export class SettingService {
             const settings: Setting[] = await this.settingRepository.findBySlug(slugs, is_public);
             return this.parser(settings);
         } catch (error) {
-            console.error(`Database retrieval failed for is_public=${is_public}:`, error);
+            logger.error(
+                {is_public, message: (error as Error).message},
+                "Database retrieval failed",
+            );
             throw new Error("Unable to fetch configuration settings from database.", { cause: error });
         }
     }

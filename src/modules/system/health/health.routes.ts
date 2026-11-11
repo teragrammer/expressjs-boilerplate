@@ -1,7 +1,6 @@
 // src/modules/system/health/health.routes.ts
 import {Router} from "express";
 import catchAsync from "../../../common/utils/catch-async";
-import {renderMetrics} from "../../../common/metrics/metrics";
 import {HealthService} from "./health.service";
 
 const healthService = new HealthService();

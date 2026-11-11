@@ -2,6 +2,7 @@
 import Joi from 'joi';
 import {sql} from 'kysely';
 import {db as defaultDb, type DatabaseExecutor} from '../../../config/database';
+import {logger} from "../../../config/logger";
 
 interface ExistsOptions {
     column?: string;
@@ -34,7 +35,10 @@ export const validateExists = (
                 .where(column as any, '=', value)
                 .executeTakeFirst();
         } catch (error) {
-            console.error(`Database validation error on ${table}.${column}:`, error);
+            logger.error(
+                {table, column, message: (error as Error).message},
+                "Database validation error",
+            );
 
             throw new Joi.ValidationError(
                 'database.error',

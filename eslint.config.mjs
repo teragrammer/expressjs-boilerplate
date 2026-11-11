@@ -34,6 +34,12 @@ export default [
       '.git/**',
       'tests/load/reports/**',
       '**/*.d.ts',
+      /*
+       * Vendored agent skills are not application code: they are
+       * installed tooling with their own style and globals.
+       */
+      '.agents/**',
+      '.opencode/**',
     ],
   },
 

@@ -16,14 +16,52 @@ environment configuration to help you kickstart your API development with best p
 
 ### Features
 
-- Database Connection (PostgreSQL)
-- Redis Connection (cache application settings and roles guard)
-- Registration and Login (JWT Token)
-- User Roles (Can be manage by admin)
-- Two-Factor Authentication Setup (Using Email)
-- Password Recovery
-- Profile Information and Password Change
-- Application Settings (Can be manage by admin)
+**Authentication and sessions**
+
+- Registration and login with short-lived access tokens and rotating,
+  hashed refresh tokens delivered in an `HttpOnly` cookie
+- Every access token references a live database session, so revocation,
+  expiry and account status take effect immediately
+- Two-factor authentication with an email one-time password, a policy
+  (`disabled`, `per_user`, `global`), enrollment and recovery codes
+- Password recovery that never reveals whether an account exists,
+  resets atomically and revokes every session
+- Email and phone verification
+- Layered rate limiting on login, registration, recovery, OTP and
+  verification endpoints
+
+**Authorization**
+
+- Route guards with a canonical, seeded route catalog
+- An `authorization_version` on the user, so a role or status change
+  takes effect on the next request
+- Field-level authorization: only an administrator can change
+  `role_id`, `status` or another user's password
+- Soft delete for users and restrictive foreign keys, so a role can
+  never delete its users
+
+**Platform**
+
+- PostgreSQL through Kysely, with typed schemas, an explicit migration
+  registry and a reviewed seed
+- Optional Redis cache for settings and route guards, encrypted with
+  AES-256-GCM and invalidated over pub/sub
+- A durable outbox: email is delivered by a background worker, never
+  inside a request or a transaction
+- An append-only audit trail with a read API
+- Structured logs with a request id, redaction, Prometheus metrics and
+  health/readiness probes
+- Graceful shutdown, a non-root production container and CI quality
+  gates (lint, typecheck, build, tests, coverage, dependency audit,
+  image scan)
+
+**API**
+
+- An OpenAPI 3.1 contract in [`docs/openapi.yaml`](docs/openapi.yaml),
+  validated against the real routes in CI
+- Consistent error envelope and PostgreSQL error mapping
+- `Idempotency-Key` support on unsafe endpoints
+- Cursor pagination for users, offset pagination for admin tables
 
 ### Testing
 
@@ -38,21 +76,43 @@ The project includes unit, integration, and load/performance tests.
 Quick start:
 
 ```bash
-npm test
-npm run test:run
+npm test              # watch mode
+npm run test:run      # single run
+npm run test:coverage # with coverage
 npm run load:test:smoke
 ```
 
+Other quality commands:
+
+```bash
+npm run typecheck     # tsc --noEmit
+npm run lint          # eslint
+npm run build         # compile to dist/
+npm run openapi:lint  # validate the contract against the routes
+npm run audit:prod    # dependency audit (production tree)
+```
+
+Every command must pass before a change is merged. The CI workflow runs
+all of them.
+
 ### Request Extensions
 
-- `req.credentials`: .jwt payload object from verified jwt header, .user() get the current authenticated user
-  information, .authentication() details of token saved from database
-- `req.sanitize`: .body form object, .query parameters
+- `req.credentials`: `.jwt` payload object from the verified JWT header, `.user()` gets the
+  current authenticated user, `.authentication()` returns the session record
+- `req.sanitize`: `.body` form object, `.query` parameters, `.data` the validated payload
     - `.body.get(key, defaults?)`: get the specific value with default to NULL
     - `.body.only(string[])`: list the objects of selected keys
     - `.body.numeric(key, defaults?)`: convert the value if possible to numeric else default to 0
     - `.query.get(key, defaults?)`: get the specific value with default to NULL
     - `.query.numeric(key, defaults?)`: convert the value if possible to numeric else default to 0
+- `req.pagination`: `page`, `offset` and `perPage` for the admin lists
+- `req.cursorPagination`: `cursor` and `perPage` for the user list
+- `req.context`: the per-request context (request id, ip, user id)
+
+> Browse filters should be parsed with `src/common/utils/query-parser.ts`.
+> It keeps an absent parameter absent (rather than turning it into `0`)
+> and rejects invalid values with a 400 instead of silently coercing
+> them.
 
 ### Getting Started
 
@@ -65,20 +125,20 @@ $ cd expressjs-boilerplate
 
 - Configure your .env (.env.example)
 
-- Initialize Docker
+- Start the stack (the application, PostgreSQL and Redis)
 
 ```
-$ docker compose build --no-cache
-$ docker compose up -d
-$ sh scripts/docker.sh -r
+$ docker compose up -d --build
 ```
 
-- Manage the container with `scripts/docker.sh`:
+The compose file builds the production image, reads the configuration
+from `.env` and waits for the database and the cache to become healthy.
+
+- Build and run the production image directly
 
 ```
-$ sh scripts/docker.sh -r   # Run: start the container and open a bash shell
-$ sh scripts/docker.sh -s   # Stop: stop the running container
-$ sh scripts/docker.sh -d   # Destroy: tear down containers, images, networks, and volumes
+$ docker build -t express-api .
+$ docker run --rm -p 4000:4000 --env-file .env express-api
 ```
 
 - Install dependencies
@@ -166,6 +226,21 @@ The Postgres MCP server reads `DB_*` values from `.env` (or `DATABASE_URL`). For
 - Postgres MCP: set `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASS`, `DB_NAME` (or `DATABASE_URL`).
 - `.opencode/` is gitignored; keep shared skills in `.agents/skills/` and config in `opencode.json`.
 
+### Operational Endpoints
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /health/live` | Liveness. The process is up; no dependency is contacted. |
+| `GET /health/ready` | Readiness. Checks PostgreSQL (and Redis when configured). Returns 503 when a dependency is down. |
+| `GET /metrics` | Prometheus metrics. Restrict this to an operator network. |
+
+### Documentation
+
+- [`docs/openapi.yaml`](docs/openapi.yaml) — the API contract
+- [`docs/adr/`](docs/adr/) — the architecture decision records
+- [`docs/runbooks/`](docs/runbooks/) — deployment, migrations, incident
+  response and backup procedures
+
 ### Database Scripts
 
 Run these from the repository root (they resolve paths relative to the current working directory):
@@ -181,13 +256,44 @@ After scaffolding a seeder, wire it into `scripts/db/seed.ts` in dependency orde
 
 ### Example API Requests
 
-- Authentication
+- Log in (the refresh token is returned as an `HttpOnly` cookie)
 
 ```
-curl -X POST http://localhost:4000/api/v1/login \
+curl -i -X POST http://localhost:4000/api/v1/auth/login \
     -H "Content-Type: application/json" \
-    -d '{"username":"test","password":"123456"}'
+    -c cookies.txt \
+    -d '{"username":"customer","password":"<password>"}'
 ```
+
+- Refresh the access token
+
+```
+curl -X POST http://localhost:4000/api/v1/auth/refresh -b cookies.txt
+```
+
+- Call an authorized endpoint
+
+```
+curl http://localhost:4000/api/v1/users \
+    -H "Authorization: Bearer <access_token>"
+```
+
+- Browse users with cursor pagination
+
+```
+curl "http://localhost:4000/api/v1/users?per_page=20&cursor=481" \
+    -H "Authorization: Bearer <access_token>"
+```
+
+> The pagination parameter is `per_page`, not `limit`.
+
+- Read the public settings (no authentication required)
+
+```
+curl http://localhost:4000/api/v1/settings/values
+```
+
+The full contract is in [`docs/openapi.yaml`](docs/openapi.yaml).
 
 ### Contributing
 

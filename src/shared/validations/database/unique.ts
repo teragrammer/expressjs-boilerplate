@@ -2,6 +2,7 @@
 import Joi from 'joi';
 import {sql} from 'kysely';
 import {db as defaultDb, type DatabaseExecutor} from "../../../config/database";
+import {logger} from "../../../config/logger";
 
 interface UniqueOptions {
     ignoreId?: string | number;
@@ -45,7 +46,10 @@ export const validateUnique = (
 
             row = await query.executeTakeFirst();
         } catch (error) {
-            console.error(`Database unique validation error on ${table}.${column}:`, error);
+            logger.error(
+                    {table, column, message: (error as Error).message},
+                    "Database unique validation error",
+                );
 
             throw new Joi.ValidationError(
                 'database.error',
@@ -122,7 +126,10 @@ export const validateCompositeUnique = (
 
             row = await query.executeTakeFirst();
         } catch (error) {
-            console.error(`Database unique validation error on ${table} [${columns.join(', ')}]:`, error);
+            logger.error(
+                    {table, columns, message: (error as Error).message},
+                    "Database unique validation error",
+                );
 
             throw new Joi.ValidationError(
                 'database.error',

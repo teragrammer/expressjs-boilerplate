@@ -214,7 +214,11 @@ function instrumentRouter(): void {
      * prototype is patched before the routers are imported so every
      * registration is recorded.
      */
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    /*
+     * The router prototype is patched at runtime, so the module is
+     * loaded dynamically rather than through a static import.
+     */
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const Router = require("router");
 
     const prototype = Router.prototype ?? Router;
@@ -271,7 +275,7 @@ function instrumentRouter(): void {
 async function collectApplicationRoutes(): Promise<string[]> {
     instrumentRouter();
 
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const v1 = require("../src/routes/v1").default;
 
     const router = v1();

@@ -3,6 +3,7 @@ import {NextFunction, Request, Response} from "express";
 import {AppError} from "../utils/errors";
 import Messages from "../utils/messages";
 import {RateLimiter} from "./rate-limiter";
+import {logger} from "../../config/logger";
 
 export interface RateLimitOptions {
     bucket: string;
@@ -53,7 +54,11 @@ export function createRateLimiter(options: RateLimitOptions) {
                 const retryAfter = Math.ceil((result.resetAt - Date.now()) / 1000);
                 res.setHeader("Retry-After", Math.max(1, retryAfter));
 
-                throw new AppError(Messages.RATE_LIMIT_EXCEEDED, message);
+                throw new AppError(
+                    Messages.RATE_LIMIT_EXCEEDED,
+                    message,
+                    code,
+                );
             }
 
             // Track response for conditional counting
@@ -133,7 +138,11 @@ function makeRateLimiter(limiter: RateLimiter, options: RateLimitOptions) {
                 const retryAfter = Math.ceil((result.resetAt - Date.now()) / 1000);
                 res.setHeader("Retry-After", Math.max(1, retryAfter));
 
-                throw new AppError(Messages.RATE_LIMIT_EXCEEDED, message);
+                throw new AppError(
+                    Messages.RATE_LIMIT_EXCEEDED,
+                    message,
+                    code,
+                );
             }
 
             // Track response for conditional counting
@@ -158,7 +167,10 @@ function makeRateLimiter(limiter: RateLimiter, options: RateLimitOptions) {
 
             next();
         } catch (error) {
-            console.error("Rate limiter error:", error);
+            logger.error(
+                {message: (error as Error).message},
+                "Rate limiter error",
+            );
             next(error);
         }
     };

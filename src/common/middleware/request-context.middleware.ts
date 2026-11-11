@@ -4,10 +4,9 @@ import {NextFunction, Request, Response} from "express";
 import {
     runWithRequestContext,
     updateRequestContext,
+    type RequestContext,
 } from "../context/request-context";
 import {logger} from "../../config/logger";
-import type {RequestContext} from "../context/request-context";
-
 const REQUEST_ID_HEADER = "x-request-id";
 
 /** Maximum accepted length of a client-supplied request id. */
