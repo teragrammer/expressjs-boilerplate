@@ -63,6 +63,8 @@ const createAuthenticatedUser = async () => {
 
 describe("User account", () => {
     afterEach(async () => {
+        // Clean up TFA records first (FK constraint)
+        await db.deleteFrom("two_factor_authentications").execute();
         await db.deleteFrom("authentication_tokens").execute();
         await db.deleteFrom("users").execute();
     });
@@ -110,6 +112,7 @@ describe("User account", () => {
             const {
                 user,
                 token,
+                authenticationToken,
             } = await createAuthenticatedUser();
 
             const response = await request(app)
@@ -132,7 +135,8 @@ describe("User account", () => {
 
             expect(newToken.uid).toBe(user.id);
             expect(newToken.tfa).toBe(true);
-            expect(newToken.tid).toBe(0);
+            // Token should preserve the same session ID (tid)
+            expect(newToken.tid).toBe(authenticationToken.id);
         });
 
         it("should reject information updates without authentication", async () => {
@@ -239,6 +243,7 @@ describe("User account", () => {
 
             expect(loginResponse.body).toEqual({
                 token: expect.any(String),
+                tfaRequired: expect.any(Boolean),
             });
         });
 
@@ -320,6 +325,7 @@ describe("User account", () => {
 
             expect(loginResponse.body).toEqual({
                 token: expect.any(String),
+                tfaRequired: expect.any(Boolean),
             });
         });
 

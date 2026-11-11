@@ -69,6 +69,7 @@ describe("Password recovery", () => {
 
         // Keep tests isolated if a recovery record remains because
         // a test intentionally exercises an unsuccessful workflow.
+        await db.deleteFrom("two_factor_authentications").execute();
         await db.deleteFrom("password_recoveries").execute();
     });
 
@@ -220,6 +221,7 @@ describe("Password recovery", () => {
 
         expect(newPasswordResponse.body).toEqual({
             token: expect.any(String),
+            tfaRequired: expect.any(Boolean),
         });
 
         expect(user.id).toBeDefined();

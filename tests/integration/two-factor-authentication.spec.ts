@@ -204,15 +204,11 @@ describe("Two-factor authentication", () => {
 
         /*
          * Delete children before parents because of FK constraints.
+         * First delete all TFA records (not just tracked ones) since
+         * tests create TFA records through the API which aren't tracked.
          */
-        if (createdTfaIds.length > 0) {
-            await db
-                .deleteFrom("two_factor_authentications")
-                .where("id", "in", createdTfaIds)
-                .execute();
-
-            createdTfaIds.length = 0;
-        }
+        await db.deleteFrom("two_factor_authentications").execute();
+        createdTfaIds.length = 0;
 
         if (
             createdAuthenticationTokenIds.length > 0

@@ -1,11 +1,18 @@
 // tests/integration/register.spec.ts
-import {describe, expect, it} from "vitest";
+import {afterEach, describe, expect, it} from "vitest";
 import request from "supertest";
 import app from "../../src/app";
 import {db} from "../../src/config/database";
 import {SecurityUtil} from "../../src/common/utils/security.util";
 
 describe("POST /api/v1/auth/register", () => {
+    afterEach(async () => {
+        await db.deleteFrom("two_factor_authentications").execute();
+        await db.deleteFrom("authentication_tokens").execute();
+        await db.deleteFrom("rate_limits").execute();
+        await db.deleteFrom("users").execute();
+    });
+
     it("should register a new user", async () => {
         const suffix = new SecurityUtil().randomString(8);
         const username = suffix;
