@@ -533,7 +533,10 @@ describe("UserController", () => {
             await invoke("view");
 
             expect(mockFindById).toHaveBeenCalledTimes(1);
-            expect(mockFindById).toHaveBeenCalledWith(42);
+            expect(mockFindById).toHaveBeenCalledWith(
+                42,
+                expect.objectContaining({roleSlug: "admin"}),
+            );
 
             expectResponse("json", result);
         });
@@ -553,7 +556,10 @@ describe("UserController", () => {
             await invoke("view");
 
             expect(mockFindById).toHaveBeenCalledTimes(1);
-            expect(mockFindById).toHaveBeenCalledWith(123);
+            expect(mockFindById).toHaveBeenCalledWith(
+                123,
+                expect.objectContaining({roleSlug: "admin"}),
+            );
 
             expectResponse("json", result);
         });

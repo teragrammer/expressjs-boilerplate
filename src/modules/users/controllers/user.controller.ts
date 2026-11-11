@@ -143,7 +143,11 @@ export class UserController {
             throw new AppError(Messages.INVALID_PATH_PARAM);
         }
 
-        const user: User = await this.userService.findById(id);
+        const user: User = await this.userService.findById(
+            id,
+            resolveActor(req),
+        );
+
         return res.status(200).json(user);
     });
 

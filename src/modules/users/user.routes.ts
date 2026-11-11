@@ -3,6 +3,7 @@ import {Router} from "express";
 import {AuthenticationMiddleware} from "../../common/middleware/authentication.middleware";
 import {AuthorizationMiddleware} from "../../common/middleware/authorization.middleware";
 import {validate} from "../../common/middleware/validate.middleware";
+import {privilegedFieldsMiddleware} from "../../common/middleware/privileged-fields.middleware";
 import {userCreateSchema} from "./validations/user-create.schema";
 import {userUpdateSchema} from "./validations/user-update.schema";
 import {UserController} from "./controllers/user.controller";
@@ -37,6 +38,11 @@ export default () => {
     router.post("/", [
         AuthenticationMiddleware(),
         AuthorizationMiddleware("users:create"),
+        /*
+         * The privileged fields are rejected before the validation,
+         * so the endpoint cannot be used to probe existing values.
+         */
+        privilegedFieldsMiddleware(),
         validate(userCreateSchema, [
             "first_name", "middle_name", "last_name",
             "role_id", "phone", "email", "username", "password",
@@ -47,6 +53,7 @@ export default () => {
     router.put("/:id", [
         AuthenticationMiddleware(),
         AuthorizationMiddleware("users:update"),
+        privilegedFieldsMiddleware(),
         validate((req) => userUpdateSchema(String(req.params.id)), [
             "first_name", "middle_name", "last_name",
             "role_id", "phone", "email", "username", "password",

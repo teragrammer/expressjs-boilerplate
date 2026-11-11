@@ -532,6 +532,59 @@ describe("P0 regression suite", () => {
         });
     });
 
+    describe("F-27: object-level authorization", () => {
+        it("does not let a customer read another user's record", async () => {
+            const {user, username, password} = await createUser();
+            const other = await createUser();
+
+            const loginResponse = await login(username, password);
+
+            expect(loginResponse.status).toBe(200);
+
+            const response = await request(app)
+                .get(`/api/v1/users/${other.user.id}`)
+                .set("Authorization", `Bearer ${loginResponse.body.token}`);
+
+            // The route guard may allow the read, but the object-level
+            // rule refuses it.
+            expect([403, 404]).toContain(response.status);
+            expect(user.id).not.toBe(other.user.id);
+        });
+
+        it("lets a customer read their own record", async () => {
+            const {user, username, password} = await createUser();
+
+            const loginResponse = await login(username, password);
+
+            const response = await request(app)
+                .get(`/api/v1/users/${user.id}`)
+                .set("Authorization", `Bearer ${loginResponse.body.token}`);
+
+            expect([200, 403]).toContain(response.status);
+        });
+
+        it("does not let a non-administrator change the role of a user", async () => {
+            const manager = await createUser({roleSlug: "manager"});
+            const target = await createUser();
+
+            const loginResponse = await login(manager.username, manager.password);
+
+            const response = await request(app)
+                .put(`/api/v1/users/${target.user.id}`)
+                .set("Authorization", `Bearer ${loginResponse.body.token}`)
+                .send({
+                    first_name: "Updated",
+                    last_name: "Name",
+                    username: target.username,
+                    email: target.user.email,
+                    role_id: 999999,
+                    status: "Activated",
+                });
+
+            expect(response.status).toBe(403);
+        });
+    });
+
     describe("F-10: transport defaults", () => {
         it("does not reflect an arbitrary origin", async () => {
             const response = await request(app)

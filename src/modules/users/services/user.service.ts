@@ -23,6 +23,11 @@ export type TransactionRunner = <T>(
     callback: (trx: Transaction<Database>) => Promise<T>,
 ) => Promise<T>;
 
+/**
+ * Roles that may read any user record.
+ */
+const ADMINISTRATIVE_ROLES = new Set(["admin", "manager"]);
+
 export class UserService {
     // Dependency injection allows passing a mock repository during testing
     constructor(
@@ -175,7 +180,25 @@ export class UserService {
     /**
      * Resolves a user profile by its unique ID for authentication context mapping.
      */
-    async findById(id: number): Promise<User> {
+    async findById(id: number, actor?: Actor): Promise<User> {
+        /*
+         * The object-level rule: an actor without administrative
+         * visibility may only read their own record. The route guard
+         * has already been checked by the middleware; this closes the
+         * gap between "may read a user" and "may read this user".
+         */
+        if (
+            actor &&
+            !actor.bypass &&
+            !ADMINISTRATIVE_ROLES.has(actor.roleSlug) &&
+            id !== actor.id
+        ) {
+            throw new AppError(
+                Messages.NO_PERMISSION,
+                "You may only read your own account.",
+            );
+        }
+
         const user: User | null = await this.userRepository.findById(id);
         if (!user) {
             throw new AppError(Messages.DATA_NOT_FOUND);
