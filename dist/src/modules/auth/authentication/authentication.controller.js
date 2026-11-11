@@ -30,7 +30,7 @@ class AuthenticationController {
         this.refreshTokenRepository = refreshTokenRepository;
         this.auditService = auditService;
         this.login = (0, catch_async_1.default)((req, res) => __awaiter(this, void 0, void 0, function* () {
-            var _a;
+            var _a, _b, _c;
             // Delegate to Business Service
             const result = yield this.authService.login(req.sanitize.data, Object.assign(Object.assign({ ip: (0, request_info_1.getClientIp)(req) }, (0, request_info_1.getUserAgentInfo)(req)), { userAgent: (_a = (0, request_info_1.getUserAgent)(req)) !== null && _a !== void 0 ? _a : null }));
             if (result.refreshToken) {
@@ -38,7 +38,9 @@ class AuthenticationController {
             }
             yield this.auditService.success(audit_interface_1.AUDIT_ACTIONS.AUTH_LOGIN_SUCCEEDED, {
                 request: req,
+                actorUserId: (_b = result.userId) !== null && _b !== void 0 ? _b : null,
                 targetType: "user",
+                targetId: (_c = result.userId) !== null && _c !== void 0 ? _c : null,
             });
             res.status(200).json({
                 token: result.accessToken,

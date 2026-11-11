@@ -12,12 +12,15 @@ Object.defineProperty(exports, "__esModule", { value: true });
 // __test__/modules/users/controllers/user.controller.spec.ts
 const vitest_1 = require("vitest");
 const user_controller_1 = require("./user.controller");
-const { mockCreateUser, mockUpdateUser, mockBrowseUsers, mockFindById, mockSoftDelete, } = vitest_1.vi.hoisted(() => ({
+const { mockCreateUser, mockUpdateUser, mockBrowseUsers, mockFindById, mockSoftDelete, mockPurge, mockAuditSuccess, mockAuditFailure, } = vitest_1.vi.hoisted(() => ({
     mockCreateUser: vitest_1.vi.fn(),
     mockUpdateUser: vitest_1.vi.fn(),
     mockBrowseUsers: vitest_1.vi.fn(),
     mockFindById: vitest_1.vi.fn(),
     mockSoftDelete: vitest_1.vi.fn(),
+    mockPurge: vitest_1.vi.fn(),
+    mockAuditSuccess: vitest_1.vi.fn(),
+    mockAuditFailure: vitest_1.vi.fn(),
 }));
 vitest_1.vi.mock("../../../../src/common/utils/catch-async", () => ({
     default: (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next),
@@ -86,7 +89,14 @@ vitest_1.vi.mock("../../../../src/common/utils/catch-async", () => ({
             findById: mockFindById,
             softDelete: mockSoftDelete,
         };
-        controller = new user_controller_1.UserController(userService);
+        const userPurgeService = {
+            purge: mockPurge,
+        };
+        const auditService = {
+            success: mockAuditSuccess,
+            failure: mockAuditFailure,
+        };
+        controller = new user_controller_1.UserController(userService, userPurgeService, auditService);
         res = {
             status: vitest_1.vi.fn().mockReturnThis(),
             json: vitest_1.vi.fn().mockReturnThis(),
@@ -96,6 +106,21 @@ vitest_1.vi.mock("../../../../src/common/utils/catch-async", () => ({
         req = {
             params: {
                 id: "1",
+            },
+            /*
+             * The controller resolves the authorization actor from the
+             * request credentials.
+             */
+            credentials: {
+                jwt: {
+                    uid: 1,
+                    tid: 1,
+                    tfa: true,
+                    rol: "admin",
+                    bpa: 1,
+                },
+                user: vitest_1.vi.fn(),
+                authentication: vitest_1.vi.fn(),
             },
             sanitize: {
                 body: {
@@ -140,7 +165,7 @@ vitest_1.vi.mock("../../../../src/common/utils/catch-async", () => ({
             mockCreateUser.mockResolvedValue(createdUser);
             yield invoke("create");
             (0, vitest_1.expect)(mockCreateUser).toHaveBeenCalledTimes(1);
-            (0, vitest_1.expect)(mockCreateUser).toHaveBeenCalledWith(createData);
+            (0, vitest_1.expect)(mockCreateUser).toHaveBeenCalledWith(createData, vitest_1.expect.objectContaining({ roleSlug: "admin" }));
             expectResponse("json", {
                 id: 42,
             });
@@ -159,7 +184,7 @@ vitest_1.vi.mock("../../../../src/common/utils/catch-async", () => ({
             mockCreateUser.mockResolvedValue(createdUser);
             yield invoke("create");
             (0, vitest_1.expect)(mockCreateUser).toHaveBeenCalledTimes(1);
-            (0, vitest_1.expect)(mockCreateUser).toHaveBeenCalledWith(createData);
+            (0, vitest_1.expect)(mockCreateUser).toHaveBeenCalledWith(createData, vitest_1.expect.objectContaining({ roleSlug: "admin" }));
             expectResponse("json", {
                 id: 99,
             });
@@ -192,7 +217,7 @@ vitest_1.vi.mock("../../../../src/common/utils/catch-async", () => ({
             mockUpdateUser.mockResolvedValue(Object.assign(Object.assign({}, user), { id: 42, last_name: "Updated" }));
             yield invoke("update");
             (0, vitest_1.expect)(mockUpdateUser).toHaveBeenCalledTimes(1);
-            (0, vitest_1.expect)(mockUpdateUser).toHaveBeenCalledWith(42, updateData);
+            (0, vitest_1.expect)(mockUpdateUser).toHaveBeenCalledWith(42, updateData, vitest_1.expect.objectContaining({ roleSlug: "admin" }));
             expectResponse("send");
         }));
         (0, vitest_1.it)("should convert a string route ID to a number", () => __awaiter(void 0, void 0, void 0, function* () {
@@ -205,7 +230,7 @@ vitest_1.vi.mock("../../../../src/common/utils/catch-async", () => ({
             mockUpdateUser.mockResolvedValue(Object.assign(Object.assign({}, user), { id: 123 }));
             yield invoke("update");
             (0, vitest_1.expect)(mockUpdateUser).toHaveBeenCalledTimes(1);
-            (0, vitest_1.expect)(mockUpdateUser).toHaveBeenCalledWith(123, req.sanitize.data);
+            (0, vitest_1.expect)(mockUpdateUser).toHaveBeenCalledWith(123, req.sanitize.data, vitest_1.expect.objectContaining({ roleSlug: "admin" }));
             expectResponse("send");
         }));
         (0, vitest_1.it)("should forward service errors to the next middleware", () => __awaiter(void 0, void 0, void 0, function* () {

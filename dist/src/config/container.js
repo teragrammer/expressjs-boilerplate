@@ -9,7 +9,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.cleanupJob = exports.outboxWorker = exports.systemEventHandler = exports.accountService = exports.passwordRecoveryService = exports.routeGuardService = exports.authService = exports.twoFactorAuthenticationService = exports.auditService = exports.verificationService = exports.sessionService = exports.settingService = exports.tokenService = exports.userService = exports.outboxRepository = exports.refreshTokenRepository = exports.redisSubscriber = exports.redisCache = exports.securityUtil = void 0;
+exports.cleanupJob = exports.outboxWorker = exports.systemEventHandler = exports.userPurgeService = exports.accountService = exports.passwordRecoveryService = exports.routeGuardService = exports.authService = exports.twoFactorAuthenticationService = exports.auditService = exports.verificationService = exports.sessionService = exports.settingService = exports.tokenService = exports.userService = exports.outboxRepository = exports.refreshTokenRepository = exports.redisSubscriber = exports.redisCache = exports.securityUtil = void 0;
 // src/config/container.ts
 const database_1 = require("./database");
 const redis_1 = require("./redis");
@@ -43,6 +43,7 @@ const two_factor_authentication_service_1 = require("../modules/auth/two-factor-
 const password_recovery_service_1 = require("../modules/auth/password-recovery/password-recovery.service");
 const role_service_1 = require("../modules/system/roles/role.service");
 const account_service_1 = require("../modules/users/services/account.service");
+const user_purge_service_1 = require("../modules/users/services/user-purge.service");
 const verification_service_1 = require("../modules/auth/verification/verification.service");
 const audit_service_1 = require("../modules/audit/audit.service");
 // Jobs
@@ -72,7 +73,7 @@ const auditRepository = new audit_repository_1.AuditRepository(database_1.db);
 exports.outboxRepository = new outbox_repository_1.OutboxRepository(database_1.db);
 const roleService = new role_service_1.RoleService(new role_repository_1.RoleRepository());
 const dateUtil = new date_util_1.DateUtil();
-exports.userService = new user_service_1.UserService(userRepository, exports.securityUtil);
+exports.userService = new user_service_1.UserService(userRepository, exports.securityUtil, authenticationTokenRepository);
 exports.tokenService = new authentication_token_service_1.TokenService();
 // Application services
 exports.settingService = new setting_service_1.SettingService(settingRepository, exports.redisCache);
@@ -94,6 +95,7 @@ const passwordRecoveryRepository = new password_recovery_repository_1.PasswordRe
 exports.routeGuardService = new route_guard_service_1.RouteGuardService(routeGuardRepository, exports.redisCache);
 exports.passwordRecoveryService = new password_recovery_service_1.PasswordRecoveryService(exports.securityUtil, passwordRecoveryRepository, userRepository, exports.settingService, mailService, authenticationTokenRepository, dateUtil, exports.outboxRepository, exports.verificationService);
 exports.accountService = new account_service_1.AccountService(userRepository, exports.securityUtil, authenticationTokenRepository, roleService, dateUtil, exports.sessionService, exports.verificationService, passwordRecoveryRepository);
+exports.userPurgeService = new user_purge_service_1.UserPurgeService(userRepository, authenticationTokenRepository, exports.auditService);
 exports.systemEventHandler = new system_event_1.SystemEventHandler(exports.redisCache, exports.settingService, exports.routeGuardService);
 // Background jobs
 exports.outboxWorker = new outbox_worker_1.OutboxWorker(exports.outboxRepository);

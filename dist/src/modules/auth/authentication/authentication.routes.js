@@ -10,6 +10,7 @@ const register_controller_1 = require("./register.controller");
 const authentication_middleware_1 = require("../../../common/middleware/authentication.middleware");
 const validate_middleware_1 = require("../../../common/middleware/validate.middleware");
 const rate_limiter_middleware_1 = require("../../../common/middleware/rate-limiter.middleware");
+const idempotency_middleware_1 = require("../../../common/middleware/idempotency.middleware");
 const container_1 = require("../../../config/container");
 const authenticationController = new authentication_controller_1.AuthenticationController(container_1.authService, container_1.sessionService, container_1.refreshTokenRepository, container_1.auditService);
 const authenticationRefreshController = new authentication_refresh_controller_1.AuthenticationRefreshController(container_1.sessionService, container_1.auditService);
@@ -18,7 +19,10 @@ exports.default = () => {
     const router = (0, express_1.Router)();
     // Global auth rate limiter applied to all auth endpoints
     router.use(rate_limiter_middleware_1.authRateLimiters.globalAuth);
-    router.post("/register", rate_limiter_middleware_1.authRateLimiters.register, (0, validate_middleware_1.validate)(register_schema_1.registerSchema, [
+    router.post("/register", [
+        rate_limiter_middleware_1.authRateLimiters.register,
+        (0, idempotency_middleware_1.idempotency)({ scope: "auth:register" }),
+    ], (0, validate_middleware_1.validate)(register_schema_1.registerSchema, [
         "first_name",
         "middle_name",
         "last_name",

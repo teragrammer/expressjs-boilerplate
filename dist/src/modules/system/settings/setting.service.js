@@ -13,6 +13,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SettingService = void 0;
+const logger_1 = require("../../../config/logger");
+const single_flight_1 = require("../../../common/utils/single-flight");
 const errors_1 = require("../../../common/utils/errors");
 const messages_1 = __importDefault(require("../../../common/utils/messages"));
 class SettingService {
@@ -21,6 +23,11 @@ class SettingService {
         this.redisCache = redisCache;
         this.localCache = null;
         this.localCacheExpiresAt = 0;
+        /**
+         * Coalesces concurrent cache rebuilds so a cold start does not
+         * make every worker query the database at once.
+         */
+        this.singleFlight = new single_flight_1.SingleFlight();
         this.DEFAULT_TTL = 3600; // 1 hour
     }
     updateLocalMemory(settings) {
@@ -51,7 +58,7 @@ class SettingService {
                     }
                 }
                 catch (error) {
-                    console.error("Failed to read from Redis cache, falling back to DB:", error);
+                    logger_1.logger.error({ message: error.message }, "Failed to read from Redis cache, falling back to DB");
                 }
             }
             // Fallback to Database (L3) and warm caches
@@ -63,17 +70,22 @@ class SettingService {
      */
     boot() {
         return __awaiter(this, void 0, void 0, function* () {
-            const freshSettings = yield this.initializer();
-            // Warm L1 Cache
-            this.localCache = freshSettings;
-            this.localCacheExpiresAt = Date.now() + this.DEFAULT_TTL * 1000;
-            // Warm L2 Cache asynchronously to optimize thread performance
-            if (this.redisCache.isConnected()) {
-                this.redisCache.set(SettingService.CACHE_KEY, freshSettings, this.DEFAULT_TTL).catch((err) => {
-                    console.error("Failed to sync fresh settings to Redis:", err);
-                });
-            }
-            return freshSettings;
+            return this.singleFlight.run("settings", () => __awaiter(this, void 0, void 0, function* () {
+                const freshSettings = yield this.initializer();
+                // Warm L1 Cache
+                this.localCache = freshSettings;
+                this.localCacheExpiresAt =
+                    Date.now() + this.DEFAULT_TTL * 1000;
+                // Warm L2 Cache asynchronously to optimize thread performance
+                if (this.redisCache.isConnected()) {
+                    this.redisCache
+                        .set(SettingService.CACHE_KEY, freshSettings, this.DEFAULT_TTL)
+                        .catch((err) => {
+                        logger_1.logger.error({ message: err.message }, "Failed to sync fresh settings to Redis");
+                    });
+                }
+                return freshSettings;
+            }));
         });
     }
     /**
@@ -101,7 +113,7 @@ class SettingService {
                 return this.parser(settings);
             }
             catch (error) {
-                console.error(`Database retrieval failed for is_public=${is_public}:`, error);
+                logger_1.logger.error({ is_public, message: error.message }, "Database retrieval failed");
                 throw new Error("Unable to fetch configuration settings from database.", { cause: error });
             }
         });

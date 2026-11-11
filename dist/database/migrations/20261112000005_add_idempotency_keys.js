@@ -27,6 +27,7 @@ function up(db) {
             .addColumn("response_body", "jsonb")
             .addColumn("locked_at", "timestamptz")
             .addColumn("created_at", "timestamptz", (col) => col.notNull().defaultTo((0, kysely_1.sql) `now()`))
+            .addColumn("updated_at", "timestamptz", (col) => col.notNull().defaultTo((0, kysely_1.sql) `now()`))
             .addColumn("expires_at", "timestamptz", (col) => col.notNull())
             .addCheckConstraint("idempotency_keys_status_check", (0, kysely_1.sql) `status in ('in_progress', 'completed')`)
             .execute();

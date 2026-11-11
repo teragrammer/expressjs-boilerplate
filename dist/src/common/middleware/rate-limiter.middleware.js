@@ -12,11 +12,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.authRateLimiters = void 0;
+exports.authRateLimiters = exports.rateLimitControl = void 0;
 exports.createRateLimiter = createRateLimiter;
 const errors_1 = require("../utils/errors");
 const messages_1 = __importDefault(require("../utils/messages"));
 const rate_limiter_1 = require("./rate-limiter");
+const logger_1 = require("../../config/logger");
 const defaultKeyGenerator = (req) => {
     return req.ip || "unknown";
 };
@@ -36,7 +37,7 @@ function createRateLimiter(options) {
                 if (!result.allowed) {
                     const retryAfter = Math.ceil((result.resetAt - Date.now()) / 1000);
                     res.setHeader("Retry-After", Math.max(1, retryAfter));
-                    throw new errors_1.AppError(messages_1.default.RATE_LIMIT_EXCEEDED, message);
+                    throw new errors_1.AppError(messages_1.default.RATE_LIMIT_EXCEEDED, message, code);
                 }
                 // Track response for conditional counting
                 if (skipSuccessfulRequests || skipFailedRequests) {
@@ -64,7 +65,17 @@ function createRateLimiter(options) {
         });
     };
 }
-// Pre-configured limiters for common endpoints - using shared limiter instances
+/**
+ * Runtime switch for the rate limiter.
+ *
+ * The limits are enforced by default. The switch exists so a test can
+ * exercise the real limits without the rest of the suite tripping over
+ * them; it is never disabled in production.
+ */
+exports.rateLimitControl = { enabled: true };
+/**
+ * Pre-configured limiters for common endpoints - using shared limiter instances
+ */
 const globalAuthLimiter = new rate_limiter_1.RateLimiter();
 const registerLimiter = new rate_limiter_1.RateLimiter();
 const loginLimiter = new rate_limiter_1.RateLimiter();
@@ -74,26 +85,28 @@ const tfaSendLimiter = new rate_limiter_1.RateLimiter();
 const tfaValidateLimiter = new rate_limiter_1.RateLimiter();
 const logoutLimiter = new rate_limiter_1.RateLimiter();
 const refreshLimiter = new rate_limiter_1.RateLimiter();
+const verificationSendLimiter = new rate_limiter_1.RateLimiter();
+const verificationConfirmLimiter = new rate_limiter_1.RateLimiter();
 function makeRateLimiter(limiter, options) {
     const { bucket, maxRequests, windowMs, keyGenerator = defaultKeyGenerator, skipSuccessfulRequests = false, skipFailedRequests = false, message = "Too many requests, please try again later.", code = "RATE_LIMIT_EXCEEDED", } = options;
-    // In test environment, use very high limits to avoid interfering with tests
-    const isTest = process.env.NODE_ENV === "test" || process.env.VITEST === "true";
-    const testMaxRequests = isTest ? 10000 : maxRequests;
-    const testWindowMs = isTest ? 1000 : windowMs; // 1 second window in tests
     return function rateLimiterMiddleware(req, res, next) {
         return __awaiter(this, void 0, void 0, function* () {
+            if (!exports.rateLimitControl.enabled) {
+                next();
+                return;
+            }
             try {
                 const key = `${bucket}:${keyGenerator(req)}`;
-                const windowSec = Math.ceil(testWindowMs / 1000);
-                const result = yield limiter.consume(key, testMaxRequests, windowSec);
+                const windowSec = Math.ceil(windowMs / 1000);
+                const result = yield limiter.consume(key, maxRequests, windowSec);
                 // Set rate limit headers
-                res.setHeader("X-RateLimit-Limit", testMaxRequests);
-                res.setHeader("X-RateLimit-Remaining", Math.max(0, testMaxRequests - result.count));
-                res.setHeader("X-RateLimit-Reset", Math.ceil((Date.now() + testWindowMs) / 1000));
+                res.setHeader("X-RateLimit-Limit", maxRequests);
+                res.setHeader("X-RateLimit-Remaining", Math.max(0, maxRequests - result.count));
+                res.setHeader("X-RateLimit-Reset", Math.ceil((Date.now() + windowMs) / 1000));
                 if (!result.allowed) {
                     const retryAfter = Math.ceil((result.resetAt - Date.now()) / 1000);
                     res.setHeader("Retry-After", Math.max(1, retryAfter));
-                    throw new errors_1.AppError(messages_1.default.RATE_LIMIT_EXCEEDED, message);
+                    throw new errors_1.AppError(messages_1.default.RATE_LIMIT_EXCEEDED, message, code);
                 }
                 // Track response for conditional counting
                 if (skipSuccessfulRequests || skipFailedRequests) {
@@ -116,7 +129,16 @@ function makeRateLimiter(limiter, options) {
                 next();
             }
             catch (error) {
-                console.error("Rate limiter error:", error);
+                /*
+                 * The 429 the limiter raises is an expected outcome, not
+                 * an internal failure: it is forwarded without an error
+                 * log.
+                 */
+                if (error instanceof errors_1.AppError) {
+                    next(error);
+                    return;
+                }
+                logger_1.logger.error({ message: error.message }, "Rate limiter error");
                 next(error);
             }
         });
@@ -176,6 +198,20 @@ exports.authRateLimiters = {
         maxRequests: 30,
         windowMs: 60 * 1000, // 30 per minute
         message: "Too many token refresh attempts, please try again later.",
+    }),
+    verificationSend: makeRateLimiter(verificationSendLimiter, {
+        bucket: "auth:verification_send",
+        maxRequests: 3,
+        windowMs: 15 * 60 * 1000, // 3 per 15 minutes
+        keyGenerator: (req) => { var _a, _b; return `user:${((_b = (_a = req.credentials) === null || _a === void 0 ? void 0 : _a.jwt) === null || _b === void 0 ? void 0 : _b.uid) || "unknown"}`; },
+        message: "Too many verification requests, please try again later.",
+    }),
+    verificationConfirm: makeRateLimiter(verificationConfirmLimiter, {
+        bucket: "auth:verification_confirm",
+        maxRequests: 5,
+        windowMs: 15 * 60 * 1000, // 5 per 15 minutes
+        keyGenerator: (req) => { var _a, _b; return `user:${((_b = (_a = req.credentials) === null || _a === void 0 ? void 0 : _a.jwt) === null || _b === void 0 ? void 0 : _b.uid) || "unknown"}`; },
+        message: "Too many verification attempts, please try again later.",
     }),
     globalAuth: makeRateLimiter(globalAuthLimiter, {
         bucket: "auth:global",

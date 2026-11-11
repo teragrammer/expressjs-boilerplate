@@ -10,7 +10,7 @@ const setting_controller_1 = require("./setting.controller");
 const setting_service_1 = require("./setting.service");
 const setting_repository_1 = require("./setting.repository");
 const container_1 = require("../../../config/container");
-const settingController = new setting_controller_1.SettingController(new setting_service_1.SettingService(new setting_repository_1.SettingRepository(), container_1.redisCache));
+const settingController = new setting_controller_1.SettingController(new setting_service_1.SettingService(new setting_repository_1.SettingRepository(), container_1.redisCache), container_1.auditService);
 exports.default = () => {
     const router = (0, express_1.Router)();
     router.post("/", [

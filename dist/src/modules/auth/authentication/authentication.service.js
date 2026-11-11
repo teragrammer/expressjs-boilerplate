@@ -77,6 +77,7 @@ class AuthenticationService {
                 sessionId: newUser.session.id,
                 expiresAt: issued.expiresAt,
                 tfaRequired: false,
+                userId: newUser.created.id,
             };
         });
     }
@@ -152,7 +153,7 @@ class AuthenticationService {
                 metadata,
             });
             metrics_1.authAttemptsTotal.inc({ event: "login", outcome: "success" });
-            return Object.assign(Object.assign({}, issued), { tfaRequired });
+            return Object.assign(Object.assign({}, issued), { tfaRequired, userId: user.id });
         });
     }
     /**

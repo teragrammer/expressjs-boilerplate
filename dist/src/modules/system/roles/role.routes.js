@@ -10,7 +10,8 @@ const role_update_schema_1 = require("./role-update.schema");
 const role_controller_1 = require("./role.controller");
 const role_service_1 = require("./role.service");
 const role_repository_1 = require("./role.repository");
-const roleController = new role_controller_1.RoleController(new role_service_1.RoleService(new role_repository_1.RoleRepository()));
+const container_1 = require("../../../config/container");
+const roleController = new role_controller_1.RoleController(new role_service_1.RoleService(new role_repository_1.RoleRepository()), container_1.auditService);
 exports.default = () => {
     const router = (0, express_1.Router)();
     router.post("/", [

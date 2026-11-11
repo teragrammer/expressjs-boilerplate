@@ -63,8 +63,13 @@ vitest_1.vi.mock("../../../../src/common/utils/catch-async", () => ({
         (0, vitest_1.expect)(res.json).not.toHaveBeenCalled();
         (0, vitest_1.expect)(res.send).not.toHaveBeenCalled();
     };
+    let auditService;
     (0, vitest_1.beforeEach)(() => {
         vitest_1.vi.resetAllMocks();
+        auditService = {
+            success: vitest_1.vi.fn(),
+            failure: vitest_1.vi.fn(),
+        };
         const roleService = {
             createRole: mockCreateRole,
             updateRole: mockUpdateRole,
@@ -72,7 +77,7 @@ vitest_1.vi.mock("../../../../src/common/utils/catch-async", () => ({
             findById: mockFindById,
             hardDelete: mockHardDelete,
         };
-        controller = new role_controller_1.RoleController(roleService);
+        controller = new role_controller_1.RoleController(roleService, auditService);
         res = {
             status: vitest_1.vi.fn().mockReturnThis(),
             json: vitest_1.vi.fn().mockReturnThis(),

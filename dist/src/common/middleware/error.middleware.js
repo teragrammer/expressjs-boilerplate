@@ -85,6 +85,21 @@ const errorHandler = (err, _req, res, _next) => {
     const requestId = (0, request_context_1.getRequestId)();
     // Handle Joi validation failures cleanly.
     if (err instanceof joi_1.default.ValidationError) {
+        /*
+         * A uniqueness conflict is a conflict, not a validation error:
+         * the client learns that the value is taken, which is what
+         * lets it show a field-level message and retry with another
+         * value.
+         */
+        const hasConflict = err.details.some((detail) => detail.type === "any.unique");
+        if (hasConflict) {
+            res.status(409).json({
+                code: messages_1.default.DUPLICATE_DATA.code,
+                message: messages_1.default.DUPLICATE_DATA.message,
+                errors: formatValidationErrors(err),
+            });
+            return;
+        }
         res.status(422).json({
             code: messages_1.default.VALIDATION_FAILED.code,
             message: messages_1.default.VALIDATION_FAILED.message,

@@ -15,11 +15,13 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.UserService = void 0;
 const errors_1 = require("../../../common/utils/errors");
 const messages_1 = __importDefault(require("../../../common/utils/messages"));
+const policy_1 = require("../../../common/authz/policy");
 class UserService {
     // Dependency injection allows passing a mock repository during testing
-    constructor(userRepository, securityUtil) {
+    constructor(userRepository, securityUtil, authenticationTokenRepository) {
         this.userRepository = userRepository;
         this.securityUtil = securityUtil;
+        this.authenticationTokenRepository = authenticationTokenRepository;
     }
     /**
      * Handles business logic for creating a user under registration form
@@ -48,8 +50,16 @@ class UserService {
             return this.userRepository.create(data, executor);
         });
     }
-    createUser(data) {
+    createUser(data, actor) {
         return __awaiter(this, void 0, void 0, function* () {
+            /*
+             * Privileged fields (role, status, password) may only be set
+             * by an administrator. The check lives in the service so every
+             * entry point is covered, not only the HTTP route.
+             */
+            if (actor) {
+                (0, policy_1.assertCanChangePrivilegedFields)(actor, Object.keys(data));
+            }
             if (data.password !== null && typeof data.password !== "undefined") {
                 data.password = yield this.securityUtil.hash(data.password);
             }
@@ -60,8 +70,11 @@ class UserService {
             return user;
         });
     }
-    updateUser(id, data) {
+    updateUser(id, data, actor) {
         return __awaiter(this, void 0, void 0, function* () {
+            if (actor) {
+                (0, policy_1.assertCanChangePrivilegedFields)(actor, Object.keys(data));
+            }
             // First check current user to compare role_id and status
             const currentUser = yield this.userRepository.findAuthById(id);
             if (!currentUser) {
@@ -80,6 +93,14 @@ class UserService {
             const user = yield this.userRepository.update(id, data);
             if (!user) {
                 throw new errors_1.AppError(messages_1.default.DATA_NOT_FOUND);
+            }
+            /*
+             * A role or status change must take effect immediately: the
+             * sessions of the affected user are revoked so the old
+             * permissions cannot be used until the next login.
+             */
+            if (roleChanged || statusChanged) {
+                yield this.authenticationTokenRepository.deleteAllByUserId(id);
             }
             return user;
         });
@@ -114,11 +135,21 @@ class UserService {
             return user;
         });
     }
+    /**
+     * Soft-deletes a user and revokes its sessions.
+     *
+     * The row is kept (with `deleted_at` set) so the account history
+     * and the audit trail stay intact, and every session is revoked so
+     * the deleted account cannot keep using an existing token.
+     */
     softDelete(id) {
         return __awaiter(this, void 0, void 0, function* () {
-            if (!(yield this.userRepository.softDelete(id))) {
-                throw new errors_1.AppError(messages_1.default.DELETE_FAILED);
+            const user = yield this.userRepository.findAuthById(id);
+            if (!user) {
+                throw new errors_1.AppError(messages_1.default.DATA_NOT_FOUND);
             }
+            yield this.userRepository.softDelete(id);
+            yield this.authenticationTokenRepository.deleteAllByUserId(id);
         });
     }
     hardDelete(id) {

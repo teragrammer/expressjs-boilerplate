@@ -6,9 +6,16 @@ exports.AppError = void 0;
  * Allows throwing errors with custom HTTP status codes and API error codes.
  */
 class AppError extends Error {
-    constructor(errMeta, customMessage) {
+    constructor(errMeta, customMessage, 
+    /**
+     * Overrides the machine-readable code of the error.
+     *
+     * Used when the same status is reported under several codes,
+     * for example the rate limiter's per-bucket codes.
+     */
+    code) {
         super(customMessage !== null && customMessage !== void 0 ? customMessage : errMeta.message);
-        this.errorCode = errMeta.code;
+        this.errorCode = code !== null && code !== void 0 ? code : errMeta.code;
         this.statusCode = errMeta.status;
         Object.setPrototypeOf(this, new.target.prototype);
         Error.captureStackTrace(this, this.constructor);

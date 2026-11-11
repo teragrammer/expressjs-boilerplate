@@ -190,4 +190,32 @@ const security_util_1 = require("./security.util");
             yield (0, vitest_1.expect)(secureUtilWithConfig.unshield(`v9:${iv}:${authTag}:${content}`)).rejects.toThrow("Invalid encrypted payload structure");
         }));
     });
+    (0, vitest_1.describe)("Long password handling", () => {
+        (0, vitest_1.it)("hashes and verifies a password longer than the bcrypt limit", () => __awaiter(void 0, void 0, void 0, function* () {
+            const longPassword = "a".repeat(100);
+            const hashed = yield secureUtilWithConfig.hash(longPassword);
+            (0, vitest_1.expect)(yield secureUtilWithConfig.compare(hashed, longPassword)).toBe(true);
+        }));
+        (0, vitest_1.it)("does not truncate the tail of a long password", () => __awaiter(void 0, void 0, void 0, function* () {
+            const base = "a".repeat(100);
+            const hashed = yield secureUtilWithConfig.hash(base);
+            // A password that shares the first 72 bytes must not match.
+            (0, vitest_1.expect)(yield secureUtilWithConfig.compare(hashed, `${"a".repeat(72)}different`)).toBe(false);
+        }));
+        (0, vitest_1.it)("verifies a password with multi-byte characters", () => __awaiter(void 0, void 0, void 0, function* () {
+            const password = "こんにちは🌟🧑‍💻 Cryptographic Test 🚀";
+            const hashed = yield secureUtilWithConfig.hash(password);
+            (0, vitest_1.expect)(yield secureUtilWithConfig.compare(hashed, password)).toBe(true);
+        }));
+        (0, vitest_1.it)("still verifies a password created under the previous policy", () => __awaiter(void 0, void 0, void 0, function* () {
+            /*
+             * A password at or below the bcrypt limit keeps the same
+             * material, so hashes created before the change still
+             * verify.
+             */
+            const password = "Short1!";
+            const hashed = yield secureUtilWithConfig.hash(password);
+            (0, vitest_1.expect)(yield secureUtilWithConfig.compare(hashed, password)).toBe(true);
+        }));
+    });
 });

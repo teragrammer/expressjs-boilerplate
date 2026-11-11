@@ -107,10 +107,19 @@ describe("UserService", () => {
             deleteAllByUserId: vi.fn().mockResolvedValue(0),
         };
 
+        /*
+         * The transaction runner is faked so the unit test does not
+         * need a database; the callback is invoked with a stub
+         * executor.
+         */
+        const runInTransaction = (async (callback: any) =>
+            callback({})) as never;
+
         service = new UserService(
             userRepository as unknown as UserRepository,
             securityUtil as unknown as SecurityUtil,
             authenticationTokenRepository as unknown as AuthenticationTokenRepository,
+            runInTransaction,
         );
 
         // Default mock for findAuthById to return the mockUser
@@ -509,6 +518,8 @@ describe("UserService", () => {
                     role_id: 2,
                     authorization_version: 1,
                 }),
+                undefined,
+                expect.anything(),
             );
         });
 
@@ -530,6 +541,8 @@ describe("UserService", () => {
                     status: "Suspended",
                     authorization_version: 1,
                 }),
+                undefined,
+                expect.anything(),
             );
         });
     });

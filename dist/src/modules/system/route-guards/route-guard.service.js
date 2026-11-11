@@ -14,6 +14,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.RouteGuardService = void 0;
 const errors_1 = require("../../../common/utils/errors");
+const single_flight_1 = require("../../../common/utils/single-flight");
+const logger_1 = require("../../../config/logger");
 const messages_1 = __importDefault(require("../../../common/utils/messages"));
 class RouteGuardService {
     constructor(routeGuardRepository, redisCache) {
@@ -21,6 +23,11 @@ class RouteGuardService {
         this.redisCache = redisCache;
         this.localCache = null;
         this.localCacheExpiresAt = 0;
+        /**
+         * Coalesces concurrent cache rebuilds so a cold start does not
+         * make every worker query the database at once.
+         */
+        this.singleFlight = new single_flight_1.SingleFlight();
         this.DEFAULT_TTL = 3600; // 1 Hour
     }
     updateLocalMemory(guards) {
@@ -51,7 +58,7 @@ class RouteGuardService {
                     }
                 }
                 catch (error) {
-                    console.error("Redis error reading route guards, falling back to DB:", error);
+                    logger_1.logger.error({ message: error.message }, "Redis error reading route guards, falling back to DB");
                 }
             }
             // 3. Fallback to Database (L3) and warm caches
@@ -63,17 +70,22 @@ class RouteGuardService {
      */
     boot() {
         return __awaiter(this, void 0, void 0, function* () {
-            const freshGuards = yield this.initializer();
-            // Warm L1 Cache
-            this.localCache = freshGuards;
-            this.localCacheExpiresAt = Date.now() + this.DEFAULT_TTL * 1000;
-            // Warm L2 Cache asynchronously to optimize performance
-            if (this.redisCache.isConnected()) {
-                this.redisCache.set(RouteGuardService.CACHE_KEY, freshGuards, this.DEFAULT_TTL).catch((err) => {
-                    console.error("Failed to update route guards in Redis:", err);
-                });
-            }
-            return freshGuards;
+            return this.singleFlight.run("route_guards", () => __awaiter(this, void 0, void 0, function* () {
+                const freshGuards = yield this.initializer();
+                // Warm L1 Cache
+                this.localCache = freshGuards;
+                this.localCacheExpiresAt =
+                    Date.now() + this.DEFAULT_TTL * 1000;
+                // Warm L2 Cache asynchronously to optimize performance
+                if (this.redisCache.isConnected()) {
+                    this.redisCache
+                        .set(RouteGuardService.CACHE_KEY, freshGuards, this.DEFAULT_TTL)
+                        .catch((err) => {
+                        logger_1.logger.error({ message: err.message }, "Failed to update route guards in Redis");
+                    });
+                }
+                return freshGuards;
+            }));
         });
     }
     /**

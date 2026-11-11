@@ -4,12 +4,24 @@ import {BrowseUsersQuery, BrowseUsersResult, CreateUserDTO, UpdateUserDTO, User}
 import {AppError} from "../../../common/utils/errors";
 import Messages from "../../../common/utils/messages";
 import {SecurityUtil} from "../../../common/utils/security.util";
-import type {DatabaseExecutor} from "../../../config/database";
+import {
+    type DatabaseExecutor,
+    withTransaction,
+} from "../../../config/database";
+import type {Transaction} from "kysely";
+import type {Database} from "../../../config/schema";
 import {
     Actor,
     assertCanChangePrivilegedFields,
 } from "../../../common/authz/policy";
 import {AuthenticationTokenRepository} from "../../auth/authentication/authentication-token.repository";
+
+/**
+ * Runs a callback inside a database transaction.
+ */
+export type TransactionRunner = <T>(
+    callback: (trx: Transaction<Database>) => Promise<T>,
+) => Promise<T>;
 
 export class UserService {
     // Dependency injection allows passing a mock repository during testing
@@ -17,6 +29,7 @@ export class UserService {
         private userRepository: UserRepository,
         private readonly securityUtil: SecurityUtil,
         private readonly authenticationTokenRepository: AuthenticationTokenRepository,
+        private readonly runInTransaction: TransactionRunner = withTransaction,
     ) {
     }
 
@@ -114,19 +127,43 @@ export class UserService {
             data.password = await this.securityUtil.hash(data.password);
         }
 
-        const user: User | null = await this.userRepository.update(id, data);
-        if (!user) {throw new AppError(Messages.DATA_NOT_FOUND);}
+        if (!roleChanged && !statusChanged) {
+            const user: User | null = await this.userRepository.update(id, data);
+
+            if (!user) {throw new AppError(Messages.DATA_NOT_FOUND);}
+
+            return user;
+        }
 
         /*
          * A role or status change must take effect immediately: the
          * sessions of the affected user are revoked so the old
          * permissions cannot be used until the next login.
+         *
+         * The update and the revocation happen in one transaction, so
+         * a failure cannot leave a user with new permissions and a live
+         * session.
          */
-        if (roleChanged || statusChanged) {
-            await this.authenticationTokenRepository.deleteAllByUserId(id);
-        }
+        return this.runInTransaction(async (trx) => {
+            const updated = await this.userRepository.update(
+                id,
+                data,
+                undefined,
+                trx,
+            );
 
-        return user;
+            if (!updated) {
+                throw new AppError(Messages.DATA_NOT_FOUND);
+            }
+
+            await this.authenticationTokenRepository.deleteAllByUserId(
+                id,
+                undefined,
+                trx,
+            );
+
+            return updated;
+        });
     }
 
     async browseUsers(

@@ -17,11 +17,19 @@ const messages_1 = require("../../../common/utils/messages");
 const catch_async_1 = __importDefault(require("../../../common/utils/catch-async"));
 const errors_1 = require("../../../common/utils/errors");
 const query_parser_1 = require("../../../common/utils/query-parser");
+const audit_interface_1 = require("../../audit/audit.interface");
 class RoleController {
-    constructor(roleService) {
+    constructor(roleService, auditService) {
         this.roleService = roleService;
+        this.auditService = auditService;
         this.create = (0, catch_async_1.default)((req, res) => __awaiter(this, void 0, void 0, function* () {
             const role = yield this.roleService.createRole(req.sanitize.data);
+            yield this.auditService.success(audit_interface_1.AUDIT_ACTIONS.ROLE_CREATED, {
+                request: req,
+                targetType: "role",
+                targetId: role.id,
+                metadata: { slug: role.slug },
+            });
             res.status(201).json({ id: role.id });
         }));
         this.update = (0, catch_async_1.default)((req, res) => __awaiter(this, void 0, void 0, function* () {
@@ -62,6 +70,11 @@ class RoleController {
                 throw new errors_1.AppError(messages_1.Messages.INVALID_PATH_PARAM);
             }
             yield this.roleService.hardDelete(id);
+            yield this.auditService.success(audit_interface_1.AUDIT_ACTIONS.ROLE_DELETED, {
+                request: req,
+                targetType: "role",
+                targetId: id,
+            });
             res.status(200).send();
         }));
     }

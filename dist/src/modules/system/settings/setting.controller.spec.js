@@ -68,8 +68,13 @@ vitest_1.vi.mock("../../../../src/common/utils/catch-async", () => ({
         (0, vitest_1.expect)(res.json).not.toHaveBeenCalled();
         (0, vitest_1.expect)(res.send).not.toHaveBeenCalled();
     };
+    let auditService;
     (0, vitest_1.beforeEach)(() => {
         vitest_1.vi.resetAllMocks();
+        auditService = {
+            success: vitest_1.vi.fn(),
+            failure: vitest_1.vi.fn(),
+        };
         const settingService = {
             createSetting: mockCreateSetting,
             updateSetting: mockUpdateSetting,
@@ -79,7 +84,7 @@ vitest_1.vi.mock("../../../../src/common/utils/catch-async", () => ({
             findById: mockFindById,
             hardDelete: mockHardDelete,
         };
-        controller = new setting_controller_1.SettingController(settingService);
+        controller = new setting_controller_1.SettingController(settingService, auditService);
         res = {
             status: vitest_1.vi.fn().mockReturnThis(),
             json: vitest_1.vi.fn().mockReturnThis(),

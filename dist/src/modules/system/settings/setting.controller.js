@@ -17,11 +17,19 @@ const messages_1 = require("../../../common/utils/messages");
 const catch_async_1 = __importDefault(require("../../../common/utils/catch-async"));
 const errors_1 = require("../../../common/utils/errors");
 const query_parser_1 = require("../../../common/utils/query-parser");
+const audit_interface_1 = require("../../audit/audit.interface");
 class SettingController {
-    constructor(settingService) {
+    constructor(settingService, auditService) {
         this.settingService = settingService;
+        this.auditService = auditService;
         this.create = (0, catch_async_1.default)((req, res) => __awaiter(this, void 0, void 0, function* () {
             const setting = yield this.settingService.createSetting(req.sanitize.data);
+            yield this.auditService.success(audit_interface_1.AUDIT_ACTIONS.SETTING_CREATED, {
+                request: req,
+                targetType: "setting",
+                targetId: setting.id,
+                metadata: { slug: setting.slug },
+            });
             res.status(201).json({ id: setting.id });
         }));
         this.update = (0, catch_async_1.default)((req, res) => __awaiter(this, void 0, void 0, function* () {
@@ -74,6 +82,11 @@ class SettingController {
                 throw new errors_1.AppError(messages_1.Messages.INVALID_PATH_PARAM);
             }
             yield this.settingService.hardDelete(id);
+            yield this.auditService.success(audit_interface_1.AUDIT_ACTIONS.SETTING_DELETED, {
+                request: req,
+                targetType: "setting",
+                targetId: id,
+            });
             res.status(200).send();
         }));
     }

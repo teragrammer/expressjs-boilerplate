@@ -1,5 +1,38 @@
 "use strict";
 // src/common/utils/security.util.ts
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -14,7 +47,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SecurityUtil = void 0;
-const crypto_1 = __importDefault(require("crypto"));
+const crypto_1 = __importStar(require("crypto"));
 const bcrypt_1 = __importDefault(require("bcrypt"));
 /**
  * Context string for the HKDF key derivation.
@@ -27,6 +60,13 @@ const HKDF_CONTEXT = "express-api:cache:v1";
  * Length of the derived AES-256 key in bytes.
  */
 const AES_KEY_LENGTH = 32;
+/**
+ * The maximum number of bytes bcrypt reads from its input.
+ *
+ * Anything beyond this is silently ignored, so a longer password is
+ * folded into a digest first.
+ */
+const BCRYPT_MAX_INPUT_BYTES = 72;
 class SecurityUtil {
     // Defaults to empty object if no config is injected
     constructor(config = {}) {
@@ -85,6 +125,24 @@ class SecurityUtil {
         return Buffer.from(data, "base64url").toString("utf8");
     }
     /**
+     * The material that is actually hashed.
+     *
+     * bcrypt ignores everything past 72 bytes, so a longer password
+     * would silently lose its tail. Such a password is folded into a
+     * SHA-256 digest first; the digest is 64 characters, so the whole
+     * secret still fits.
+     *
+     * The rule depends only on the plaintext, so a hash created with
+     * one rule verifies with the other.
+     */
+    hashMaterial(plain) {
+        const byteLength = Buffer.byteLength(plain, "utf8");
+        if (byteLength <= BCRYPT_MAX_INPUT_BYTES) {
+            return plain;
+        }
+        return `sha256:${(0, crypto_1.createHash)("sha256").update(plain).digest("hex")}`;
+    }
+    /**
      * CONFIG OPTIONAL (Requires method parameter if constructor config missing)
      */
     hash(plain, secret) {
@@ -96,7 +154,7 @@ class SecurityUtil {
             }
             const saltRounds = (_a = this.config.bcryptSaltRounds) !== null && _a !== void 0 ? _a : 10;
             const salt = yield bcrypt_1.default.genSalt(saltRounds);
-            return bcrypt_1.default.hash(`${plain}.${pepper}`, salt);
+            return bcrypt_1.default.hash(`${this.hashMaterial(plain)}.${pepper}`, salt);
         });
     }
     /**
@@ -108,7 +166,7 @@ class SecurityUtil {
             if (!pepper) {
                 throw new Error("SecurityUtil Error: A bcrypt secret must be provided via constructor or function parameter.");
             }
-            return bcrypt_1.default.compare(`${plain}.${pepper}`, hashed);
+            return bcrypt_1.default.compare(`${this.hashMaterial(plain)}.${pepper}`, hashed);
         });
     }
     /**

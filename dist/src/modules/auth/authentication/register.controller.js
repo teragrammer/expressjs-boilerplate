@@ -25,7 +25,7 @@ class RegisterController {
         this.authService = authService;
         this.auditService = auditService;
         this.create = (0, catch_async_1.default)((req, res) => __awaiter(this, void 0, void 0, function* () {
-            var _a;
+            var _a, _b, _c;
             // Delegate to Business Service
             const result = yield this.authService.register(req.sanitize.data, Object.assign(Object.assign({ ip: (0, request_info_1.getClientIp)(req) }, (0, request_info_1.getUserAgentInfo)(req)), { userAgent: (_a = (0, request_info_1.getUserAgent)(req)) !== null && _a !== void 0 ? _a : null }));
             if (result.refreshToken) {
@@ -33,8 +33,9 @@ class RegisterController {
             }
             yield this.auditService.success(audit_interface_1.AUDIT_ACTIONS.USER_CREATED, {
                 request: req,
+                actorUserId: (_b = result.userId) !== null && _b !== void 0 ? _b : null,
                 targetType: "user",
-                targetId: result.sessionId,
+                targetId: (_c = result.userId) !== null && _c !== void 0 ? _c : null,
             });
             res.status(201).json({
                 token: result.accessToken,

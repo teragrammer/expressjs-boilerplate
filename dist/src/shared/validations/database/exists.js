@@ -17,6 +17,7 @@ exports.validateExists = void 0;
 const joi_1 = __importDefault(require("joi"));
 const kysely_1 = require("kysely");
 const database_1 = require("../../../config/database");
+const logger_1 = require("../../../config/logger");
 const validateExists = (table, { column = 'id', db = database_1.db } = {}) => {
     const validIdentifierRegex = /^[a-zA-Z0-9_]+$/;
     if (!validIdentifierRegex.test(table) || !validIdentifierRegex.test(column)) {
@@ -41,7 +42,7 @@ const validateExists = (table, { column = 'id', db = database_1.db } = {}) => {
                 .executeTakeFirst();
         }
         catch (error) {
-            console.error(`Database validation error on ${table}.${column}:`, error);
+            logger_1.logger.error({ table, column, message: error.message }, "Database validation error");
             throw new joi_1.default.ValidationError('database.error', [
                 {
                     message: 'An internal validation error occurred.',

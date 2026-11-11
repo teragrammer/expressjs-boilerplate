@@ -11,6 +11,7 @@ const user_routes_1 = __importDefault(require("../modules/users/user.routes"));
 const setting_routes_1 = __importDefault(require("../modules/system/settings/setting.routes"));
 const role_routes_1 = __importDefault(require("../modules/system/roles/role.routes"));
 const route_guard_routes_1 = __importDefault(require("../modules/system/route-guards/route-guard.routes"));
+const audit_routes_1 = __importDefault(require("../modules/audit/audit.routes"));
 exports.default = () => {
     const router = (0, express_1.Router)();
     router.use("/auth", (0, auth_routes_1.default)());
@@ -19,5 +20,6 @@ exports.default = () => {
     router.use("/settings", (0, setting_routes_1.default)());
     router.use("/roles", (0, role_routes_1.default)());
     router.use("/route/guards", (0, route_guard_routes_1.default)());
+    router.use("/audit", (0, audit_routes_1.default)());
     return router;
 };

@@ -19,6 +19,7 @@ const user_service_1 = require("./user.service");
     let service;
     let userRepository;
     let securityUtil;
+    let authenticationTokenRepository;
     const mockUser = {
         id: 42,
         first_name: "John",
@@ -82,7 +83,10 @@ const user_service_1 = require("./user.service");
         securityUtil = {
             hash: vitest_1.vi.fn(),
         };
-        service = new user_service_1.UserService(userRepository, securityUtil);
+        authenticationTokenRepository = {
+            deleteAllByUserId: vitest_1.vi.fn().mockResolvedValue(0),
+        };
+        service = new user_service_1.UserService(userRepository, securityUtil, authenticationTokenRepository);
         // Default mock for findAuthById to return the mockUser
         userRepository.findAuthById.mockResolvedValue(mockUser);
     });

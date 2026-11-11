@@ -17,6 +17,7 @@ exports.validateCompositeUnique = exports.validateUnique = void 0;
 const joi_1 = __importDefault(require("joi"));
 const kysely_1 = require("kysely");
 const database_1 = require("../../../config/database");
+const logger_1 = require("../../../config/logger");
 /**
  * Validates uniqueness for a **scalar** field (single column).
  * When attached via Joi's `.external()`, Joi passes the scalar value directly.
@@ -45,7 +46,7 @@ const validateUnique = (table, column, { ignoreId, idColumn = 'id', db = databas
             row = yield query.executeTakeFirst();
         }
         catch (error) {
-            console.error(`Database unique validation error on ${table}.${column}:`, error);
+            logger_1.logger.error({ table, column, message: error.message }, "Database unique validation error");
             throw new joi_1.default.ValidationError('database.error', [
                 {
                     message: 'An internal validation error occurred.',
@@ -99,7 +100,7 @@ const validateCompositeUnique = (table, columns, { ignoreId, idColumn = 'id', db
             row = yield query.executeTakeFirst();
         }
         catch (error) {
-            console.error(`Database unique validation error on ${table} [${columns.join(', ')}]:`, error);
+            logger_1.logger.error({ table, columns, message: error.message }, "Database unique validation error");
             throw new joi_1.default.ValidationError('database.error', [
                 {
                     message: 'An internal validation error occurred.',

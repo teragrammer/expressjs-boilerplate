@@ -42,23 +42,35 @@ function configureSecurity(app) {
     // Parse CORS origins
     let corsOrigin;
     const isProduction = environment_1.__ENV.NODE_ENV === "production";
+    /*
+     * The development allowlist.
+     *
+     * A wildcard is never expanded into "reflect any origin": with
+     * `credentials: true` that lets any website read authenticated
+     * responses from a developer machine.
+     */
+    const developmentOrigins = [
+        "http://localhost:3000",
+        "http://localhost:4000",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:4000",
+    ];
     if (!environment_1.__ENV.CORS_ORIGINS || environment_1.__ENV.CORS_ORIGINS.trim() === "") {
         if (isProduction) {
             throw new Error("CORS_ORIGINS must be explicitly set in production");
         }
-        // Development: allow localhost origins
-        corsOrigin = [
-            "http://localhost:3000",
-            "http://localhost:4000",
-            "http://127.0.0.1:3000",
-            "http://127.0.0.1:4000",
-        ];
+        // Development: allow the local origins only.
+        corsOrigin = developmentOrigins;
     }
-    else if (environment_1.__ENV.CORS_ORIGINS === "*") {
+    else if (environment_1.__ENV.CORS_ORIGINS.trim() === "*") {
         if (isProduction) {
             throw new Error("CORS wildcard (*) is not allowed in production with credentials");
         }
-        corsOrigin = true; // Allow all in development only
+        /*
+         * Development: the wildcard means "the local origins", not
+         * "any origin".
+         */
+        corsOrigin = developmentOrigins;
     }
     else {
         corsOrigin = environment_1.__ENV.CORS_ORIGINS.split(",").map((o) => o.trim()).filter(Boolean);

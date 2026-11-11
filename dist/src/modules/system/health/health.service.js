@@ -10,6 +10,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.HealthService = void 0;
+exports.probeDatabase = probeDatabase;
+exports.probeRedis = probeRedis;
 // src/modules/system/health/health.service.ts
 const kysely_1 = require("kysely");
 const database_1 = require("../../../config/database");
@@ -22,11 +24,10 @@ const logger_1 = require("../../../config/logger");
  * not translate into a database query per second.
  */
 const READINESS_TTL_MS = 5000;
-let cachedReport = null;
 /**
  * Checks PostgreSQL with a lightweight query.
  */
-function checkDatabase() {
+function probeDatabase() {
     return __awaiter(this, arguments, void 0, function* (executor = database_1.db) {
         try {
             yield (0, kysely_1.sql) `SELECT 1`.execute(executor);
@@ -41,7 +42,7 @@ function checkDatabase() {
 /**
  * Checks Redis when it is configured.
  */
-function checkRedis() {
+function probeRedis() {
     if (!redis_1.DBRedis.publisher) {
         return "disabled";
     }
@@ -49,6 +50,17 @@ function checkRedis() {
     return status === "ready" || status === "connect" ? "up" : "down";
 }
 class HealthService {
+    constructor(databaseProbe = () => probeDatabase(), redisProbe = probeRedis) {
+        this.databaseProbe = databaseProbe;
+        this.redisProbe = redisProbe;
+        /**
+         * The cached readiness result.
+         *
+         * The cache belongs to the instance: two services with different
+         * probes must not share a result.
+         */
+        this.cachedReport = null;
+    }
     /**
      * Liveness: the process is up and the event loop is responsive.
      *
@@ -69,18 +81,19 @@ class HealthService {
      */
     ready() {
         return __awaiter(this, void 0, void 0, function* () {
-            if (cachedReport && cachedReport.expiresAt > Date.now()) {
-                return cachedReport.report;
+            if (this.cachedReport &&
+                this.cachedReport.expiresAt > Date.now()) {
+                return this.cachedReport.report;
             }
-            const database = yield checkDatabase();
-            const redis = checkRedis();
+            const database = yield this.databaseProbe();
+            const redis = this.redisProbe();
             const report = {
                 status: database === "up" && redis !== "down"
                     ? "ready"
                     : "not_ready",
                 dependencies: { database, redis },
             };
-            cachedReport = {
+            this.cachedReport = {
                 report,
                 expiresAt: Date.now() + READINESS_TTL_MS,
             };
