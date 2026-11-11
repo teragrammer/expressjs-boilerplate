@@ -3,6 +3,7 @@ import {NextFunction, Request, Response} from "express";
 
 import {RoleController} from "./role.controller";
 import {RoleService} from "./role.service";
+import {AuditService} from "../../audit/audit.service";
 import {
     BrowseRoleQuery,
     CreateRoleDTO,
@@ -111,8 +112,18 @@ describe("RoleController", () => {
         expect(res.send).not.toHaveBeenCalled();
     };
 
+    let auditService: {
+        success: ReturnType<typeof vi.fn>;
+        failure: ReturnType<typeof vi.fn>;
+    };
+
     beforeEach(() => {
         vi.resetAllMocks();
+
+        auditService = {
+            success: vi.fn(),
+            failure: vi.fn(),
+        };
 
         const roleService = {
             createRole: mockCreateRole,
@@ -122,7 +133,10 @@ describe("RoleController", () => {
             hardDelete: mockHardDelete,
         } as unknown as RoleService;
 
-        controller = new RoleController(roleService);
+        controller = new RoleController(
+            roleService,
+            auditService as unknown as AuditService,
+        );
 
         res = {
             status: vi.fn().mockReturnThis(),

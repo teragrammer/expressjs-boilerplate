@@ -25,6 +25,13 @@ import {__ENV} from "../../../config/environment";
 
 export interface AuthenticatedResult extends IssuedTokens {
     tfaRequired?: boolean;
+    /**
+     * The authenticated user.
+     *
+     * The login and registration routes are public, so the audit
+     * trail cannot take the actor from the request credentials.
+     */
+    userId?: number;
 }
 
 export class AuthenticationService {
@@ -117,6 +124,7 @@ export class AuthenticationService {
             sessionId: newUser.session.id,
             expiresAt: issued.expiresAt,
             tfaRequired: false,
+            userId: newUser.created.id,
         };
     }
 
@@ -232,7 +240,7 @@ export class AuthenticationService {
 
         authAttemptsTotal.inc({event: "login", outcome: "success"});
 
-        return {...issued, tfaRequired};
+        return {...issued, tfaRequired, userId: user.id};
     }
 
     /**

@@ -57,7 +57,9 @@ export class AuthenticationController {
 
         await this.auditService.success(AUDIT_ACTIONS.AUTH_LOGIN_SUCCEEDED, {
             request: req,
+            actorUserId: result.userId ?? null,
             targetType: "user",
+            targetId: result.userId ?? null,
         });
 
         res.status(200).json({

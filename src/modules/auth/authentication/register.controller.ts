@@ -47,8 +47,9 @@ export class RegisterController {
 
         await this.auditService.success(AUDIT_ACTIONS.USER_CREATED, {
             request: req,
+            actorUserId: result.userId ?? null,
             targetType: "user",
-            targetId: result.sessionId,
+            targetId: result.userId ?? null,
         });
 
         res.status(201).json({

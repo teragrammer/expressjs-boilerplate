@@ -1,4 +1,5 @@
 // src/modules/users/controllers/user.controller.ts
+// src/modules/users/controllers/user.controller.ts
 import {Request, Response} from "express";
 import catchAsync from "../../../common/utils/catch-async";
 import {UserService} from "../services/user.service";
@@ -7,11 +8,14 @@ import {BrowseUsersResult, CreateUserDTO, UpdateUserDTO, User} from "../user.int
 import {AppError} from "../../../common/utils/errors";
 import Messages from "../../../common/utils/messages";
 import {resolveActor} from "../../../common/utils/actor";
+import {AuditService} from "../../audit/audit.service";
+import {AUDIT_ACTIONS} from "../../audit/audit.interface";
 
 export class UserController {
     constructor(
         private readonly userService: UserService,
         private readonly userPurgeService: UserPurgeService,
+        private readonly auditService: AuditService,
     ) {
     }
 
@@ -20,6 +24,14 @@ export class UserController {
             req.sanitize.data as unknown as CreateUserDTO,
             resolveActor(req),
         );
+
+        await this.auditService.success(AUDIT_ACTIONS.USER_CREATED, {
+            request: req,
+            targetType: "user",
+            targetId: user.id,
+            metadata: {role_id: user.role_id},
+        });
+
         res.status(200).json({id: user.id});
     });
 
@@ -30,17 +42,56 @@ export class UserController {
             throw new AppError(Messages.INVALID_PATH_PARAM);
         }
 
-        await this.userService.updateUser(
+        const data = req.sanitize.data as unknown as UpdateUserDTO;
+
+        const user: User = await this.userService.updateUser(
             id,
-            req.sanitize.data as UpdateUserDTO,
+            data,
             resolveActor(req),
         );
+
+        /*
+         * A role or status change is a privilege change: it is
+         * recorded separately so the trail shows what was granted or
+         * revoked.
+         */
+        if (data.role_id !== undefined) {
+            await this.auditService.success(
+                AUDIT_ACTIONS.USER_ROLE_CHANGED,
+                {
+                    request: req,
+                    targetType: "user",
+                    targetId: id,
+                    metadata: {role_id: data.role_id},
+                },
+            );
+        }
+
+        if (data.status !== undefined) {
+            await this.auditService.success(
+                AUDIT_ACTIONS.USER_STATUS_CHANGED,
+                {
+                    request: req,
+                    targetType: "user",
+                    targetId: id,
+                    metadata: {status: data.status},
+                },
+            );
+        }
+
+        await this.auditService.success(AUDIT_ACTIONS.USER_UPDATED, {
+            request: req,
+            targetType: "user",
+            targetId: id,
+            metadata: {authorization_version: user.authorization_version},
+        });
+
         res.status(200).send();
     });
 
     browse = catchAsync(async (req: Request, res: Response): Promise<any> => {
         /*
-         * Cursor-based pagination
+         * Cursor-based pagination.
          *
          * First request:
          *   GET /users?per_page=20
@@ -103,6 +154,14 @@ export class UserController {
         }
 
         await this.userService.softDelete(id);
+
+        await this.auditService.success(AUDIT_ACTIONS.USER_DELETED, {
+            request: req,
+            targetType: "user",
+            targetId: id,
+            metadata: {permanent: false},
+        });
+
         res.status(200).send();
     });
 

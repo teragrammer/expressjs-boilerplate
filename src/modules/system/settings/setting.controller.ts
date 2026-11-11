@@ -16,15 +16,26 @@ import {
     parseOptionalEnum,
     parseOptionalSearch,
 } from "../../../common/utils/query-parser";
+import {AuditService} from "../../audit/audit.service";
+import {AUDIT_ACTIONS} from "../../audit/audit.interface";
 
 export class SettingController {
     constructor(
         private readonly settingService: SettingService,
+        private readonly auditService: AuditService,
     ) {
     }
 
     create = catchAsync(async (req: Request, res: Response): Promise<void> => {
         const setting: Setting = await this.settingService.createSetting(req.sanitize.data as unknown as CreateSettingDTO)
+
+        await this.auditService.success(AUDIT_ACTIONS.SETTING_CREATED, {
+            request: req,
+            targetType: "setting",
+            targetId: setting.id,
+            metadata: {slug: setting.slug},
+        });
+
         res.status(201).json({id: setting.id});
     });
 
@@ -106,6 +117,13 @@ export class SettingController {
         }
 
         await this.settingService.hardDelete(id);
+
+        await this.auditService.success(AUDIT_ACTIONS.SETTING_DELETED, {
+            request: req,
+            targetType: "setting",
+            targetId: id,
+        });
+
         res.status(200).send();
     });
 }

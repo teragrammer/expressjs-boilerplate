@@ -5,6 +5,7 @@ import {NextFunction, Request, Response} from "express";
 import {UserController} from "./user.controller";
 import {UserService} from "../services/user.service";
 import {UserPurgeService} from "../services/user-purge.service";
+import {AuditService} from "../../audit/audit.service";
 import {BrowseUsersResult, CreateUserDTO, UpdateUserDTO, User,} from "../user.interface";
 
 const {
@@ -14,6 +15,8 @@ const {
     mockFindById,
     mockSoftDelete,
     mockPurge,
+    mockAuditSuccess,
+    mockAuditFailure,
 } = vi.hoisted(() => ({
     mockCreateUser: vi.fn(),
     mockUpdateUser: vi.fn(),
@@ -21,6 +24,8 @@ const {
     mockFindById: vi.fn(),
     mockSoftDelete: vi.fn(),
     mockPurge: vi.fn(),
+    mockAuditSuccess: vi.fn(),
+    mockAuditFailure: vi.fn(),
 }));
 
 vi.mock("../../../../src/common/utils/catch-async", () => ({
@@ -119,9 +124,15 @@ describe("UserController", () => {
             purge: mockPurge,
         } as unknown as UserPurgeService;
 
+        const auditService = {
+            success: mockAuditSuccess,
+            failure: mockAuditFailure,
+        } as unknown as AuditService;
+
         controller = new UserController(
             userService,
             userPurgeService,
+            auditService,
         );
 
         res = {

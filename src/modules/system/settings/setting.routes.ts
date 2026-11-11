@@ -7,12 +7,12 @@ import {settingUpdateSchema} from "./setting-update.schema";
 import {SettingController} from "./setting.controller";
 import {SettingService} from "./setting.service";
 import {SettingRepository} from "./setting.repository";
-import {redisCache} from "../../../config/container";
+import {auditService, redisCache} from "../../../config/container";
 
-const settingController = new SettingController(new SettingService(
-    new SettingRepository(),
-    redisCache,
-),);
+const settingController = new SettingController(
+    new SettingService(new SettingRepository(), redisCache),
+    auditService,
+);
 
 export default () => {
     const router = Router();

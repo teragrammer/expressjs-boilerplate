@@ -117,6 +117,15 @@ export class UserService {
         const user: User | null = await this.userRepository.update(id, data);
         if (!user) {throw new AppError(Messages.DATA_NOT_FOUND);}
 
+        /*
+         * A role or status change must take effect immediately: the
+         * sessions of the affected user are revoked so the old
+         * permissions cannot be used until the next login.
+         */
+        if (roleChanged || statusChanged) {
+            await this.authenticationTokenRepository.deleteAllByUserId(id);
+        }
+
         return user;
     }
 

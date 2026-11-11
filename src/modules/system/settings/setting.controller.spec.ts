@@ -5,6 +5,7 @@ import {NextFunction, Request, Response,} from "express";
 
 import {SettingController} from "./setting.controller";
 import {SettingService} from "./setting.service";
+import {AuditService} from "../../audit/audit.service";
 import {
     CreateSettingDTO,
     Setting,
@@ -119,8 +120,18 @@ describe("SettingController", () => {
         expect(res.send).not.toHaveBeenCalled();
     };
 
+    let auditService: {
+        success: ReturnType<typeof vi.fn>;
+        failure: ReturnType<typeof vi.fn>;
+    };
+
     beforeEach(() => {
         vi.resetAllMocks();
+
+        auditService = {
+            success: vi.fn(),
+            failure: vi.fn(),
+        };
 
         const settingService = {
             createSetting: mockCreateSetting,
@@ -132,7 +143,10 @@ describe("SettingController", () => {
             hardDelete: mockHardDelete,
         } as unknown as SettingService;
 
-        controller = new SettingController(settingService);
+        controller = new SettingController(
+            settingService,
+            auditService as unknown as AuditService,
+        );
 
         res = {
             status: vi.fn().mockReturnThis(),

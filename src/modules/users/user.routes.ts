@@ -28,6 +28,7 @@ const userController = new UserController(
         new AuthenticationTokenRepository(),
         auditService,
     ),
+    auditService,
 );
 
 export default () => {

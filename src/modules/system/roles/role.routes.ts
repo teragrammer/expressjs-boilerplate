@@ -8,10 +8,12 @@ import {roleUpdateSchema} from "./role-update.schema";
 import {RoleController} from "./role.controller";
 import {RoleService} from "./role.service";
 import {RoleRepository} from "./role.repository";
+import {auditService} from "../../../config/container";
 
-const roleController = new RoleController(new RoleService(
-    new RoleRepository(),
-));
+const roleController = new RoleController(
+    new RoleService(new RoleRepository()),
+    auditService,
+);
 
 export default () => {
     const router = Router();

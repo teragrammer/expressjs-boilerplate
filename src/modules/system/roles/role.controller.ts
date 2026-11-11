@@ -14,10 +14,13 @@ import {
     parseOptionalBoolean,
     parseOptionalSearch,
 } from "../../../common/utils/query-parser";
+import {AuditService} from "../../audit/audit.service";
+import {AUDIT_ACTIONS} from "../../audit/audit.interface";
 
 export class RoleController {
     constructor(
         private readonly roleService: RoleService,
+        private readonly auditService: AuditService,
     ) {
     }
 
@@ -25,6 +28,13 @@ export class RoleController {
         const role: Role = await this.roleService.createRole(
             req.sanitize.data as unknown as CreateRoleDTO,
         );
+
+        await this.auditService.success(AUDIT_ACTIONS.ROLE_CREATED, {
+            request: req,
+            targetType: "role",
+            targetId: role.id,
+            metadata: {slug: role.slug},
+        });
 
         res.status(201).json({id: role.id});
     });
@@ -88,6 +98,12 @@ export class RoleController {
         }
 
         await this.roleService.hardDelete(id);
+
+        await this.auditService.success(AUDIT_ACTIONS.ROLE_DELETED, {
+            request: req,
+            targetType: "role",
+            targetId: id,
+        });
 
         res.status(200).send();
     });
