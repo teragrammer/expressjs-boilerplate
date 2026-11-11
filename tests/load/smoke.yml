@@ -30,7 +30,7 @@ scenarios:
           url: "/api/v1/auth/login"
           json:
             username: "admin"
-            password: "123456"
+            password: "pass1234"
           expect:
             - statusCode: 200
             - hasProperty: token
@@ -42,7 +42,7 @@ scenarios:
           url: "/api/v1/auth/login"
           json:
             username: "admin"
-            password: "123456"
+            password: "pass1234"
           capture:
             - json: "$.token"
               as: "authToken"

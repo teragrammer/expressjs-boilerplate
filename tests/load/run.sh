@@ -63,7 +63,7 @@ check_prerequisites() {
     local target_url="${TARGET_URL:-http://localhost:4000}"
     log_info "Checking target: ${target_url}"
 
-    if ! curl -s -o /dev/null -w "%{http_code}" "${target_url}/api/v1/auth/login" -X POST -H "Content-Type: application/json" -d '{"username":"admin","password":"123456"}' &> /dev/null; then
+    if ! curl -s -o /dev/null -w "%{http_code}" "${target_url}/api/v1/auth/login" -X POST -H "Content-Type: application/json" -d '{"username":"admin","password":"pass1234"}' &> /dev/null; then
         log_warning "Target ${target_url} may not be reachable. Ensure the server is running."
         log_info "Start the server with: npm run dev"
     fi

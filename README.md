@@ -25,10 +25,23 @@ environment configuration to help you kickstart your API development with best p
 - Profile Information and Password Change
 - Application Settings (Can be manage by admin)
 
-### Test
-- Unit
-- Integration
-- Load / Performance
+### Testing
+
+The project includes unit, integration, and load/performance tests.
+
+- **Unit tests** — colocated with source as `src/**/*.spec.ts`.
+- **Integration tests** — `tests/integration/*.spec.ts`; run against PostgreSQL.
+  See [docs/testing/integration.md](docs/testing/integration.md).
+- **Load / performance tests** — Artillery configs in `tests/load/`.
+  See [docs/testing/load-performance.md](docs/testing/load-performance.md).
+
+Quick start:
+
+```bash
+npm test
+npm run test:run
+npm run load:test:smoke
+```
 
 ### Request Extensions
 
@@ -171,7 +184,7 @@ After scaffolding a seeder, wire it into `scripts/db/seed.ts` in dependency orde
 - Authentication
 
 ```
-curl -X POST https://localhost:3000/api/v1/login \
+curl -X POST http://localhost:4000/api/v1/login \
     -H "Content-Type: application/json" \
     -d '{"username":"test","password":"123456"}'
 ```
