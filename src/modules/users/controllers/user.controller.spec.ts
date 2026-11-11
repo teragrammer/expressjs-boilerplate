@@ -127,6 +127,22 @@ describe("UserController", () => {
                 id: "1",
             },
 
+            /*
+             * The controller resolves the authorization actor from the
+             * request credentials.
+             */
+            credentials: {
+                jwt: {
+                    uid: 1,
+                    tid: 1,
+                    tfa: true,
+                    rol: "admin",
+                    bpa: 1,
+                },
+                user: vi.fn(),
+                authentication: vi.fn(),
+            },
+
             sanitize: {
                 body: {
                     only: vi.fn(),
@@ -181,7 +197,10 @@ describe("UserController", () => {
             await invoke("create");
 
             expect(mockCreateUser).toHaveBeenCalledTimes(1);
-            expect(mockCreateUser).toHaveBeenCalledWith(createData);
+            expect(mockCreateUser).toHaveBeenCalledWith(
+                createData,
+                expect.objectContaining({roleSlug: "admin"}),
+            );
 
             expectResponse("json", {
                 id: 42,
@@ -209,7 +228,10 @@ describe("UserController", () => {
             await invoke("create");
 
             expect(mockCreateUser).toHaveBeenCalledTimes(1);
-            expect(mockCreateUser).toHaveBeenCalledWith(createData);
+            expect(mockCreateUser).toHaveBeenCalledWith(
+                createData,
+                expect.objectContaining({roleSlug: "admin"}),
+            );
 
             expectResponse("json", {
                 id: 99,
@@ -267,6 +289,7 @@ describe("UserController", () => {
             expect(mockUpdateUser).toHaveBeenCalledWith(
                 42,
                 updateData,
+                expect.objectContaining({roleSlug: "admin"}),
             );
 
             expectResponse("send");
@@ -292,6 +315,7 @@ describe("UserController", () => {
             expect(mockUpdateUser).toHaveBeenCalledWith(
                 123,
                 req.sanitize!.data,
+                expect.objectContaining({roleSlug: "admin"}),
             );
 
             expectResponse("send");

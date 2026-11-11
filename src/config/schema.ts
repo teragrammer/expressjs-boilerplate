@@ -211,6 +211,7 @@ export interface IdempotencyKeysTable {
     response_body: Record<string, unknown> | null;
     locked_at: NullableTimestamp;
     created_at: GeneratedTimestamp;
+    updated_at: GeneratedTimestamp;
     expires_at: RequiredTimestamp;
 }
 

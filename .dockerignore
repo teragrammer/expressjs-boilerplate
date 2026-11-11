@@ -1,0 +1,32 @@
+# Build artefacts
+node_modules
+dist
+build
+coverage
+*.tsbuildinfo
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Version control and tooling
+.git
+.gitignore
+.github
+.vscode
+.idea
+.opencode
+.agents
+
+# Documentation and tests
+docs
+README.md
+tests
+*.md
+
+# Local artifacts
+tests/load/reports
+npm-debug.log*
+yarn-error.log*
+.DS_Store

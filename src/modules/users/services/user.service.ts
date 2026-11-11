@@ -5,6 +5,10 @@ import {AppError} from "../../../common/utils/errors";
 import Messages from "../../../common/utils/messages";
 import {SecurityUtil} from "../../../common/utils/security.util";
 import type {DatabaseExecutor} from "../../../config/database";
+import {
+    Actor,
+    assertCanChangePrivilegedFields,
+} from "../../../common/authz/policy";
 
 export class UserService {
     // Dependency injection allows passing a mock repository during testing
@@ -51,7 +55,22 @@ export class UserService {
         return this.userRepository.create(data, executor);
     }
 
-    async createUser(data: CreateUserDTO): Promise<User> {
+    async createUser(
+        data: CreateUserDTO,
+        actor?: Actor,
+    ): Promise<User> {
+        /*
+         * Privileged fields (role, status, password) may only be set
+         * by an administrator. The check lives in the service so every
+         * entry point is covered, not only the HTTP route.
+         */
+        if (actor) {
+            assertCanChangePrivilegedFields(
+                actor,
+                Object.keys(data as unknown as Record<string, unknown>),
+            );
+        }
+
         if (data.password !== null && typeof data.password !== "undefined") {
             data.password = await this.securityUtil.hash(data.password);
         }
@@ -62,7 +81,18 @@ export class UserService {
         return user;
     }
 
-    async updateUser(id: number, data: UpdateUserDTO): Promise<User> {
+    async updateUser(
+        id: number,
+        data: UpdateUserDTO,
+        actor?: Actor,
+    ): Promise<User> {
+        if (actor) {
+            assertCanChangePrivilegedFields(
+                actor,
+                Object.keys(data as unknown as Record<string, unknown>),
+            );
+        }
+
         // First check current user to compare role_id and status
         const currentUser = await this.userRepository.findAuthById(id);
         if (!currentUser) {

@@ -1,0 +1,1463 @@
+openapi: 3.1.0
+
+info:
+  title: Express API Boilerplate
+  version: 1.0.0
+  description: |
+    REST API for an authenticated application.
+
+    ## Authentication
+
+    Every endpoint except `POST /auth/register`, `POST /auth/login`,
+    `POST /auth/refresh`, `POST /auth/password-recovery/*` and
+    `GET /settings/values` requires a bearer access token.
+
+    Access tokens are short-lived JWTs (default 15 minutes) that always
+    reference a live database session. The refresh token is an opaque
+    value delivered in an `HttpOnly` cookie scoped to `/api/v1/auth`;
+    `POST /auth/refresh` rotates it and returns a new pair.
+
+    ## Errors
+
+    Every error uses the same envelope:
+
+    ```json
+    { "code": "VALIDATION_FAILED", "message": "...", "errors": [...] }
+    ```
+
+    ## Request correlation
+
+    Send `X-Request-ID` to correlate a request with the logs and the
+    audit trail. The value is echoed back in the response header.
+
+    ## Rate limits
+
+    Rate-limited endpoints return `429` with `Retry-After` and the
+    `X-RateLimit-Limit`, `X-RateLimit-Remaining` and `X-RateLimit-Reset`
+    headers.
+
+servers:
+  - url: /api/v1
+    description: Versioned API root
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Auth
+  - name: Account
+  - name: Users
+  - name: Settings
+  - name: Roles
+  - name: Route Guards
+  - name: Audit
+  - name: Health
+  - name: Metrics
+
+paths:
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a customer account
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: The account was created
+          headers:
+            Set-Cookie:
+              description: The refresh token cookie
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthTokens"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Exchange credentials for a token pair
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+                  format: password
+      responses:
+        "200":
+          description: The credentials were accepted
+          headers:
+            Set-Cookie:
+              description: The refresh token cookie
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthTokens"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Rotate the refresh token and issue a new access token
+      security: []
+      responses:
+        "200":
+          description: A new token pair was issued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccessTokens"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Revoke the current session
+      responses:
+        "204":
+          description: The session was revoked
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    get:
+      tags: [Auth]
+      summary: Revoke the current session (deprecated)
+      deprecated: true
+      description: |
+        Deprecated alias for `POST /auth/logout`. State-changing
+        operations must use POST; this alias exists only for a
+        deprecation window.
+      responses:
+        "204":
+          description: The session was revoked
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /auth/logout-all:
+    post:
+      tags: [Auth]
+      summary: Revoke every session of the caller
+      responses:
+        "204":
+          description: Every session was revoked
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /auth/sessions:
+    get:
+      tags: [Auth]
+      summary: List the caller's active sessions
+      responses:
+        "200":
+          description: The active sessions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessions:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Session"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /auth/password-recovery/send:
+    post:
+      tags: [Auth]
+      summary: Request a password recovery code
+      description: |
+        The response is identical whether or not the account exists, so
+        the endpoint cannot be used to enumerate users.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, send_to]
+              properties:
+                type:
+                  type: string
+                  enum: [email, phone]
+                send_to:
+                  type: string
+      responses:
+        "200":
+          description: The request was accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    nullable: true
+                    properties:
+                      next_resend_at:
+                        type: string
+                        format: date-time
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /auth/password-recovery/validate:
+    post:
+      tags: [Auth]
+      summary: Reset the password with a recovery code
+      description: |
+        The reset is atomic and revokes every existing session.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, send_to, code, new_password]
+              properties:
+                type:
+                  type: string
+                  enum: [email, phone]
+                send_to:
+                  type: string
+                code:
+                  type: string
+                new_password:
+                  type: string
+                  format: password
+      responses:
+        "200":
+          description: The password was reset
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /auth/tfa/send:
+    post:
+      tags: [Auth]
+      summary: Send a one-time password
+      responses:
+        "200":
+          description: The code was sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  next_try:
+                    type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    get:
+      tags: [Auth]
+      summary: Send a one-time password (deprecated)
+      deprecated: true
+      description: |
+        Deprecated alias for `POST /auth/tfa/send`. Sending an OTP is a
+        state-changing operation and must use POST.
+      responses:
+        "200":
+          description: The code was sent
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /auth/tfa/validate:
+    post:
+      tags: [Auth]
+      summary: Verify a one-time password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code:
+                  type: string
+      responses:
+        "200":
+          description: The token was upgraded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /auth/tfa/enroll:
+    post:
+      tags: [Auth]
+      summary: Enroll in two-factor authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code:
+                  type: string
+      responses:
+        "200":
+          description: The enrollment succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enrolled:
+                    type: boolean
+                  recovery_codes:
+                    type: array
+                    items:
+                      type: string
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /auth/tfa/disable:
+    post:
+      tags: [Auth]
+      summary: Disable two-factor authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password:
+                  type: string
+                  format: password
+      responses:
+        "200":
+          description: Two-factor authentication was disabled
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /account/information:
+    put:
+      tags: [Account]
+      summary: Update the caller's profile
+      description: |
+        Requires a token with `tfa: true`. The response contains a new
+        access token bound to the caller's live session.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [first_name, last_name]
+              properties:
+                first_name:
+                  type: string
+                middle_name:
+                  type: string
+                  nullable: true
+                last_name:
+                  type: string
+                address:
+                  type: string
+                  nullable: true
+      responses:
+        "200":
+          description: The profile was updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  access_token:
+                    type: string
+                  expires_at:
+                    type: string
+                    format: date-time
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /account/password:
+    put:
+      tags: [Account]
+      summary: Change the caller's credentials
+      description: |
+        Requires a token with `tfa: true`. Every other session is
+        revoked and the current session is rotated.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [current_password, new_password]
+              properties:
+                current_password:
+                  type: string
+                  format: password
+                new_password:
+                  type: string
+                  format: password
+                username:
+                  type: string
+                  nullable: true
+                email:
+                  type: string
+                  nullable: true
+                phone:
+                  type: string
+                  nullable: true
+      responses:
+        "200":
+          description: The credentials were changed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  access_token:
+                    type: string
+                  expires_at:
+                    type: string
+                    format: date-time
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /account/email/verification/send:
+    post:
+      tags: [Account]
+      summary: Request an email verification code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        "200":
+          description: The code was sent
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /account/email/verification/confirm:
+    post:
+      tags: [Account]
+      summary: Confirm an email verification code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code:
+                  type: string
+      responses:
+        "200":
+          description: The address was verified
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /account/phone/verification/send:
+    post:
+      tags: [Account]
+      summary: Request a phone verification code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone]
+              properties:
+                phone:
+                  type: string
+      responses:
+        "200":
+          description: The code was sent
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /account/phone/verification/confirm:
+    post:
+      tags: [Account]
+      summary: Confirm a phone verification code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code:
+                  type: string
+      responses:
+        "200":
+          description: The number was verified
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /users:
+    get:
+      tags: [Users]
+      summary: Browse users
+      parameters:
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: cursor
+          in: query
+          description: The cursor returned by the previous page
+          schema:
+            type: integer
+        - name: role_id
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [Activated, Suspended, Deactivated, Pending]
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: A page of users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/User"
+                  hasMore:
+                    type: boolean
+                  nextCursor:
+                    type: integer
+                    nullable: true
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [Users]
+      summary: Create a user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserRequest"
+      responses:
+        "200":
+          description: The user was created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+
+  /users/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+    get:
+      tags: [Users]
+      summary: Read a user
+      responses:
+        "200":
+          description: The user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Users]
+      summary: Update a user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserRequest"
+      responses:
+        "200":
+          description: The user was updated
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+    delete:
+      tags: [Users]
+      summary: Delete a user
+      description: The deletion is a soft delete and revokes the sessions.
+      responses:
+        "200":
+          description: The user was deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /settings:
+    get:
+      tags: [Settings]
+      summary: Browse settings
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: is_disabled
+          in: query
+          schema:
+            type: boolean
+        - name: is_public
+          in: query
+          schema:
+            type: boolean
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [string, integer, float, boolean, array]
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The settings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Setting"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+    post:
+      tags: [Settings]
+      summary: Create a setting
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSettingRequest"
+      responses:
+        "201":
+          description: The setting was created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /settings/values:
+    get:
+      tags: [Settings]
+      summary: Read the public settings
+      security: []
+      responses:
+        "200":
+          description: The public settings
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+
+  /settings/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+    get:
+      tags: [Settings]
+      summary: Read a setting
+      responses:
+        "200":
+          description: The setting
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Setting"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Settings]
+      summary: Update a setting
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSettingRequest"
+      responses:
+        "200":
+          description: The setting was updated
+        "409":
+          $ref: "#/components/responses/Conflict"
+    delete:
+      tags: [Settings]
+      summary: Delete a setting
+      responses:
+        "200":
+          description: The setting was deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /roles:
+    get:
+      tags: [Roles]
+      summary: Browse roles
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: is_public
+          in: query
+          schema:
+            type: boolean
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The roles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Role"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+    post:
+      tags: [Roles]
+      summary: Create a role
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRoleRequest"
+      responses:
+        "201":
+          description: The role was created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /roles/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+    get:
+      tags: [Roles]
+      summary: Read a role
+      responses:
+        "200":
+          description: The role
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Role"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Roles]
+      summary: Update a role
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRoleRequest"
+      responses:
+        "200":
+          description: The role was updated
+        "409":
+          $ref: "#/components/responses/Conflict"
+    delete:
+      tags: [Roles]
+      summary: Delete a role
+      description: The role must not be assigned to users or route guards.
+      responses:
+        "200":
+          description: The role was deleted
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /route/guards:
+    get:
+      tags: [Route Guards]
+      summary: Browse route guards
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: role_id
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: The route guards
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RouteGuard"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+    post:
+      tags: [Route Guards]
+      summary: Grant a route to a role
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role_id, route]
+              properties:
+                role_id:
+                  type: integer
+                route:
+                  type: string
+                  pattern: "^[a-z0-9-]+:[a-z0-9-]+$"
+      responses:
+        "200":
+          description: The guard was created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /route/guards/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+    get:
+      tags: [Route Guards]
+      summary: Read a route guard
+      responses:
+        "200":
+          description: The route guard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RouteGuard"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Route Guards]
+      summary: Revoke a route from a role
+      responses:
+        "200":
+          description: The guard was deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /audit:
+    get:
+      tags: [Audit]
+      summary: Read the audit trail
+      parameters:
+        - name: actor_user_id
+          in: query
+          schema:
+            type: integer
+        - name: action
+          in: query
+          schema:
+            type: string
+        - name: outcome
+          in: query
+          schema:
+            type: string
+            enum: [success, failure]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: The audit events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AuditEvent"
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  per_page:
+                    type: integer
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: |
+        Makes the request safe to retry. A repeated request with the same
+        key and payload replays the stored response instead of writing
+        twice.
+      schema:
+        type: string
+        maxLength: 255
+
+  responses:
+    BadRequest:
+      description: The request was malformed
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: The caller is not authenticated
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: The caller lacks the required permission
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: The resource does not exist
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Conflict:
+      description: The request conflicts with the current state
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ValidationFailed:
+      description: The payload failed validation
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    RateLimited:
+      description: The rate limit was exceeded
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  schemas:
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          example: VALIDATION_FAILED
+        message:
+          type: string
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+
+    AuthTokens:
+      type: object
+      required: [token, access_token, expires_at]
+      properties:
+        token:
+          type: string
+          description: The access token (alias of access_token)
+        access_token:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+        tfa_required:
+          type: boolean
+        tfaRequired:
+          type: boolean
+
+    AccessTokens:
+      type: object
+      required: [token, access_token, expires_at]
+      properties:
+        token:
+          type: string
+        access_token:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+
+    Session:
+      type: object
+      properties:
+        id:
+          type: string
+        session_id:
+          type: integer
+        ip:
+          type: string
+          nullable: true
+        user_agent:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+
+    RegisterRequest:
+      type: object
+      required: [first_name, last_name, username, password, email]
+      properties:
+        first_name:
+          type: string
+          minLength: 2
+          maxLength: 100
+        middle_name:
+          type: string
+          nullable: true
+        last_name:
+          type: string
+          minLength: 2
+          maxLength: 100
+        username:
+          type: string
+          minLength: 3
+          maxLength: 16
+          pattern: "^[a-zA-Z0-9_]+$"
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 32
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        first_name:
+          type: string
+          nullable: true
+        middle_name:
+          type: string
+          nullable: true
+        last_name:
+          type: string
+          nullable: true
+        gender:
+          type: string
+          nullable: true
+          enum: [Male, Female, Other]
+        address:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        is_phone_verified:
+          type: boolean
+        email:
+          type: string
+          nullable: true
+        is_email_verified:
+          type: boolean
+        has_tfa:
+          type: boolean
+        role_id:
+          type: integer
+        username:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [Activated, Suspended, Deactivated, Pending]
+        comments:
+          type: string
+          nullable: true
+        authorization_version:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateUserRequest:
+      type: object
+      required: [first_name, last_name, username, password, role_id]
+      properties:
+        first_name:
+          type: string
+          maxLength: 100
+        middle_name:
+          type: string
+          nullable: true
+        last_name:
+          type: string
+          maxLength: 100
+        email:
+          type: string
+          format: email
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        username:
+          type: string
+          maxLength: 16
+          pattern: "^[a-zA-Z0-9_]+$"
+        password:
+          type: string
+          format: password
+        role_id:
+          type: integer
+          description: Administrator-only field
+        status:
+          type: string
+          enum: [Activated, Suspended, Deactivated, Pending]
+          description: Administrator-only field
+        address:
+          type: string
+          nullable: true
+        comments:
+          type: string
+          nullable: true
+
+    UpdateUserRequest:
+      type: object
+      required: [first_name, last_name]
+      properties:
+        first_name:
+          type: string
+          maxLength: 100
+        middle_name:
+          type: string
+          nullable: true
+        last_name:
+          type: string
+          maxLength: 100
+        email:
+          type: string
+          format: email
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        username:
+          type: string
+          maxLength: 16
+        role_id:
+          type: integer
+          description: Administrator-only field
+        status:
+          type: string
+          enum: [Activated, Suspended, Deactivated, Pending]
+          description: Administrator-only field
+        address:
+          type: string
+          nullable: true
+        comments:
+          type: string
+          nullable: true
+
+    Setting:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+        value:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        type:
+          type: string
+          enum: [string, integer, float, boolean, array]
+        is_disabled:
+          type: boolean
+        is_public:
+          type: boolean
+
+    CreateSettingRequest:
+      type: object
+      required: [name, slug, value, type]
+      properties:
+        name:
+          type: string
+        slug:
+          type: string
+        value:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        type:
+          type: string
+          enum: [string, integer, float, boolean, array]
+        is_disabled:
+          type: boolean
+        is_public:
+          type: boolean
+
+    Role:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+          nullable: true
+        is_public:
+          type: boolean
+        is_bypass_authorization:
+          type: boolean
+
+    CreateRoleRequest:
+      type: object
+      required: [name, slug, is_public, is_bypass_authorization]
+      properties:
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+          nullable: true
+        is_public:
+          type: integer
+          enum: [0, 1]
+        is_bypass_authorization:
+          type: integer
+          enum: [0, 1]
+
+    RouteGuard:
+      type: object
+      properties:
+        id:
+          type: integer
+        role_id:
+          type: integer
+        route:
+          type: string
+        role_slug:
+          type: string
+
+    AuditEvent:
+      type: object
+      properties:
+        id:
+          type: string
+        occurred_at:
+          type: string
+          format: date-time
+        actor_user_id:
+          type: integer
+          nullable: true
+        actor_type:
+          type: string
+        action:
+          type: string
+        target_type:
+          type: string
+          nullable: true
+        target_id:
+          type: string
+          nullable: true
+        outcome:
+          type: string
+          enum: [success, failure]
+        request_id:
+          type: string
+          nullable: true
+        ip:
+          type: string
+          nullable: true
+        user_agent:
+          type: string
+          nullable: true
+        metadata:
+          type: object
+          additionalProperties: true

@@ -5,6 +5,7 @@ import {UserService} from "../services/user.service";
 import {BrowseUsersResult, CreateUserDTO, UpdateUserDTO, User} from "../user.interface";
 import {AppError} from "../../../common/utils/errors";
 import Messages from "../../../common/utils/messages";
+import {resolveActor} from "../../../common/utils/actor";
 
 export class UserController {
     constructor(
@@ -13,13 +14,25 @@ export class UserController {
     }
 
     create = catchAsync(async (req: Request, res: Response): Promise<any> => {
-        const user: User = await this.userService.createUser(req.sanitize.data as unknown as CreateUserDTO);
+        const user: User = await this.userService.createUser(
+            req.sanitize.data as unknown as CreateUserDTO,
+            resolveActor(req),
+        );
         res.status(200).json({id: user.id});
     });
 
     update = catchAsync(async (req: Request, res: Response): Promise<any> => {
         const id = Number(req.params.id);
-        await this.userService.updateUser(id, req.sanitize.data as UpdateUserDTO);
+
+        if (!Number.isSafeInteger(id) || id <= 0) {
+            throw new AppError(Messages.INVALID_PATH_PARAM);
+        }
+
+        await this.userService.updateUser(
+            id,
+            req.sanitize.data as UpdateUserDTO,
+            resolveActor(req),
+        );
         res.status(200).send();
     });
 

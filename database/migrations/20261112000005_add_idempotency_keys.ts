@@ -18,6 +18,9 @@ export async function up(db: Kysely<any>): Promise<void> {
         .addColumn("created_at", "timestamptz", (col) =>
             col.notNull().defaultTo(sql`now()`),
         )
+        .addColumn("updated_at", "timestamptz", (col) =>
+            col.notNull().defaultTo(sql`now()`),
+        )
         .addColumn("expires_at", "timestamptz", (col) => col.notNull())
         .addCheckConstraint(
             "idempotency_keys_status_check",

@@ -10,6 +10,7 @@ import {RegisterController} from "./register.controller";
 import {AuthenticationMiddleware} from "../../../common/middleware/authentication.middleware";
 import {validate} from "../../../common/middleware/validate.middleware";
 import {authRateLimiters} from "../../../common/middleware/rate-limiter.middleware";
+import {idempotency} from "../../../common/middleware/idempotency.middleware";
 
 import {
     authService,
@@ -39,7 +40,10 @@ export default () => {
 
     router.post(
         "/register",
-        authRateLimiters.register,
+        [
+            authRateLimiters.register,
+            idempotency({scope: "auth:register"}),
+        ],
         validate(registerSchema, [
             "first_name",
             "middle_name",

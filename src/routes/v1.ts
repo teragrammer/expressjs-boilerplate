@@ -7,6 +7,7 @@ import userRoutes from "../modules/users/user.routes";
 import settingRoutes from "../modules/system/settings/setting.routes";
 import roleRoutes from "../modules/system/roles/role.routes";
 import routeGuardRoutes from "../modules/system/route-guards/route-guard.routes";
+import auditRoutes from "../modules/audit/audit.routes";
 
 export default () => {
     const router = Router();
@@ -17,6 +18,7 @@ export default () => {
     router.use("/settings", settingRoutes());
     router.use("/roles", roleRoutes());
     router.use("/route/guards", routeGuardRoutes());
+    router.use("/audit", auditRoutes());
 
     return router;
 }

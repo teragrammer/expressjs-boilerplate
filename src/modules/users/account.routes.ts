@@ -7,11 +7,18 @@ import {accountInformationSchema} from "./validations/account-information.schema
 import {AccountController} from "./controllers/account.controller";
 import {accountPasswordSchema} from "./validations/account-password.schema";
 import {accountService} from "../../config/container";
+import verificationRoutes from "../auth/verification/verification.routes";
 
 const accountController = new AccountController(accountService);
 
 export default () => {
     const router = Router();
+
+    /*
+     * Verification endpoints live under /account because they operate
+     * on the caller's own contact details.
+     */
+    router.use(verificationRoutes());
 
     router.put("/information", [
         AuthenticationMiddleware(),

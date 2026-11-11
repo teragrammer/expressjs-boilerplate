@@ -93,6 +93,8 @@ const tfaSendLimiter = new RateLimiter();
 const tfaValidateLimiter = new RateLimiter();
 const logoutLimiter = new RateLimiter();
 const refreshLimiter = new RateLimiter();
+const verificationSendLimiter = new RateLimiter();
+const verificationConfirmLimiter = new RateLimiter();
 
 function makeRateLimiter(limiter: RateLimiter, options: RateLimitOptions) {
     const {
@@ -223,6 +225,24 @@ export const authRateLimiters = {
         maxRequests: 30,
         windowMs: 60 * 1000, // 30 per minute
         message: "Too many token refresh attempts, please try again later.",
+    }),
+
+    verificationSend: makeRateLimiter(verificationSendLimiter, {
+        bucket: "auth:verification_send",
+        maxRequests: 3,
+        windowMs: 15 * 60 * 1000, // 3 per 15 minutes
+        keyGenerator: (req) =>
+            `user:${req.credentials?.jwt?.uid || "unknown"}`,
+        message: "Too many verification requests, please try again later.",
+    }),
+
+    verificationConfirm: makeRateLimiter(verificationConfirmLimiter, {
+        bucket: "auth:verification_confirm",
+        maxRequests: 5,
+        windowMs: 15 * 60 * 1000, // 5 per 15 minutes
+        keyGenerator: (req) =>
+            `user:${req.credentials?.jwt?.uid || "unknown"}`,
+        message: "Too many verification attempts, please try again later.",
     }),
 
     globalAuth: makeRateLimiter(globalAuthLimiter, {

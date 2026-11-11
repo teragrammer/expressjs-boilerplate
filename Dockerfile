@@ -1,52 +1,66 @@
-FROM ubuntu:26.04
+# syntax=docker/dockerfile:1
 
-ENV DEBIAN_FRONTEND=noninteractive
+#
+# Production image.
+#
+# Multi-stage: the builder installs the full dependency tree and
+# compiles TypeScript; the runtime only carries the compiled output and
+# the production dependencies. The runtime stage runs as a non-root user
+# and contains no development tooling, no SSH configuration and no
+# source code.
+#
 
-RUN mkdir -p /app
+# ---------------------------------------------------------------- builder
+FROM node:24-bookworm-slim AS builder
 
-# Set working directory
 WORKDIR /app
 
-# Install dependencies
-RUN apt-get update && apt-get upgrade -y && apt-get install -y \
-    libfreetype-dev \
-    git \
-    curl \
-    libpng-dev \
-    libonig-dev \
-    libxml2-dev \
-    nano \
-    zip \
-    unzip
+# Install the full dependency tree (including dev dependencies) once.
+COPY package.json package-lock.json ./
+RUN npm ci
 
-# NODEJS
-RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - && apt-get update && apt-get install -y nodejs && rm -rf /var/lib/apt/lists/*
-# Verify that Node.js and npm were installed correctly
-RUN node -v
-RUN npm -v
+# Compile the application.
+COPY tsconfig.json ./
+COPY src ./src
+COPY scripts ./scripts
+COPY database ./database
+RUN npm run build
 
-# Update npm packages
-RUN npm install -g npm@latest
-RUN npm install -g nodemon
-RUN npm install -g npm-check-updates
+# Prune to the production dependency tree.
+RUN npm prune --omit=dev
 
-# Configure SSH and Git
-# Create the .ssh directory and write the config file
-RUN mkdir -p /root/.ssh && \
-    chmod 700 /root/.ssh && \
-    printf "Host github.com\n  Hostname ssh.github.com\n  Port 443\n  User git\n" > /root/.ssh/config && \
-    chmod 600 /root/.ssh/config
+# ---------------------------------------------------------------- runtime
+FROM node:24-bookworm-slim AS runtime
 
-RUN echo "StrictHostKeyChecking no" >> /root/.ssh/config
+ENV NODE_ENV=production \
+    PORT=4000 \
+    PORT_EXPOSE=4000 \
+    NPM_CONFIG_UPDATE_NOTIFIER=false
 
-# Mark /app as a safe directory for Git
-RUN git config --global --add safe.directory /app
+WORKDIR /app
 
-# Install OpenCode
-RUN curl -fsSL https://opencode.ai/v2/install | bash
+# `tini` reaps zombies and forwards signals to the Node process, which
+# the graceful shutdown handler relies on.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tini ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
-# Clean up
-RUN apt-get clean && rm -rf /var/lib/apt/lists/*
+# Copy the compiled application and the production dependencies.
+COPY --from=builder --chown=node:node /app/node_modules ./node_modules
+COPY --from=builder --chown=node:node /app/dist ./dist
+COPY --from=builder --chown=node:node /app/package.json ./package.json
+COPY --from=builder --chown=node:node /app/database ./database
 
-# Expose port
-EXPOSE $PORT
+# Run as the unprivileged `node` user shipped with the base image.
+USER node
+
+EXPOSE 4000
+
+STOPSIGNAL SIGTERM
+
+# The liveness endpoint answers without touching a dependency.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD node -e "require('http').get({host:'127.0.0.1',port:process.env.PORT||4000,path:'/health/live',timeout:4000},r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
+
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["node", "dist/src/index.js"]
