@@ -11,6 +11,13 @@ import * as authenticationTokens from "../../database/migrations/20250313141555_
 import * as twoFactorAuthentications from "../../database/migrations/20250313141609_two_factor_authentications";
 import * as passwordRecoveries from "../../database/migrations/20250511063013_password_recoveries";
 import * as routeGuards from "../../database/migrations/20251023075024_route_guards";
+import * as changeFkUsersRoles from "../../database/migrations/20261111042541_change_fk_to_restrict_users_roles";
+import * as changeFkAuthTokens from "../../database/migrations/20261111042557_change_fk_to_restrict_auth_tokens";
+import * as changeFk2fa from "../../database/migrations/20261111042610_change_fk_to_restrict_2fa";
+import * as changeFkRouteGuards from "../../database/migrations/20261111042618_change_fk_to_restrict_route_guards";
+import * as addAuthVersion from "../../database/migrations/20261111042626_add_authorization_version_to_users";
+import * as makeExpiredAtNotNull from "../../database/migrations/20261111042635_make_expired_at_not_null_auth_tokens";
+import * as addRateLimitTable from "../../database/migrations/20261111050942_add_rate_limit_table";
 
 /**
  * Ordered migration registry.
@@ -30,6 +37,13 @@ const MIGRATIONS: Array<[string, Migration]> = [
     ["20250313141609_two_factor_authentications", twoFactorAuthentications],
     ["20250511063013_password_recoveries", passwordRecoveries],
     ["20251023075024_route_guards", routeGuards],
+    ["20261111042541_change_fk_to_restrict_users_roles", changeFkUsersRoles],
+    ["20261111042557_change_fk_to_restrict_auth_tokens", changeFkAuthTokens],
+    ["20261111042610_change_fk_to_restrict_2fa", changeFk2fa],
+    ["20261111042618_change_fk_to_restrict_route_guards", changeFkRouteGuards],
+    ["20261111042626_add_authorization_version_to_users", addAuthVersion],
+    ["20261111042635_make_expired_at_not_null_auth_tokens", makeExpiredAtNotNull],
+    ["20261111050942_add_rate_limit_table", addRateLimitTable],
 ];
 
 class StaticMigrationProvider implements MigrationProvider {

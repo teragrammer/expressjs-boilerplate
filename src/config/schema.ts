@@ -56,6 +56,7 @@ export interface UsersTable {
     login_tries: Generated<number>;
     failed_login_expired_at: NullableTimestamp;
     comments: string | null;
+    authorization_version: Generated<number>;
     created_at: GeneratedTimestamp;
     updated_at: GeneratedTimestamp;
     deleted_at: NullableTimestamp;
@@ -97,7 +98,7 @@ export interface AuthenticationTokensTable {
     id: Generated<number>;
     user_id: number | null;
     tries: Generated<number>;
-    expired_at: NullableTimestamp;
+    expired_at: RequiredTimestamp;
     ip: string | null;
     browser: string | null;
     os: string | null;
@@ -130,6 +131,16 @@ export interface TwoFactorAuthenticationsTable {
     updated_at: GeneratedTimestamp;
 }
 
+export interface RateLimitsTable {
+    id: Generated<number>;
+    key: string;
+    bucket: string;
+    count: number;
+    expires_at: RequiredTimestamp;
+    created_at: GeneratedTimestamp;
+    updated_at: GeneratedTimestamp;
+}
+
 /**
  * Kysely database schema.
  *
@@ -144,4 +155,5 @@ export interface Database {
     authentication_tokens: AuthenticationTokensTable;
     password_recoveries: PasswordRecoveriesTable;
     two_factor_authentications: TwoFactorAuthenticationsTable;
+    rate_limits: RateLimitsTable;
 }
