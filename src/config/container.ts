@@ -28,6 +28,7 @@ import {TokenService} from "../modules/auth/authentication/authentication-token.
 import {TwoFactorAuthenticationService} from "../modules/auth/two-factor-authentication/two-factor-authentication.service";
 import {PasswordRecoveryService} from "../modules/auth/password-recovery/password-recovery.service";
 import {RoleService} from "../modules/system/roles/role.service";
+import {AccountService} from "../modules/users/services/account.service";
 
 // Event Handlers
 import {SystemEventHandler} from "../modules/system/settings/system.event";
@@ -68,21 +69,12 @@ export const settingService = new SettingService(
     redisCache,
 );
 
-export const authService = new AuthenticationService(securityUtil, authenticationTokenRepository, roleService, userService, userRepository, tokenService, dateUtil, settingService);
-
-// Mail provider
+// Mail provider (needed for TwoFactorAuthenticationService)
 const mailService = new SendGridMailService(
     __ENV.SENDGRID_API_KEY,
 );
 
-const passwordRecoveryRepository =
-    new PasswordRecoveryRepository(db);
-
-export const routeGuardService = new RouteGuardService(
-    routeGuardRepository,
-    redisCache,
-);
-
+// TwoFactorAuthenticationService must be created before AuthenticationService
 export const twoFactorAuthenticationService = new TwoFactorAuthenticationService(
     securityUtil,
     new TwoFactorAuthenticationRepository(db),
@@ -92,6 +84,17 @@ export const twoFactorAuthenticationService = new TwoFactorAuthenticationService
     settingService,
     mailService,
     roleService,
+    userRepository,
+);
+
+export const authService = new AuthenticationService(securityUtil, authenticationTokenRepository, roleService, userService, userRepository, tokenService, dateUtil, settingService, twoFactorAuthenticationService);
+
+const passwordRecoveryRepository =
+    new PasswordRecoveryRepository(db);
+
+export const routeGuardService = new RouteGuardService(
+    routeGuardRepository,
+    redisCache,
 );
 
 export const passwordRecoveryService =
@@ -101,7 +104,18 @@ export const passwordRecoveryService =
         userRepository,
         settingService,
         mailService,
+        authenticationTokenRepository,
+        dateUtil,
     );
+
+export const accountService = new AccountService(
+    userRepository,
+    tokenService,
+    securityUtil,
+    authenticationTokenRepository,
+    roleService,
+    dateUtil,
+);
 
 export const systemEventHandler = new SystemEventHandler(
     redisCache,

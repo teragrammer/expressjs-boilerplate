@@ -1,6 +1,6 @@
 // src/modules/users/validations/user-create.schema.ts
 import Joi from '../../../shared/validations/joi';
-import {validateCompositeUnique} from "../../../shared/validations/database/unique";
+import {validateUnique, validateExists} from "../../../shared/validations";
 import {STATUSES} from "../user.interface";
 
 export const userCreateSchema = Joi.object({
@@ -13,13 +13,13 @@ export const userCreateSchema = Joi.object({
     status: Joi.string().valid(...STATUSES).allow(null, ""),
 
     role_id: Joi.number().integer().required()
-        .external(validateCompositeUnique("roles", ["role_id"])),
+        .external(validateExists("roles", {column: "id"})),
     phone: Joi.string().min(10).max(16).allow(null, "")
-        .external(validateCompositeUnique("users", ["phone"])),
+        .external(validateUnique("users", "phone")),
     email: Joi.string().email().max(180).allow(null, "")
-        .external(validateCompositeUnique("users", ["email"])),
+        .external(validateUnique("users", "email")),
     username: Joi.string().min(2).max(16).pattern(/^[a-zA-Z0-9_]+$/).allow(null, "")
-        .external(validateCompositeUnique("users", ["username"]))
+        .external(validateUnique("users", "username"))
         .required(),
     password: Joi.string().min(8).max(32)
         .pattern(/[A-Z]/)           // At least one uppercase letter

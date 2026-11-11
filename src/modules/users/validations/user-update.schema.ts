@@ -1,6 +1,6 @@
 // src/modules/users/validations/user-update.schema.ts
 import Joi from '../../../shared/validations/joi';
-import {validateCompositeUnique} from "../../../shared/validations/database/unique";
+import {validateUnique, validateExists} from "../../../shared/validations";
 import {STATUSES} from "../user.interface";
 
 export const userUpdateSchema = (userId: string | number) => Joi.object({
@@ -10,16 +10,17 @@ export const userUpdateSchema = (userId: string | number) => Joi.object({
 
     address: Joi.string().max(100).allow(null, ""),
     comments: Joi.string().max(100).allow(null, ""),
-    status: Joi.string().valid(...STATUSES).allow(null, ""),
+    // status is NOT NULL in DB, so don't allow null
+    status: Joi.string().valid(...STATUSES).required(),
 
-    role_id: Joi.number().integer().required()
-        .external(validateCompositeUnique("roles", ["role_id"], {ignoreId: userId})),
+    role_id: Joi.number().integer()
+        .external(validateExists("roles", {column: "id"})),
     phone: Joi.string().min(10).max(16).allow(null, "")
-        .external(validateCompositeUnique("users", ["phone"], {ignoreId: userId})),
+        .external(validateUnique("users", "phone", {ignoreId: userId})),
     email: Joi.string().email().max(180).allow(null, "")
-        .external(validateCompositeUnique("users", ["email"], {ignoreId: userId})),
+        .external(validateUnique("users", "email", {ignoreId: userId})),
     username: Joi.string().min(2).max(16).pattern(/^[a-zA-Z0-9_]+$/).allow(null, "")
-        .external(validateCompositeUnique("users", ["username"], {ignoreId: userId}))
+        .external(validateUnique("users", "username", {ignoreId: userId}))
         .required(),
     password: Joi.string().min(8).max(32)
         .pattern(/[A-Z]/)           // At least one uppercase letter

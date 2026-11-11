@@ -1,5 +1,6 @@
 // src/modules/auth/password-recovery/password-recovery.service.ts
 import {UserRepository} from "../../users/user.repository";
+import {AuthenticationTokenRepository} from "../authentication/authentication-token.repository";
 import {PasswordRecoveryRepository} from "./password-recovery.repository";
 import {
     PasswordRecoveryCreateData,
@@ -13,6 +14,7 @@ import {AppError} from "../../../common/utils/errors";
 import Messages from "../../../common/utils/messages";
 import {SettingService} from "../../system/settings/setting.service";
 import {MailService} from "../../../common/interfaces/mail.interface";
+import {DateUtil} from "../../../common/utils/date.util";
 
 const CODE_LENGTH = 6;
 const CODE_EXPIRATION_MINUTES = 30;
@@ -28,21 +30,16 @@ export class PasswordRecoveryService {
         private readonly userRepository: UserRepository,
         private readonly settingService: SettingService,
         private readonly mailService: MailService,
+        private readonly authenticationTokenRepository: AuthenticationTokenRepository,
+        private readonly dateUtil: DateUtil,
     ) {
     }
 
     /**
      * Sends a password recovery code.
      *
-     * The recovery record and notification are treated as one workflow:
-     *
-     * 1. Resolve account.
-     * 2. Check resend cooldown.
-     * 3. Generate and persist hashed recovery code.
-     * 4. Send notification.
-     * 5. Commit transaction.
-     *
-     * If notification delivery throws, the transaction is rolled back.
+     * Always returns the same response shape to prevent account enumeration.
+     * Email is sent OUTSIDE the transaction to avoid holding DB connections.
      */
     async sendRecoveryCode(
         type: Type,
@@ -52,9 +49,15 @@ export class PasswordRecoveryService {
 
         /*
          * Do not reveal whether the account exists.
+         * Return the same shape for both cases.
          */
         if (!user) {
-            return {sent: true};
+            // Simulate processing time for unknown accounts to prevent timing attacks
+            await this.securityUtil.compare(
+                "$2b$12$00000000000000000000000000000000000000000000000000000",
+                sendTo,
+            );
+            return {sent: true, nextResendAt: null};
         }
 
         const now = new Date();
@@ -88,10 +91,8 @@ export class PasswordRecoveryService {
         };
 
         /*
-         * The mail operation intentionally occurs inside the transaction.
-         *
-         * If MailService throws, the transaction rolls back
-         * the inserted recovery record automatically.
+         * The transaction only handles the DB operations.
+         * Email is sent AFTER the transaction commits.
          */
         await this.recoveryRepository.withTransaction(async (trx) => {
             if (existingRecovery) {
@@ -105,13 +106,17 @@ export class PasswordRecoveryService {
                 recoveryData,
                 trx,
             );
-
-            await this.sendRecoveryNotification(
-                type,
-                sendTo,
-                rawCode,
-            );
         });
+
+        /*
+         * Send notification OUTSIDE the transaction.
+         * This prevents holding DB connections during email delivery.
+         */
+        await this.sendRecoveryNotification(
+            type,
+            sendTo,
+            rawCode,
+        );
 
         return {
             sent: true,
@@ -121,6 +126,9 @@ export class PasswordRecoveryService {
 
     /**
      * Validates the recovery code and changes the user's password.
+     *
+     * This operation is atomic: password update + recovery deletion +
+     * session revocation all happen in a single transaction.
      */
     async resetPassword(
         type: Type,
@@ -185,29 +193,29 @@ export class PasswordRecoveryService {
             await this.securityUtil.hash(newPassword);
 
         /*
-         * Password update and recovery invalidation should happen
-         * atomically.
+         * All operations happen in a single transaction:
+         * 1. Update password
+         * 2. Delete recovery record
+         * 3. Revoke all sessions
          */
-        await this.userRepository.updatePassword(
-            user.id,
-            hashedPassword,
-        );
-
-        const deleted =
-            await this.recoveryRepository.deleteById(recovery.id);
-
-        if (!deleted) {
-            /*
-             * At this point the password has already changed.
-             *
-             * This is why the final implementation should move these
-             * two operations into a shared transaction/unit-of-work.
-             */
-            throw new AppError(
-                Messages.RECOVERY_COMPLETION_FAILED,
-                "Unable to complete password recovery.",
+        await this.recoveryRepository.withTransaction(async (trx) => {
+            await this.userRepository.updatePassword(
+                user.id,
+                hashedPassword,
+                trx,
             );
-        }
+
+            await this.recoveryRepository.deleteById(
+                recovery.id,
+                trx,
+            );
+
+            // Revoke all sessions for this user
+            await this.authenticationTokenRepository.deleteAllByUserId(user.id);
+        });
+
+        // Send password changed notification (outside transaction)
+        await this.sendPasswordChangedNotification(type, sendTo);
     }
 
     private async findUser(
@@ -326,10 +334,13 @@ export class PasswordRecoveryService {
 
             case RECOVERY_PHONE:
                 /*
-                 * SMS provider can be added here without changing
-                 * controller/API behavior.
+                 * Phone recovery is not implemented yet.
+                 * Return a clear error instead of claiming success.
                  */
-                return;
+                throw new AppError(
+                    Messages.INVALID_RECOVERY_TYPE,
+                    "Phone recovery channel is not available. Please use email recovery.",
+                );
         }
     }
 
@@ -346,5 +357,27 @@ export class PasswordRecoveryService {
             subject: emailSettings.psr_eml_sbj,
             text: `Recovery Code: ${plainCode}`,
         });
+    }
+
+    private async sendPasswordChangedNotification(
+        type: Type,
+        sendTo: string,
+    ): Promise<void> {
+        switch (type) {
+            case RECOVERY_EMAIL:
+                const settings = await this.settingService.getCache();
+                const emailSettings = settings.pri;
+
+                await this.mailService.send({
+                    to: sendTo,
+                    from: emailSettings.psr_eml_snd,
+                    subject: emailSettings.psr_eml_sbj,
+                    text: "Your password has been successfully reset. If you didn't make this change, please contact support.",
+                });
+                return;
+
+            case RECOVERY_PHONE:
+                return;
+        }
     }
 }

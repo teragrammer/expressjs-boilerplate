@@ -72,6 +72,11 @@ export const errorHandler = (
         "Unhandled Application Exception:",
         err,
     );
+    logger.error(`Error stack: ${err?.stack}`);
+    logger.error(`Error type: ${typeof err}`);
+    logger.error(`Error constructor: ${err?.constructor?.name}`);
+    logger.error(`Error keys: ${err ? Object.keys(err) : "null"}`);
+    logger.error(`Error JSON: ${err ? JSON.stringify(err, Object.getOwnPropertyNames(err)) : "null"}`);
 
     res.status(500).json({
         code: errors.SERVER_ERROR.code,

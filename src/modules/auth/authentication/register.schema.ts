@@ -1,6 +1,6 @@
 // src/modules/auth/authentication/register.schema.ts
 import Joi from '../../../shared/validations/joi';
-import {validateCompositeUnique} from "../../../shared/validations/database/unique"; // Using your customized extended Joi
+import {validateUnique} from "../../../shared/validations";
 
 export const registerSchema = Joi.object({
     first_name: Joi.string().trim().min(2).max(100).required(),
@@ -14,14 +14,14 @@ export const registerSchema = Joi.object({
         .max(16)
         .pattern(/^[a-zA-Z0-9_]+$/)
         .required()
-        .external(validateCompositeUnique('users', ['username'])),
+        .external(validateUnique('users', 'username')),
 
     email: Joi.string()
         .trim()
         .email()
         .max(180)
         .required()
-        .external(validateCompositeUnique('users', ['email'])),
+        .external(validateUnique('users', 'email')),
 
     password: Joi.string()
         .min(8)

@@ -6,6 +6,7 @@ import {verifyOtpSchema} from "./two-factor-authentication.schema";
 
 import {AuthenticationMiddleware} from "../../../common/middleware/authentication.middleware";
 import {validate} from "../../../common/middleware/validate.middleware";
+import {authRateLimiters} from "../../../common/middleware/rate-limiter.middleware";
 
 import {twoFactorAuthenticationService} from "../../../config/container";
 
@@ -19,6 +20,7 @@ export default () => {
 
     router.get(
         "/tfa/send",
+        authRateLimiters.tfaSend,
         AuthenticationMiddleware(),
         twoFactorAuthenticationController.send,
     );
@@ -26,10 +28,32 @@ export default () => {
     router.post(
         "/tfa/validate",
         [
+            authRateLimiters.tfaValidate,
             AuthenticationMiddleware(),
             validate(verifyOtpSchema, ["code"]),
         ],
         twoFactorAuthenticationController.validate,
+    );
+
+    // TFA Enrollment - requires authentication and a valid OTP
+    router.post(
+        "/tfa/enroll",
+        [
+            authRateLimiters.tfaValidate,
+            AuthenticationMiddleware(),
+            validate(verifyOtpSchema, ["code"]),
+        ],
+        twoFactorAuthenticationController.enroll,
+    );
+
+    // TFA Disable - requires authentication and password verification
+    router.post(
+        "/tfa/disable",
+        [
+            AuthenticationMiddleware(),
+            // Rate limit disable attempts
+        ],
+        twoFactorAuthenticationController.disable,
     );
 
     return router;

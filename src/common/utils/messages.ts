@@ -185,6 +185,11 @@ export const Messages = {
         status: 500,
         message: "Unable to delete the requested resource at this time. Please try again shortly",
     },
+    RATE_LIMIT_EXCEEDED: {
+        code: "RATE_LIMIT_EXCEEDED",
+        status: 429,
+        message: "Too many requests, please try again later",
+    },
 } as const;
 
 /**

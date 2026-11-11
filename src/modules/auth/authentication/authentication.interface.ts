@@ -19,7 +19,7 @@ export interface AuthenticationToken {
     id: number;
     user_id: number | null;
     tries?: number;
-    expired_at: Date | string | null;
+    expired_at: Date | string;
     ip: string | null;
     browser: string | null;
     os: string | null;
@@ -36,4 +36,5 @@ export interface JwtExtendedPayload extends JwtPayload {
     tfa: boolean; // if true continue without validation, false need 2fa validation
     rol?: string; // role slug used for authorization
     bpa?: number; // bypass authorization flag (1 = bypass)
+    av?: number; // authorization_version for fresh auth checks
 }

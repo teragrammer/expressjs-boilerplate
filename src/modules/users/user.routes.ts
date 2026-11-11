@@ -35,7 +35,7 @@ export default () => {
     router.put("/:id", [
         AuthenticationMiddleware(),
         AuthorizationMiddleware("users:update"),
-        validate((req) => userUpdateSchema(req.credentials!.jwt.uid), [
+        validate((req) => userUpdateSchema(String(req.params.id)), [
             "first_name", "middle_name", "last_name",
             "role_id", "phone", "email", "username", "password",
             "address", "comments", "status",

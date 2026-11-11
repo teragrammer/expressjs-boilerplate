@@ -1,6 +1,12 @@
 // src/modules/auth/two-factor-authentication/two-factor-authentication.interface.ts
 import {User} from "../../users/user.interface";
 
+export enum TfaPolicy {
+    DISABLED = "disabled",
+    PER_USER = "per_user",
+    GLOBAL = "global",
+}
+
 export interface TwoFactorAuthentication {
     id: number;
     token_id: number | null;
@@ -34,4 +40,15 @@ export interface VerifyOtpInput {
         browser: string | null;
         os: string | null;
     };
+}
+
+export interface EnrollTfaInput {
+    userId: number;
+    tokenId: number;
+    code: string;
+}
+
+export interface EnrollTfaResult {
+    enrolled: boolean;
+    recoveryCodes?: string[];
 }

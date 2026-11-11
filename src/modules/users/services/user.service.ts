@@ -55,6 +55,21 @@ export class UserService {
     }
 
     async updateUser(id: number, data: UpdateUserDTO): Promise<User> {
+        // First check current user to compare role_id and status
+        const currentUser = await this.userRepository.findAuthById(id);
+        if (!currentUser) {
+            throw new AppError(Messages.DATA_NOT_FOUND);
+        }
+
+        // Check if role_id or status is being changed to increment authorization_version
+        const roleChanged = data.role_id !== undefined && data.role_id !== currentUser.role_id;
+        const statusChanged = data.status !== undefined && data.status !== currentUser.status;
+        
+        if (roleChanged || statusChanged) {
+            data.authorization_version = (currentUser.authorization_version || 0) + 1;
+        }
+
+        // Hash password if provided
         if (data.password !== null && typeof data.password !== "undefined") {
             data.password = await this.securityUtil.hash(data.password);
         }
@@ -92,6 +107,12 @@ export class UserService {
             throw new AppError(Messages.DATA_NOT_FOUND);
         }
         return user;
+    }
+
+    async softDelete(id: number): Promise<void> {
+        if (!await this.userRepository.softDelete(id)) {
+            throw new AppError(Messages.DELETE_FAILED);
+        }
     }
 
     async hardDelete(id: number): Promise<void> {

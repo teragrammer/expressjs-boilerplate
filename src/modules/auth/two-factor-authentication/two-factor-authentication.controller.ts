@@ -48,4 +48,38 @@ export class TwoFactorAuthenticationController {
 
         res.status(200).json({token});
     });
+
+    enroll = catchAsync(async (req: Request, res: Response): Promise<void> => {
+        assertCredentials(req);
+        const {jwt} = req.credentials;
+        const user = await req.credentials.user();
+
+        const result = await this.tfaService.enrollTfa({
+            userId: user.id,
+            tokenId: jwt.tid,
+            code: req.body.code,
+        });
+
+        if (result.enrolled && result.recoveryCodes) {
+            res.status(200).json({
+                enrolled: true,
+                message: "Two-factor authentication enabled successfully. Save your recovery codes.",
+                recovery_codes: result.recoveryCodes,
+            });
+        } else {
+            res.status(200).json({enrolled: false});
+        }
+    });
+
+    disable = catchAsync(async (req: Request, res: Response): Promise<void> => {
+        assertCredentials(req);
+        const user = await req.credentials.user();
+
+        await this.tfaService.disableTfa(user.id, req.body.password);
+
+        res.status(200).json({
+            disabled: true,
+            message: "Two-factor authentication disabled successfully.",
+        });
+    });
 }

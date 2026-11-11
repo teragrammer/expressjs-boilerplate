@@ -16,6 +16,7 @@ export class AccountController {
         const token = await this.accountService.information(
             req.credentials.jwt.uid,
             req.sanitize.data as UpdateUserDTO,
+            req.credentials.jwt.tid,
             req.credentials.jwt.tfa,
         );
 
@@ -27,6 +28,7 @@ export class AccountController {
         const token: string = await this.accountService.password(
             await req.credentials.user(),
             req.sanitize.data as unknown as SecurityAccountDTO,
+            req.credentials.jwt.tid,
         );
 
         res.status(200).json(token);

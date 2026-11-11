@@ -5,6 +5,7 @@ export interface SettingKeyValue {
     tkn_exp: number;            // Authentication Token Expiration
 
     tta_req: number;            // TFA Required
+    tta_policy: string;         // TFA Policy (disabled, per_user, global)
     tta_eml_snd: string;        // TFA Email Sender
     tta_eml_sbj: string;        // TFA Email Subject
 

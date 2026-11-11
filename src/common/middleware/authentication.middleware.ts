@@ -44,9 +44,15 @@ export function AuthenticationMiddleware(isHalt = true): any {
             };
 
             // Enforce server-side session existence for revocable tokens.
-            if (payload.tid && payload.tid > 0) {
-                await req.credentials.authentication();
+            // All tokens must have a valid tid > 0 and corresponding session.
+            if (!payload.tid || payload.tid <= 0) {
+                if (isHalt) {
+                    return next(new AppError(Messages.UNAUTHORIZED, "Invalid session token"));
+                }
+                return next();
             }
+
+            await req.credentials.authentication();
 
             return next();
         } catch (err) {

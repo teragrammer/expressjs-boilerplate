@@ -148,6 +148,7 @@ describe("AccountController", () => {
             expect(mockInformation).toHaveBeenCalledWith(
                 1,
                 validatedData,
+                45,  // currentTid
                 false,
             );
 
@@ -175,6 +176,7 @@ describe("AccountController", () => {
             expect(mockInformation).toHaveBeenCalledWith(
                 42,
                 validatedData,
+                45,  // currentTid (unchanged)
                 false,
             );
 
@@ -209,6 +211,7 @@ describe("AccountController", () => {
             expect(mockInformation).toHaveBeenCalledWith(
                 1,
                 validatedData,
+                45,
                 false,
             );
 
@@ -259,6 +262,7 @@ describe("AccountController", () => {
             expect(mockInformation).toHaveBeenCalledWith(
                 1,
                 req.sanitize!.data,
+                45,
                 false,
             );
 
@@ -290,6 +294,7 @@ describe("AccountController", () => {
             expect(mockPassword).toHaveBeenCalledWith(
                 user,
                 validatedData,
+                45,  // currentTid
             );
 
             expect(req.sanitize!.body.only).not.toHaveBeenCalled();
@@ -322,6 +327,7 @@ describe("AccountController", () => {
             expect(mockPassword).toHaveBeenCalledWith(
                 authenticatedUser,
                 validatedData,
+                45,  // currentTid
             );
 
             expectSuccessfulResponse("new-token");
@@ -348,6 +354,7 @@ describe("AccountController", () => {
             expect(mockPassword).toHaveBeenCalledWith(
                 user,
                 validatedData,
+                45,
             );
 
             expectErrorForwarded(serviceError);
@@ -409,6 +416,7 @@ describe("AccountController", () => {
             expect(mockPassword).toHaveBeenCalledWith(
                 user,
                 undefined,
+                45,
             );
 
             expectSuccessfulResponse("token");

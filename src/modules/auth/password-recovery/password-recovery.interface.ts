@@ -30,7 +30,7 @@ export interface PasswordRecoveryCreateData {
 
 export interface PasswordRecoveryResult {
     sent: boolean;
-    nextResendAt?: Date;
+    nextResendAt?: Date | null;
 }
 
 export interface PasswordRecoverySendRequest {

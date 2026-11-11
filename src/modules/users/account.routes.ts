@@ -5,21 +5,10 @@ import {TwoFactorAuthenticationMiddleware} from "../../common/middleware/two-fac
 import {validate} from "../../common/middleware/validate.middleware";
 import {accountInformationSchema} from "./validations/account-information.schema";
 import {AccountController} from "./controllers/account.controller";
-import {AccountService} from "./services/account.service";
-import {UserRepository} from "./user.repository";
-import {TokenService} from "../auth/authentication/authentication-token.service";
 import {accountPasswordSchema} from "./validations/account-password.schema";
-import {SecurityUtil} from "../../common/utils/security.util";
-import {__ENV} from "../../config/environment";
+import {accountService} from "../../config/container";
 
-const accountController = new AccountController(new AccountService(
-    new UserRepository(),
-    new TokenService(),
-    new SecurityUtil({
-        bcryptSecret: __ENV.BCRYPT_SECRET,
-        bcryptSaltRounds: Number(__ENV.BCRYPT_SALT_ROUND || 10),
-    })
-));
+const accountController = new AccountController(accountService);
 
 export default () => {
     const router = Router();

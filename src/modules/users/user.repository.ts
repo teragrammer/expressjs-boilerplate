@@ -24,6 +24,7 @@ const USER_PUBLIC_COLUMNS = [
     "comments",
     "created_at",
     "updated_at",
+    "authorization_version",
 ] as const;
 
 /**
@@ -49,6 +50,7 @@ export class UserRepository {
             is_phone_verified: Boolean(row.is_phone_verified),
             is_email_verified: Boolean(row.is_email_verified),
             has_tfa: Boolean(row.has_tfa),
+            authorization_version: Number(row.authorization_version),
         } as User;
     }
 
@@ -289,6 +291,7 @@ export class UserRepository {
                 is_phone_verified: Boolean(row.is_phone_verified),
                 is_email_verified: Boolean(row.is_email_verified),
                 has_tfa: Boolean(row.has_tfa),
+                authorization_version: Number(row.authorization_version),
             })) as User[];
 
         const nextCursor =

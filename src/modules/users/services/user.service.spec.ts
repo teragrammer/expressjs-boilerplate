@@ -21,6 +21,8 @@ describe("UserService", () => {
         update: ReturnType<typeof vi.fn>;
         browse: ReturnType<typeof vi.fn>;
         findById: ReturnType<typeof vi.fn>;
+        findAuthById: ReturnType<typeof vi.fn>;
+        softDelete: ReturnType<typeof vi.fn>;
         hardDelete: ReturnType<typeof vi.fn>;
     };
     let securityUtil: {
@@ -46,6 +48,7 @@ describe("UserService", () => {
         tfa_secret: null,
         login_tries: 0,
         failed_login_expired_at: null,
+        authorization_version: 0,
         deleted_at: null,
         created_at: new Date(),
         updated_at: new Date(),
@@ -86,6 +89,8 @@ describe("UserService", () => {
             update: vi.fn(),
             browse: vi.fn(),
             findById: vi.fn(),
+            findAuthById: vi.fn(),
+            softDelete: vi.fn(),
             hardDelete: vi.fn(),
         };
 
@@ -97,6 +102,9 @@ describe("UserService", () => {
             userRepository as unknown as UserRepository,
             securityUtil as unknown as SecurityUtil,
         );
+
+        // Default mock for findAuthById to return the mockUser
+        userRepository.findAuthById.mockResolvedValue(mockUser);
     });
 
     describe("registerUser()", () => {
@@ -371,6 +379,7 @@ describe("UserService", () => {
             expect(securityUtil.hash).toHaveBeenCalledWith(
                 "PlainPassword123!",
             );
+            expect(userRepository.findAuthById).toHaveBeenCalledWith(42);
             expect(userRepository.update).toHaveBeenCalledWith(
                 42,
                 {
@@ -392,6 +401,7 @@ describe("UserService", () => {
 
             expect(result).toEqual(mockUser);
             expect(securityUtil.hash).not.toHaveBeenCalled();
+            expect(userRepository.findAuthById).toHaveBeenCalledWith(42);
             expect(userRepository.update).toHaveBeenCalledWith(42, data);
         });
 
@@ -407,6 +417,7 @@ describe("UserService", () => {
 
             expect(result).toEqual(mockUser);
             expect(securityUtil.hash).not.toHaveBeenCalled();
+            expect(userRepository.findAuthById).toHaveBeenCalledWith(42);
             expect(userRepository.update).toHaveBeenCalledWith(42, data);
         });
 
@@ -419,6 +430,7 @@ describe("UserService", () => {
             );
 
             expect(result).toEqual(mockUser);
+            expect(userRepository.findAuthById).toHaveBeenCalledWith(42);
         });
 
         it("should throw a server error when repository returns null", async () => {
@@ -432,6 +444,7 @@ describe("UserService", () => {
                 statusCode: 404,
             });
 
+            expect(userRepository.findAuthById).toHaveBeenCalledWith(42);
             expect(userRepository.update).toHaveBeenCalledWith(
                 42,
                 updateUserData,
@@ -450,6 +463,7 @@ describe("UserService", () => {
                 }),
             ).rejects.toThrow("Hashing failed");
 
+            expect(userRepository.findAuthById).toHaveBeenCalledWith(42);
             expect(userRepository.update).not.toHaveBeenCalled();
         });
 
@@ -461,6 +475,51 @@ describe("UserService", () => {
             await expect(
                 service.updateUser(42, {...updateUserData}),
             ).rejects.toThrow("Database error");
+
+            expect(userRepository.findAuthById).toHaveBeenCalledWith(42);
+        });
+
+        it("should increment authorization_version when role_id changes", async () => {
+            const data: UpdateUserDTO = {
+                ...updateUserData,
+                role_id: 2,
+            };
+
+            securityUtil.hash.mockResolvedValue("hashed-password");
+            userRepository.update.mockResolvedValue({...mockUser, role_id: 2, authorization_version: 1});
+
+            const result = await service.updateUser(42, data);
+
+            expect(result).toEqual(expect.objectContaining({role_id: 2, authorization_version: 1}));
+            expect(userRepository.findAuthById).toHaveBeenCalledWith(42);
+            expect(userRepository.update).toHaveBeenCalledWith(
+                42,
+                expect.objectContaining({
+                    role_id: 2,
+                    authorization_version: 1,
+                }),
+            );
+        });
+
+        it("should increment authorization_version when status changes", async () => {
+            const data: UpdateUserDTO = {
+                ...updateUserData,
+                status: "Suspended",
+            };
+
+            userRepository.update.mockResolvedValue({...mockUser, status: "Suspended", authorization_version: 1});
+
+            const result = await service.updateUser(42, data);
+
+            expect(result).toEqual(expect.objectContaining({status: "Suspended", authorization_version: 1}));
+            expect(userRepository.findAuthById).toHaveBeenCalledWith(42);
+            expect(userRepository.update).toHaveBeenCalledWith(
+                42,
+                expect.objectContaining({
+                    status: "Suspended",
+                    authorization_version: 1,
+                }),
+            );
         });
     });
 

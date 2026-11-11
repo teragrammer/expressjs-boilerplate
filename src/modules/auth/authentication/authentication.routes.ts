@@ -8,6 +8,7 @@ import {RegisterController} from "./register.controller";
 
 import {AuthenticationMiddleware} from "../../../common/middleware/authentication.middleware";
 import {validate} from "../../../common/middleware/validate.middleware";
+import {authRateLimiters} from "../../../common/middleware/rate-limiter.middleware";
 
 import {authService} from "../../../config/container";
 
@@ -20,8 +21,12 @@ const registerController =
 export default () => {
     const router = Router();
 
+    // Global auth rate limiter applied to all auth endpoints
+    router.use(authRateLimiters.globalAuth);
+
     router.post(
         "/register",
+        authRateLimiters.register,
         validate(registerSchema, [
             "first_name",
             "middle_name",
@@ -35,6 +40,7 @@ export default () => {
 
     router.post(
         "/login",
+        authRateLimiters.login,
         validate(loginSchema, [
             "username",
             "password",
@@ -44,6 +50,7 @@ export default () => {
 
     router.get(
         "/logout",
+        authRateLimiters.logout,
         AuthenticationMiddleware(),
         authenticationController.logout,
     );

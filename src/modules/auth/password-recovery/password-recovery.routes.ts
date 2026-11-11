@@ -4,6 +4,7 @@ import {Router} from "express";
 import {PasswordRecoveryController} from "./password-recovery.controller";
 
 import {validate} from "../../../common/middleware/validate.middleware";
+import {authRateLimiters} from "../../../common/middleware/rate-limiter.middleware";
 
 import {passwordRecoveryService} from "../../../config/container";
 
@@ -20,6 +21,7 @@ export default () => {
 
     router.post(
         "/password-recovery/send",
+        authRateLimiters.passwordRecoverySend,
         validate(
             passwordRecoverySendSchema,
             ["type", "send_to"],
@@ -29,6 +31,7 @@ export default () => {
 
     router.post(
         "/password-recovery/validate",
+        authRateLimiters.passwordRecoveryValidate,
         validate(
             passwordRecoveryValidateSchema,
             [

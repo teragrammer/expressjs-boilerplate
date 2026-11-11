@@ -8,6 +8,7 @@ import {
 } from "./authentication.interface";
 
 export const AUTHENTICATION_TOKEN_TABLE = "authentication_tokens";
+export const TWO_FACTOR_AUTHENTICATION_TABLE = "two_factor_authentications";
 
 export class AuthenticationTokenRepository {
     private readonly db: DatabaseExecutor;
@@ -29,25 +30,33 @@ export class AuthenticationTokenRepository {
 
     /**
      * Retrieves an active, unexpired token record by its ID.
+     * Enforces session expiry and user_id matching for security.
      */
-    public async findById(id: number): Promise<AuthenticationToken | null> {
-        const token = await this.db
+    public async findById(id: number, userId?: number): Promise<AuthenticationToken | null> {
+        let query = this.db
             .selectFrom(AUTHENTICATION_TOKEN_TABLE)
             .selectAll()
             .where("id", "=", id)
-            .executeTakeFirst();
+            .where("expired_at", ">", sql<Date>`now()`);
+
+        if (userId !== undefined) {
+            query = query.where("user_id", "=", userId);
+        }
+
+        const token = await query.executeTakeFirst();
 
         return token || null;
     }
 
     /**
-     * Finds all active tokens associated with a specific user.
+     * Finds all active (unexpired) tokens associated with a specific user.
      */
     public async findByUserId(userId: number): Promise<AuthenticationToken[]> {
         return this.db
             .selectFrom(AUTHENTICATION_TOKEN_TABLE)
             .selectAll()
             .where("user_id", "=", userId)
+            .where("expired_at", ">", sql<Date>`now()`)
             .orderBy("created_at", "desc")
             .execute();
     }
@@ -85,8 +94,15 @@ export class AuthenticationTokenRepository {
 
     /**
      * Deletes a single token record by its primary ID.
+     * Also deletes associated 2FA records to maintain referential integrity.
      */
     public async deleteById(id: number): Promise<boolean> {
+        // First delete associated 2FA records
+        await this.db
+            .deleteFrom(TWO_FACTOR_AUTHENTICATION_TABLE)
+            .where("token_id", "=", id)
+            .execute();
+
         const result = await this.db
             .deleteFrom(AUTHENTICATION_TOKEN_TABLE)
             .where("id", "=", id)
@@ -96,27 +112,74 @@ export class AuthenticationTokenRepository {
     }
 
     /**
-     * Revokes (deletes) all active tokens linked to a specific user.
+     * Revokes (deletes) all tokens linked to a specific user (including expired).
+     * Also deletes associated 2FA records.
      */
-    public async deleteAllByUserId(userId: number): Promise<number> {
-        const result = await this.db
+    public async deleteAllByUserId(userId: number, excludeTokenId?: number): Promise<number> {
+        // First delete all 2FA records for this user's tokens (excluding the excluded one)
+        let tokenQuery = this.db
+            .selectFrom(AUTHENTICATION_TOKEN_TABLE)
+            .select("id")
+            .where("user_id", "=", userId);
+
+        if (excludeTokenId !== undefined) {
+            tokenQuery = tokenQuery.where("id", "!=", excludeTokenId);
+        }
+
+        const tokens = await tokenQuery.execute();
+
+        if (tokens.length > 0) {
+            const tokenIds = tokens.map(t => t.id);
+            await this.db
+                .deleteFrom(TWO_FACTOR_AUTHENTICATION_TABLE)
+                .where("token_id", "in", tokenIds)
+                .execute();
+        }
+
+        // Now delete the tokens
+        let deleteQuery = this.db
             .deleteFrom(AUTHENTICATION_TOKEN_TABLE)
-            .where("user_id", "=", userId)
-            .executeTakeFirst();
+            .where("user_id", "=", userId);
+
+        if (excludeTokenId !== undefined) {
+            deleteQuery = deleteQuery.where("id", "!=", excludeTokenId);
+        }
+
+        const result = await deleteQuery.executeTakeFirst();
 
         return Number(result.numDeletedRows);
     }
 
     /**
      * Automatically purges obsolete or expired session tokens from the table.
+     * Also deletes associated 2FA records.
      */
     public async purgeExpiredTokensByUserId(userId: number): Promise<number> {
-        const result = await this.db
-            .deleteFrom(AUTHENTICATION_TOKEN_TABLE)
+        // First get expired token IDs
+        const expiredTokens = await this.db
+            .selectFrom(AUTHENTICATION_TOKEN_TABLE)
+            .select("id")
             .where("user_id", "=", userId)
             .where("expired_at", "<", sql<Date>`now()`)
-            .executeTakeFirst();
+            .execute();
 
-        return Number(result.numDeletedRows);
+        if (expiredTokens.length > 0) {
+            const tokenIds = expiredTokens.map(t => t.id);
+            // Delete associated 2FA records
+            await this.db
+                .deleteFrom(TWO_FACTOR_AUTHENTICATION_TABLE)
+                .where("token_id", "in", tokenIds)
+                .execute();
+
+            // Delete expired tokens
+            const result = await this.db
+                .deleteFrom(AUTHENTICATION_TOKEN_TABLE)
+                .where("id", "in", tokenIds)
+                .executeTakeFirst();
+
+            return Number(result.numDeletedRows);
+        }
+
+        return 0;
     }
 }

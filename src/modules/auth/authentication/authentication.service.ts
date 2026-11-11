@@ -12,6 +12,7 @@ import Messages from "../../../common/utils/messages";
 import {User} from "../../users/user.interface";
 import {AuthenticationTokenRepository} from "./authentication-token.repository";
 import {SettingService} from "../../system/settings/setting.service";
+import {TwoFactorAuthenticationService} from "../two-factor-authentication/two-factor-authentication.service";
 import {__ENV} from "../../../config/environment";
 
 export class AuthenticationService {
@@ -24,6 +25,7 @@ export class AuthenticationService {
         private readonly tokenService: TokenService,
         private readonly dateUtil: DateUtil,
         private readonly settingService: SettingService,
+        private readonly tfaService: TwoFactorAuthenticationService,
     ) {
     }
 
@@ -67,6 +69,7 @@ export class AuthenticationService {
             tfa: false,
             rol: role.slug,
             bpa: role.is_bypass_authorization ? 1 : 0,
+            av: newUser.authorization_version || 0,
         });
 
         return {token};
@@ -75,7 +78,7 @@ export class AuthenticationService {
     /**
      * Executes the business workflow for user login.
      */
-    async login(data: LoginInput): Promise<{ token: string }> {
+    async login(data: LoginInput): Promise<{ token: string; tfaRequired?: boolean }> {
         const user: User | null = await this.userRepository.findByUsername(data.username);
 
         // Mitigate Username Enumeration. If user is missing, skip to generic fail block.
@@ -85,6 +88,12 @@ export class AuthenticationService {
                 "$2b$12$00000000000000000000000000000000000000000000000000000",
                 data.password,
             );
+            this.handleFailedLogin();
+        }
+
+        // Enforce account status - only Activated users can authenticate
+        if (user.status !== "Activated") {
+            // Don't reveal the specific status, use generic error
             this.handleFailedLogin();
         }
 
@@ -127,6 +136,17 @@ export class AuthenticationService {
             this.handleFailedLogin();
         }
 
+        // Reset login tries on successful login
+        if (user.login_tries > 0 || user.failed_login_expired_at) {
+            await this.userRepository.update(user.id, {
+                login_tries: 0,
+                failed_login_expired_at: null,
+            });
+        }
+
+        // Check if TFA is required for this user
+        const tfaRequired = await this.tfaService.isTfaRequired(user);
+
         // purge expired tokens
         await this.authenticationTokenRepository.purgeExpiredTokensByUserId(user.id);
 
@@ -145,16 +165,17 @@ export class AuthenticationService {
             os: null,
         });
 
-        // generate a JWT token
+        // generate a JWT token - set tfa to false if TFA is required (user needs to complete TFA)
         const token = this.tokenService.generateToken({
             uid: user.id,
             tid: session.id,
-            tfa: false,
+            tfa: !tfaRequired, // false if TFA required, true if not required or disabled
             rol: role.slug,
             bpa: role.is_bypass_authorization ? 1 : 0,
+            av: user.authorization_version || 0,
         });
 
-        return {token};
+        return {token, tfaRequired};
     }
 
     /**
@@ -179,10 +200,17 @@ export class AuthenticationService {
     }
 
     async findAuthenticationToken(payload: JwtExtendedPayload): Promise<AuthenticationToken> {
-        const session = await this.authenticationTokenRepository.findById(payload.tid);
+        const session = await this.authenticationTokenRepository.findById(payload.tid, payload.uid);
         if (!session) {
             throw new AppError(Messages.SESSION_EXPIRED, "Active token session not found.");
         }
+        
+        // Check if authorization_version matches (for fresh auth)
+        const user = await this.userRepository.findAuthById(payload.uid);
+        if (user && payload.av !== undefined && user.authorization_version !== payload.av) {
+            throw new AppError(Messages.SESSION_EXPIRED, "Authorization has changed. Please log in again.");
+        }
+        
         return session;
     }
 }

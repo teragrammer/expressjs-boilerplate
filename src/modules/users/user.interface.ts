@@ -26,6 +26,7 @@ export interface UserRow {
     login_tries: number;
     failed_login_expired_at: Date | null;
     comments: string | null;
+    authorization_version: number;
     created_at: Date;
     updated_at: Date;
     deleted_at: Date | null;
@@ -52,6 +53,7 @@ export interface User {
     login_tries: number;
     failed_login_expired_at: Date | null;
     comments: string | null;
+    authorization_version: number;
     created_at: Date;
     updated_at: Date;
     deleted_at: Date | null;
@@ -81,6 +83,7 @@ export type UpdateUserDTO = Partial<CreateUserDTO> & {
     tfa_secret?: string | null;
     login_tries?: number;
     failed_login_expired_at?: Date | null;
+    authorization_version?: number;
 };
 
 export interface SecurityAccountDTO {

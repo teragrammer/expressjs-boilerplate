@@ -11,13 +11,13 @@ const {
     mockUpdateUser,
     mockBrowseUsers,
     mockFindById,
-    mockHardDelete,
+    mockSoftDelete,
 } = vi.hoisted(() => ({
     mockCreateUser: vi.fn(),
     mockUpdateUser: vi.fn(),
     mockBrowseUsers: vi.fn(),
     mockFindById: vi.fn(),
-    mockHardDelete: vi.fn(),
+    mockSoftDelete: vi.fn(),
 }));
 
 vi.mock("../../../../src/common/utils/catch-async", () => ({
@@ -108,7 +108,7 @@ describe("UserController", () => {
             updateUser: mockUpdateUser,
             browseUsers: mockBrowseUsers,
             findById: mockFindById,
-            hardDelete: mockHardDelete,
+            softDelete: mockSoftDelete,
         } as unknown as UserService;
 
         controller = new UserController(userService);
@@ -538,17 +538,17 @@ describe("UserController", () => {
     });
 
     describe("delete()", () => {
-        it("should hard delete a user using the numeric route ID", async () => {
+        it("should soft delete a user using the numeric route ID", async () => {
             req.params = {
                 id: "42",
             };
 
-            mockHardDelete.mockResolvedValue(undefined);
+            mockSoftDelete.mockResolvedValue(undefined);
 
             await invoke("delete");
 
-            expect(mockHardDelete).toHaveBeenCalledTimes(1);
-            expect(mockHardDelete).toHaveBeenCalledWith(42);
+            expect(mockSoftDelete).toHaveBeenCalledTimes(1);
+            expect(mockSoftDelete).toHaveBeenCalledWith(42);
 
             expectResponse("send");
         });
@@ -558,12 +558,12 @@ describe("UserController", () => {
                 id: "99",
             };
 
-            mockHardDelete.mockResolvedValue(undefined);
+            mockSoftDelete.mockResolvedValue(undefined);
 
             await invoke("delete");
 
-            expect(mockHardDelete).toHaveBeenCalledTimes(1);
-            expect(mockHardDelete).toHaveBeenCalledWith(99);
+            expect(mockSoftDelete).toHaveBeenCalledTimes(1);
+            expect(mockSoftDelete).toHaveBeenCalledWith(99);
 
             expectResponse("send");
         });
@@ -573,11 +573,11 @@ describe("UserController", () => {
                 "Failed to delete user",
             );
 
-            mockHardDelete.mockRejectedValue(serviceError);
+            mockSoftDelete.mockRejectedValue(serviceError);
 
             await invoke("delete");
 
-            expect(mockHardDelete).toHaveBeenCalledTimes(1);
+            expect(mockSoftDelete).toHaveBeenCalledTimes(1);
 
             expectErrorForwarded(serviceError);
         });
@@ -587,7 +587,7 @@ describe("UserController", () => {
 
             await invoke("delete");
 
-            expect(mockHardDelete).not.toHaveBeenCalled();
+            expect(mockSoftDelete).not.toHaveBeenCalled();
 
             expectErrorForwarded(expect.any(TypeError));
         });

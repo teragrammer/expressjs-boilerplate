@@ -4,11 +4,15 @@ import {AccountService} from "./account.service";
 import {UserRepository} from "../user.repository";
 import {TokenService} from "../../auth/authentication/authentication-token.service";
 import {SecurityUtil} from "../../../common/utils/security.util";
+import {AuthenticationTokenRepository} from "../../auth/authentication/authentication-token.repository";
+import {RoleService} from "../../system/roles/role.service";
+import {DateUtil} from "../../../common/utils/date.util";
 import {
     SecurityAccountDTO,
     UpdateUserDTO,
     User,
 } from "../user.interface";
+import {AuthenticationToken} from "../../auth/authentication/authentication.interface";
 import Messages from "../../../common/utils/messages";
 
 describe("AccountService", () => {
@@ -25,6 +29,21 @@ describe("AccountService", () => {
     let mockSecurityUtil: {
         compare: ReturnType<typeof vi.fn>;
         hash: ReturnType<typeof vi.fn>;
+    };
+
+    let mockAuthTokenRepository: {
+        findById: ReturnType<typeof vi.fn>;
+        update: ReturnType<typeof vi.fn>;
+        create: ReturnType<typeof vi.fn>;
+        deleteAllByUserId: ReturnType<typeof vi.fn>;
+    };
+
+    let mockRoleService: {
+        findById: ReturnType<typeof vi.fn>;
+    };
+
+    let mockDateUtil: {
+        expiredAt: ReturnType<typeof vi.fn>;
     };
 
     let user: User;
@@ -45,14 +64,30 @@ describe("AccountService", () => {
             hash: vi.fn(),
         };
 
+        mockAuthTokenRepository = {
+            findById: vi.fn(),
+            update: vi.fn(),
+            create: vi.fn(),
+            deleteAllByUserId: vi.fn(),
+        };
+
+        mockRoleService = {
+            findById: vi.fn(),
+        };
+
+        mockDateUtil = {
+            expiredAt: vi.fn(),
+        };
+
         service = new AccountService(
             mockUserRepository as unknown as UserRepository,
             mockTokenService as unknown as TokenService,
             mockSecurityUtil as unknown as SecurityUtil,
+            mockAuthTokenRepository as unknown as AuthenticationTokenRepository,
+            mockRoleService as unknown as RoleService,
+            mockDateUtil as unknown as DateUtil,
         );
 
-        // Create a fresh user for every test because password()
-        // mutates username, email and phone when they are supplied.
         user = {
             id: 1,
             first_name: "John",
@@ -80,6 +115,8 @@ describe("AccountService", () => {
     });
 
     describe("information()", () => {
+        const currentTid = 45;
+
         it("should update account information and return a generated token", async () => {
             const data: UpdateUserDTO = {
                 first_name: "Jane",
@@ -96,12 +133,36 @@ describe("AccountService", () => {
                 address: "456 New Street",
             };
 
-            mockUserRepository.update.mockResolvedValue(updatedUser);
-            mockTokenService.generateToken.mockReturnValue(
-                "mocked-jwt-token",
-            );
+            const session: AuthenticationToken = {
+                id: currentTid,
+                user_id: user.id,
+                tries: 0,
+                expired_at: new Date(Date.now() + 86400000),
+                ip: null,
+                browser: null,
+                os: null,
+                created_at: new Date(),
+                updated_at: new Date(),
+            };
 
-            const result = await service.information(1, data);
+            const role = {
+                id: 1,
+                slug: "customer",
+                is_bypass_authorization: false,
+                created_at: new Date(),
+                updated_at: new Date(),
+            };
+
+            const newExpiredAt = new Date(Date.now() + 86400000 * 7);
+
+            mockUserRepository.update.mockResolvedValue(updatedUser);
+            mockAuthTokenRepository.findById.mockResolvedValue(session);
+            mockAuthTokenRepository.update.mockResolvedValue({...session, expired_at: newExpiredAt});
+            mockDateUtil.expiredAt.mockReturnValue(newExpiredAt);
+            mockRoleService.findById.mockResolvedValue(role);
+            mockTokenService.generateToken.mockReturnValue("mocked-jwt-token");
+
+            const result = await service.information(1, data, currentTid);
 
             expect(mockUserRepository.update).toHaveBeenCalledTimes(1);
             expect(mockUserRepository.update).toHaveBeenCalledWith(
@@ -110,11 +171,18 @@ describe("AccountService", () => {
                 "Activated",
             );
 
+            expect(mockAuthTokenRepository.findById).toHaveBeenCalledWith(currentTid, user.id);
+            expect(mockAuthTokenRepository.update).toHaveBeenCalledWith(currentTid, {expired_at: newExpiredAt});
+            expect(mockRoleService.findById).toHaveBeenCalledWith(user.role_id);
+
             expect(mockTokenService.generateToken).toHaveBeenCalledTimes(1);
             expect(mockTokenService.generateToken).toHaveBeenCalledWith({
                 uid: updatedUser.id,
-                tid: 0,
+                tid: currentTid,
                 tfa: false,
+                rol: role.slug,
+                bpa: role.is_bypass_authorization ? 1 : 0,
+                av: updatedUser.authorization_version || 0,
             });
 
             expect(result).toBe("mocked-jwt-token");
@@ -131,10 +199,36 @@ describe("AccountService", () => {
                 id: 42,
             };
 
+            const session: AuthenticationToken = {
+                id: currentTid,
+                user_id: 42,
+                tries: 0,
+                expired_at: new Date(Date.now() + 86400000),
+                ip: null,
+                browser: null,
+                os: null,
+                created_at: new Date(),
+                updated_at: new Date(),
+            };
+
+            const role = {
+                id: 1,
+                slug: "customer",
+                is_bypass_authorization: false,
+                created_at: new Date(),
+                updated_at: new Date(),
+            };
+
+            const newExpiredAt = new Date(Date.now() + 86400000 * 7);
+
             mockUserRepository.update.mockResolvedValue(updatedUser);
+            mockAuthTokenRepository.findById.mockResolvedValue(session);
+            mockAuthTokenRepository.update.mockResolvedValue({...session, expired_at: newExpiredAt});
+            mockDateUtil.expiredAt.mockReturnValue(newExpiredAt);
+            mockRoleService.findById.mockResolvedValue(role);
             mockTokenService.generateToken.mockReturnValue("new-token");
 
-            const result = await service.information(1, data);
+            const result = await service.information(1, data, currentTid);
 
             expect(mockUserRepository.update).toHaveBeenCalledWith(
                 1,
@@ -142,10 +236,15 @@ describe("AccountService", () => {
                 "Activated",
             );
 
+            expect(mockAuthTokenRepository.findById).toHaveBeenCalledWith(currentTid, 42);
+
             expect(mockTokenService.generateToken).toHaveBeenCalledWith({
                 uid: 42,
-                tid: 0,
+                tid: currentTid,
                 tfa: false,
+                rol: role.slug,
+                bpa: role.is_bypass_authorization ? 1 : 0,
+                av: updatedUser.authorization_version || 0,
             });
 
             expect(result).toBe("new-token");
@@ -160,7 +259,7 @@ describe("AccountService", () => {
             mockUserRepository.update.mockResolvedValue(null);
 
             await expect(
-                service.information(1, data),
+                service.information(1, data, currentTid),
             ).rejects.toMatchObject({
                 message: Messages.SERVER_ERROR.message,
                 errorCode: Messages.SERVER_ERROR.code,
@@ -174,6 +273,7 @@ describe("AccountService", () => {
                 "Activated",
             );
 
+            expect(mockAuthTokenRepository.findById).not.toHaveBeenCalled();
             expect(mockTokenService.generateToken).not.toHaveBeenCalled();
         });
 
@@ -186,7 +286,7 @@ describe("AccountService", () => {
             mockUserRepository.update.mockResolvedValue(undefined);
 
             await expect(
-                service.information(1, data),
+                service.information(1, data, currentTid),
             ).rejects.toMatchObject({
                 message: Messages.SERVER_ERROR.message,
                 errorCode: Messages.SERVER_ERROR.code,
@@ -200,6 +300,7 @@ describe("AccountService", () => {
                 "Activated",
             );
 
+            expect(mockAuthTokenRepository.findById).not.toHaveBeenCalled();
             expect(mockTokenService.generateToken).not.toHaveBeenCalled();
         });
 
@@ -216,8 +317,29 @@ describe("AccountService", () => {
             mockUserRepository.update.mockRejectedValue(repositoryError);
 
             await expect(
-                service.information(1, data),
+                service.information(1, data, currentTid),
             ).rejects.toBe(repositoryError);
+
+            expect(mockAuthTokenRepository.findById).not.toHaveBeenCalled();
+            expect(mockTokenService.generateToken).not.toHaveBeenCalled();
+        });
+
+        it("should throw session expired when session not found", async () => {
+            const data: UpdateUserDTO = {
+                first_name: "Jane",
+                last_name: "Smith",
+            };
+
+            mockUserRepository.update.mockResolvedValue(user);
+            mockAuthTokenRepository.findById.mockResolvedValue(null);
+
+            await expect(
+                service.information(1, data, currentTid),
+            ).rejects.toMatchObject({
+                message: "Active token session not found.",
+                errorCode: Messages.SESSION_EXPIRED.code,
+                statusCode: 401,
+            });
 
             expect(mockTokenService.generateToken).not.toHaveBeenCalled();
         });
@@ -228,17 +350,44 @@ describe("AccountService", () => {
                 last_name: "Smith",
             };
 
+            const session: AuthenticationToken = {
+                id: currentTid,
+                user_id: user.id,
+                tries: 0,
+                expired_at: new Date(Date.now() + 86400000),
+                ip: null,
+                browser: null,
+                os: null,
+                created_at: new Date(),
+                updated_at: new Date(),
+            };
+
+            const role = {
+                id: 1,
+                slug: "customer",
+                is_bypass_authorization: false,
+                created_at: new Date(),
+                updated_at: new Date(),
+            };
+
+            const newExpiredAt = new Date(Date.now() + 86400000 * 7);
+
+            mockUserRepository.update.mockResolvedValue(user);
+            mockAuthTokenRepository.findById.mockResolvedValue(session);
+            mockAuthTokenRepository.update.mockResolvedValue({...session, expired_at: newExpiredAt});
+            mockDateUtil.expiredAt.mockReturnValue(newExpiredAt);
+            mockRoleService.findById.mockResolvedValue(role);
+
             const tokenError = new Error(
                 "Token generation failed",
             );
 
-            mockUserRepository.update.mockResolvedValue(user);
             mockTokenService.generateToken.mockImplementation(() => {
                 throw tokenError;
             });
 
             await expect(
-                service.information(1, data),
+                service.information(1, data, currentTid),
             ).rejects.toBe(tokenError);
 
             expect(mockUserRepository.update).toHaveBeenCalledWith(
@@ -247,31 +396,63 @@ describe("AccountService", () => {
                 "Activated",
             );
 
+            expect(mockAuthTokenRepository.findById).toHaveBeenCalledWith(currentTid, user.id);
             expect(mockTokenService.generateToken).toHaveBeenCalledWith({
                 uid: user.id,
-                tid: 0,
+                tid: currentTid,
                 tfa: false,
+                rol: role.slug,
+                bpa: role.is_bypass_authorization ? 1 : 0,
+                av: user.authorization_version || 0,
             });
         });
     });
 
     describe("password()", () => {
+        const currentTid = 45;
+
         it("should verify the current password, hash the new password, update the user and return a token", async () => {
             const data: SecurityAccountDTO = {
                 current_password: "CurrentPassword123!",
                 new_password: "NewPassword123!",
             };
 
+            const newSession: AuthenticationToken = {
+                id: 99,
+                user_id: user.id,
+                tries: 0,
+                expired_at: new Date(Date.now() + 86400000),
+                ip: null,
+                browser: null,
+                os: null,
+                created_at: new Date(),
+                updated_at: new Date(),
+            };
+
+            const role = {
+                id: 1,
+                slug: "customer",
+                is_bypass_authorization: false,
+                created_at: new Date(),
+                updated_at: new Date(),
+            };
+
+            const newExpiredAt = new Date(Date.now() + 86400000 * 7);
+
             mockSecurityUtil.compare.mockResolvedValue(true);
             mockSecurityUtil.hash.mockResolvedValue(
                 "hashed-new-password",
             );
             mockUserRepository.update.mockResolvedValue(true);
+            mockAuthTokenRepository.create.mockResolvedValue(newSession);
+            mockAuthTokenRepository.deleteAllByUserId.mockResolvedValue(1);
+            mockDateUtil.expiredAt.mockReturnValue(newExpiredAt);
+            mockRoleService.findById.mockResolvedValue(role);
             mockTokenService.generateToken.mockReturnValue(
                 "password-update-token",
             );
 
-            const result = await service.password(user, data);
+            const result = await service.password(user, data, currentTid);
 
             expect(mockSecurityUtil.compare).toHaveBeenCalledTimes(1);
             expect(mockSecurityUtil.compare).toHaveBeenCalledWith(
@@ -295,11 +476,24 @@ describe("AccountService", () => {
                 "Activated",
             );
 
+            expect(mockAuthTokenRepository.create).toHaveBeenCalledWith({
+                user_id: user.id,
+                expired_at: newExpiredAt,
+                ip: null,
+                browser: null,
+                os: null,
+            });
+
+            expect(mockAuthTokenRepository.deleteAllByUserId).toHaveBeenCalledWith(user.id, newSession.id);
+
             expect(mockTokenService.generateToken).toHaveBeenCalledTimes(1);
             expect(mockTokenService.generateToken).toHaveBeenCalledWith({
                 uid: user.id,
-                tid: 0,
+                tid: newSession.id,
                 tfa: false,
+                rol: role.slug,
+                bpa: role.is_bypass_authorization ? 1 : 0,
+                av: user.authorization_version || 0,
             });
 
             expect(result).toBe("password-update-token");
@@ -317,7 +511,7 @@ describe("AccountService", () => {
             };
 
             await expect(
-                service.password(userWithoutPassword, data),
+                service.password(userWithoutPassword, data, currentTid),
             ).rejects.toMatchObject({
                 message: Messages.CREDENTIAL_DO_NOT_MATCH.message,
                 errorCode: Messages.CREDENTIAL_DO_NOT_MATCH.code,
@@ -339,7 +533,7 @@ describe("AccountService", () => {
             mockSecurityUtil.compare.mockResolvedValue(false);
 
             await expect(
-                service.password(user, data),
+                service.password(user, data, currentTid),
             ).rejects.toMatchObject({
                 message: Messages.CREDENTIAL_DO_NOT_MATCH.message,
                 errorCode: Messages.CREDENTIAL_DO_NOT_MATCH.code,
@@ -370,7 +564,7 @@ describe("AccountService", () => {
             mockSecurityUtil.compare.mockRejectedValue(compareError);
 
             await expect(
-                service.password(user, data),
+                service.password(user, data, currentTid),
             ).rejects.toBe(compareError);
 
             expect(mockSecurityUtil.hash).not.toHaveBeenCalled();
@@ -384,14 +578,40 @@ describe("AccountService", () => {
                 new_password: "NewPassword123!",
             };
 
+            const newSession: AuthenticationToken = {
+                id: 99,
+                user_id: user.id,
+                tries: 0,
+                expired_at: new Date(Date.now() + 86400000),
+                ip: null,
+                browser: null,
+                os: null,
+                created_at: new Date(),
+                updated_at: new Date(),
+            };
+
+            const role = {
+                id: 1,
+                slug: "customer",
+                is_bypass_authorization: false,
+                created_at: new Date(),
+                updated_at: new Date(),
+            };
+
+            const newExpiredAt = new Date(Date.now() + 86400000 * 7);
+
             mockSecurityUtil.compare.mockResolvedValue(true);
             mockSecurityUtil.hash.mockResolvedValue(
                 "hashed-new-password",
             );
             mockUserRepository.update.mockResolvedValue(true);
+            mockAuthTokenRepository.create.mockResolvedValue(newSession);
+            mockAuthTokenRepository.deleteAllByUserId.mockResolvedValue(1);
+            mockDateUtil.expiredAt.mockReturnValue(newExpiredAt);
+            mockRoleService.findById.mockResolvedValue(role);
             mockTokenService.generateToken.mockReturnValue("token");
 
-            await service.password(user, data);
+            await service.password(user, data, currentTid);
 
             expect(mockSecurityUtil.hash).toHaveBeenCalledTimes(1);
             expect(mockSecurityUtil.hash).toHaveBeenCalledWith(
@@ -412,11 +632,37 @@ describe("AccountService", () => {
                 current_password: "CurrentPassword123!",
             } as SecurityAccountDTO;
 
+            const newSession: AuthenticationToken = {
+                id: 99,
+                user_id: user.id,
+                tries: 0,
+                expired_at: new Date(Date.now() + 86400000),
+                ip: null,
+                browser: null,
+                os: null,
+                created_at: new Date(),
+                updated_at: new Date(),
+            };
+
+            const role = {
+                id: 1,
+                slug: "customer",
+                is_bypass_authorization: false,
+                created_at: new Date(),
+                updated_at: new Date(),
+            };
+
+            const newExpiredAt = new Date(Date.now() + 86400000 * 7);
+
             mockSecurityUtil.compare.mockResolvedValue(true);
             mockUserRepository.update.mockResolvedValue(true);
+            mockAuthTokenRepository.create.mockResolvedValue(newSession);
+            mockAuthTokenRepository.deleteAllByUserId.mockResolvedValue(1);
+            mockDateUtil.expiredAt.mockReturnValue(newExpiredAt);
+            mockRoleService.findById.mockResolvedValue(role);
             mockTokenService.generateToken.mockReturnValue("token");
 
-            const result = await service.password(user, data);
+            const result = await service.password(user, data, currentTid);
 
             expect(mockSecurityUtil.hash).not.toHaveBeenCalled();
 
@@ -435,11 +681,37 @@ describe("AccountService", () => {
                 new_password: null,
             } as unknown as SecurityAccountDTO;
 
+            const newSession: AuthenticationToken = {
+                id: 99,
+                user_id: user.id,
+                tries: 0,
+                expired_at: new Date(Date.now() + 86400000),
+                ip: null,
+                browser: null,
+                os: null,
+                created_at: new Date(),
+                updated_at: new Date(),
+            };
+
+            const role = {
+                id: 1,
+                slug: "customer",
+                is_bypass_authorization: false,
+                created_at: new Date(),
+                updated_at: new Date(),
+            };
+
+            const newExpiredAt = new Date(Date.now() + 86400000 * 7);
+
             mockSecurityUtil.compare.mockResolvedValue(true);
             mockUserRepository.update.mockResolvedValue(true);
+            mockAuthTokenRepository.create.mockResolvedValue(newSession);
+            mockAuthTokenRepository.deleteAllByUserId.mockResolvedValue(1);
+            mockDateUtil.expiredAt.mockReturnValue(newExpiredAt);
+            mockRoleService.findById.mockResolvedValue(role);
             mockTokenService.generateToken.mockReturnValue("token");
 
-            const result = await service.password(user, data);
+            const result = await service.password(user, data, currentTid);
 
             expect(mockSecurityUtil.hash).not.toHaveBeenCalled();
 
@@ -459,14 +731,40 @@ describe("AccountService", () => {
                 username: "newusername",
             } as SecurityAccountDTO;
 
+            const newSession: AuthenticationToken = {
+                id: 99,
+                user_id: user.id,
+                tries: 0,
+                expired_at: new Date(Date.now() + 86400000),
+                ip: null,
+                browser: null,
+                os: null,
+                created_at: new Date(),
+                updated_at: new Date(),
+            };
+
+            const role = {
+                id: 1,
+                slug: "customer",
+                is_bypass_authorization: false,
+                created_at: new Date(),
+                updated_at: new Date(),
+            };
+
+            const newExpiredAt = new Date(Date.now() + 86400000 * 7);
+
             mockSecurityUtil.compare.mockResolvedValue(true);
             mockSecurityUtil.hash.mockResolvedValue(
                 "hashed-new-password",
             );
             mockUserRepository.update.mockResolvedValue(true);
+            mockAuthTokenRepository.create.mockResolvedValue(newSession);
+            mockAuthTokenRepository.deleteAllByUserId.mockResolvedValue(1);
+            mockDateUtil.expiredAt.mockReturnValue(newExpiredAt);
+            mockRoleService.findById.mockResolvedValue(role);
             mockTokenService.generateToken.mockReturnValue("token");
 
-            await service.password(user, data);
+            await service.password(user, data, currentTid);
 
             expect(mockUserRepository.update).toHaveBeenCalledWith(
                 user.id,
@@ -490,11 +788,37 @@ describe("AccountService", () => {
                 username: "updatedusername",
             } as SecurityAccountDTO;
 
+            const newSession: AuthenticationToken = {
+                id: 99,
+                user_id: user.id,
+                tries: 0,
+                expired_at: new Date(Date.now() + 86400000),
+                ip: null,
+                browser: null,
+                os: null,
+                created_at: new Date(),
+                updated_at: new Date(),
+            };
+
+            const role = {
+                id: 1,
+                slug: "customer",
+                is_bypass_authorization: false,
+                created_at: new Date(),
+                updated_at: new Date(),
+            };
+
+            const newExpiredAt = new Date(Date.now() + 86400000 * 7);
+
             mockSecurityUtil.compare.mockResolvedValue(true);
             mockUserRepository.update.mockResolvedValue(true);
+            mockAuthTokenRepository.create.mockResolvedValue(newSession);
+            mockAuthTokenRepository.deleteAllByUserId.mockResolvedValue(1);
+            mockDateUtil.expiredAt.mockReturnValue(newExpiredAt);
+            mockRoleService.findById.mockResolvedValue(role);
             mockTokenService.generateToken.mockReturnValue("token");
 
-            const result = await service.password(user, data);
+            const result = await service.password(user, data, currentTid);
 
             expect(user.username).toBe("updatedusername");
             expect(user.email).toBe("john@example.com");
@@ -509,11 +833,37 @@ describe("AccountService", () => {
                 email: "updated@example.com",
             } as SecurityAccountDTO;
 
+            const newSession: AuthenticationToken = {
+                id: 99,
+                user_id: user.id,
+                tries: 0,
+                expired_at: new Date(Date.now() + 86400000),
+                ip: null,
+                browser: null,
+                os: null,
+                created_at: new Date(),
+                updated_at: new Date(),
+            };
+
+            const role = {
+                id: 1,
+                slug: "customer",
+                is_bypass_authorization: false,
+                created_at: new Date(),
+                updated_at: new Date(),
+            };
+
+            const newExpiredAt = new Date(Date.now() + 86400000 * 7);
+
             mockSecurityUtil.compare.mockResolvedValue(true);
             mockUserRepository.update.mockResolvedValue(true);
+            mockAuthTokenRepository.create.mockResolvedValue(newSession);
+            mockAuthTokenRepository.deleteAllByUserId.mockResolvedValue(1);
+            mockDateUtil.expiredAt.mockReturnValue(newExpiredAt);
+            mockRoleService.findById.mockResolvedValue(role);
             mockTokenService.generateToken.mockReturnValue("token");
 
-            const result = await service.password(user, data);
+            const result = await service.password(user, data, currentTid);
 
             expect(user.email).toBe("updated@example.com");
             expect(user.username).toBe("johndoe");
@@ -528,11 +878,37 @@ describe("AccountService", () => {
                 phone: "+1111111111",
             } as SecurityAccountDTO;
 
+            const newSession: AuthenticationToken = {
+                id: 99,
+                user_id: user.id,
+                tries: 0,
+                expired_at: new Date(Date.now() + 86400000),
+                ip: null,
+                browser: null,
+                os: null,
+                created_at: new Date(),
+                updated_at: new Date(),
+            };
+
+            const role = {
+                id: 1,
+                slug: "customer",
+                is_bypass_authorization: false,
+                created_at: new Date(),
+                updated_at: new Date(),
+            };
+
+            const newExpiredAt = new Date(Date.now() + 86400000 * 7);
+
             mockSecurityUtil.compare.mockResolvedValue(true);
             mockUserRepository.update.mockResolvedValue(true);
+            mockAuthTokenRepository.create.mockResolvedValue(newSession);
+            mockAuthTokenRepository.deleteAllByUserId.mockResolvedValue(1);
+            mockDateUtil.expiredAt.mockReturnValue(newExpiredAt);
+            mockRoleService.findById.mockResolvedValue(role);
             mockTokenService.generateToken.mockReturnValue("token");
 
-            const result = await service.password(user, data);
+            const result = await service.password(user, data, currentTid);
 
             expect(user.phone).toBe("+1111111111");
             expect(user.username).toBe("johndoe");
@@ -549,11 +925,37 @@ describe("AccountService", () => {
                 phone: "+1111111111",
             } as SecurityAccountDTO;
 
+            const newSession: AuthenticationToken = {
+                id: 99,
+                user_id: user.id,
+                tries: 0,
+                expired_at: new Date(Date.now() + 86400000),
+                ip: null,
+                browser: null,
+                os: null,
+                created_at: new Date(),
+                updated_at: new Date(),
+            };
+
+            const role = {
+                id: 1,
+                slug: "customer",
+                is_bypass_authorization: false,
+                created_at: new Date(),
+                updated_at: new Date(),
+            };
+
+            const newExpiredAt = new Date(Date.now() + 86400000 * 7);
+
             mockSecurityUtil.compare.mockResolvedValue(true);
             mockUserRepository.update.mockResolvedValue(true);
+            mockAuthTokenRepository.create.mockResolvedValue(newSession);
+            mockAuthTokenRepository.deleteAllByUserId.mockResolvedValue(1);
+            mockDateUtil.expiredAt.mockReturnValue(newExpiredAt);
+            mockRoleService.findById.mockResolvedValue(role);
             mockTokenService.generateToken.mockReturnValue("token");
 
-            await service.password(user, data);
+            await service.password(user, data, currentTid);
 
             expect(user.username).toBe("updatedusername");
             expect(user.email).toBe("updated@example.com");
@@ -571,9 +973,10 @@ describe("AccountService", () => {
                 "hashed-new-password",
             );
             mockUserRepository.update.mockResolvedValue(null);
+            mockTokenService.generateToken.mockReturnValue("token");
 
             await expect(
-                service.password(user, data),
+                service.password(user, data, currentTid),
             ).rejects.toMatchObject({
                 message: Messages.UPDATE_FAILED.message,
                 errorCode: Messages.UPDATE_FAILED.code,
@@ -611,9 +1014,10 @@ describe("AccountService", () => {
                 "hashed-new-password",
             );
             mockUserRepository.update.mockResolvedValue(undefined);
+            mockTokenService.generateToken.mockReturnValue("token");
 
             await expect(
-                service.password(user, data),
+                service.password(user, data, currentTid),
             ).rejects.toMatchObject({
                 message: Messages.UPDATE_FAILED.message,
                 errorCode: Messages.UPDATE_FAILED.code,
@@ -641,7 +1045,7 @@ describe("AccountService", () => {
             mockUserRepository.update.mockRejectedValue(repositoryError);
 
             await expect(
-                service.password(user, data),
+                service.password(user, data, currentTid),
             ).rejects.toBe(repositoryError);
 
             expect(mockTokenService.generateToken).not.toHaveBeenCalled();
@@ -661,7 +1065,7 @@ describe("AccountService", () => {
             mockSecurityUtil.hash.mockRejectedValue(hashError);
 
             await expect(
-                service.password(user, data),
+                service.password(user, data, currentTid),
             ).rejects.toBe(hashError);
 
             expect(mockUserRepository.update).not.toHaveBeenCalled();
@@ -675,18 +1079,47 @@ describe("AccountService", () => {
 
             user.id = 99;
 
+            const newSession: AuthenticationToken = {
+                id: 100,
+                user_id: 99,
+                tries: 0,
+                expired_at: new Date(Date.now() + 86400000),
+                ip: null,
+                browser: null,
+                os: null,
+                created_at: new Date(),
+                updated_at: new Date(),
+            };
+
+            const role = {
+                id: 1,
+                slug: "customer",
+                is_bypass_authorization: false,
+                created_at: new Date(),
+                updated_at: new Date(),
+            };
+
+            const newExpiredAt = new Date(Date.now() + 86400000 * 7);
+
             mockSecurityUtil.compare.mockResolvedValue(true);
             mockUserRepository.update.mockResolvedValue(true);
+            mockAuthTokenRepository.create.mockResolvedValue(newSession);
+            mockAuthTokenRepository.deleteAllByUserId.mockResolvedValue(1);
+            mockDateUtil.expiredAt.mockReturnValue(newExpiredAt);
+            mockRoleService.findById.mockResolvedValue(role);
             mockTokenService.generateToken.mockReturnValue(
                 "authenticated-token",
             );
 
-            const result = await service.password(user, data);
+            const result = await service.password(user, data, currentTid);
 
             expect(mockTokenService.generateToken).toHaveBeenCalledWith({
                 uid: 99,
-                tid: 0,
+                tid: newSession.id,
                 tfa: false,
+                rol: role.slug,
+                bpa: role.is_bypass_authorization ? 1 : 0,
+                av: user.authorization_version || 0,
             });
 
             expect(result).toBe("authenticated-token");
@@ -697,24 +1130,54 @@ describe("AccountService", () => {
                 current_password: "CurrentPassword123!",
             };
 
+            const newSession: AuthenticationToken = {
+                id: 100,
+                user_id: user.id,
+                tries: 0,
+                expired_at: new Date(Date.now() + 86400000),
+                ip: null,
+                browser: null,
+                os: null,
+                created_at: new Date(),
+                updated_at: new Date(),
+            };
+
+            const role = {
+                id: 1,
+                slug: "customer",
+                is_bypass_authorization: false,
+                created_at: new Date(),
+                updated_at: new Date(),
+            };
+
+            const newExpiredAt = new Date(Date.now() + 86400000 * 7);
+
+            mockSecurityUtil.compare.mockResolvedValue(true);
+            mockUserRepository.update.mockResolvedValue(true);
+            mockAuthTokenRepository.create.mockResolvedValue(newSession);
+            mockAuthTokenRepository.deleteAllByUserId.mockResolvedValue(1);
+            mockDateUtil.expiredAt.mockReturnValue(newExpiredAt);
+            mockRoleService.findById.mockResolvedValue(role);
+
             const tokenError = new Error(
                 "Token generation failed",
             );
 
-            mockSecurityUtil.compare.mockResolvedValue(true);
-            mockUserRepository.update.mockResolvedValue(true);
             mockTokenService.generateToken.mockImplementation(() => {
                 throw tokenError;
             });
 
             await expect(
-                service.password(user, data),
+                service.password(user, data, currentTid),
             ).rejects.toBe(tokenError);
 
             expect(mockTokenService.generateToken).toHaveBeenCalledWith({
                 uid: user.id,
-                tid: 0,
+                tid: newSession.id,
                 tfa: false,
+                rol: role.slug,
+                bpa: role.is_bypass_authorization ? 1 : 0,
+                av: user.authorization_version || 0,
             });
         });
     });

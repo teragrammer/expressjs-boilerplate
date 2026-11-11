@@ -178,6 +178,20 @@ export class TwoFactorAuthenticationRepository {
     }
 
     /**
+     * Sets the lockout expiration time for OTP attempts.
+     */
+    public async setExpiredTriesAt(id: number, expiredAt: Date | string): Promise<void> {
+        await this.db
+            .updateTable(TWO_FACTOR_AUTHENTICATION_TABLE)
+            .set({
+                expired_tries_at: expiredAt,
+                updated_at: sql<Date>`now()`,
+            })
+            .where("id", "=", id)
+            .execute();
+    }
+
+    /**
      * Consumes the OTP after successful verification.
      */
     public async deleteById(id: number): Promise<boolean> {

@@ -87,7 +87,7 @@ export class UserController {
             throw new AppError(Messages.INVALID_PATH_PARAM);
         }
 
-        await this.userService.hardDelete(id);
+        await this.userService.softDelete(id);
         res.status(200).send();
     });
 }

@@ -3,12 +3,93 @@ import Joi from 'joi';
 import {sql} from 'kysely';
 import {db as defaultDb, type DatabaseExecutor} from "../../../config/database";
 
+interface UniqueOptions {
+    ignoreId?: string | number;
+    idColumn?: string;
+    db?: DatabaseExecutor;
+}
+
+/**
+ * Validates uniqueness for a **scalar** field (single column).
+ * When attached via Joi's `.external()`, Joi passes the scalar value directly.
+ */
+export const validateUnique = (
+    table: string,
+    column: string,
+    {ignoreId, idColumn = 'id', db = defaultDb}: UniqueOptions = {}
+) => {
+    const validIdentifierRegex = /^[a-zA-Z0-9_]+$/;
+    if (!validIdentifierRegex.test(table) || !validIdentifierRegex.test(column) || !validIdentifierRegex.test(idColumn)) {
+        throw new Error(`Security Exception: Invalid characters in table, column, or identity identifier structures.`);
+    }
+
+    return async (value: any, helpers: Joi.CustomHelpers): Promise<any> => {
+        // Handle null/empty per schema's allow(null, "") - skip uniqueness check
+        if (value === null || value === undefined || value === '') {
+            return value;
+        }
+
+        let row: unknown;
+
+        try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            let query = db.selectFrom(table as any).select(sql`1`.as('one'));
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            query = query.where(column as any, '=', value);
+
+            if (ignoreId !== undefined && ignoreId !== null) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                query = query.where(idColumn as any, '<>', ignoreId);
+            }
+
+            row = await query.executeTakeFirst();
+        } catch (error) {
+            console.error(`Database unique validation error on ${table}.${column}:`, error);
+
+            throw new Joi.ValidationError(
+                'database.error',
+                [
+                    {
+                        message: 'An internal validation error occurred.',
+                        path: helpers.state.path ?? [],
+                        type: 'database.error',
+                        context: {key: column}
+                    }
+                ],
+                value
+            );
+        }
+
+        if (row) {
+            throw new Joi.ValidationError(
+                'any.unique',
+                [
+                    {
+                        message: `${column} already exists.`,
+                        path: helpers.state.path && helpers.state.path.length > 0 ? helpers.state.path : [column],
+                        type: 'any.unique',
+                        context: {key: column, value}
+                    }
+                ],
+                value
+            );
+        }
+
+        return value;
+    };
+};
+
 interface CompositeUniqueOptions {
     ignoreId?: string | number;
     idColumn?: string;
     db?: DatabaseExecutor;
 }
 
+/**
+ * Validates uniqueness for **composite** fields (multiple columns).
+ * When attached via Joi's `.external()` on an object schema, Joi passes the full object.
+ */
 export const validateCompositeUnique = (
     table: string,
     columns: string[],
@@ -24,10 +105,7 @@ export const validateCompositeUnique = (
 
         let row: unknown;
 
-        // 1. ONLY wrap the database operation in try/catch
         try {
-            // Table/column identifiers are allowlisted above; values stay
-            // parameterized through the query builder.
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             let query = db.selectFrom(table as any).select(sql`1`.as('one'));
 
@@ -60,7 +138,6 @@ export const validateCompositeUnique = (
             );
         }
 
-        // 2. Throw the validation error OUTSIDE the try/catch block
         if (row) {
             throw new Joi.ValidationError(
                 'any.unique',
