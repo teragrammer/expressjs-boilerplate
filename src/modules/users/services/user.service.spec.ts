@@ -9,6 +9,7 @@ import {
     User,
 } from "../user.interface";
 import {SecurityUtil} from "../../../common/utils/security.util";
+import {AuthenticationTokenRepository} from "../../auth/authentication/authentication-token.repository";
 import Messages from "../../../common/utils/messages";
 import {UserService} from "./user.service";
 
@@ -27,6 +28,10 @@ describe("UserService", () => {
     };
     let securityUtil: {
         hash: ReturnType<typeof vi.fn>;
+    };
+
+    let authenticationTokenRepository: {
+        deleteAllByUserId: ReturnType<typeof vi.fn>;
     };
 
     const mockUser: User = {
@@ -98,9 +103,14 @@ describe("UserService", () => {
             hash: vi.fn(),
         };
 
+        authenticationTokenRepository = {
+            deleteAllByUserId: vi.fn().mockResolvedValue(0),
+        };
+
         service = new UserService(
             userRepository as unknown as UserRepository,
             securityUtil as unknown as SecurityUtil,
+            authenticationTokenRepository as unknown as AuthenticationTokenRepository,
         );
 
         // Default mock for findAuthById to return the mockUser

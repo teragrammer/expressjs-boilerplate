@@ -71,6 +71,7 @@
     "@types/supertest": "^7.2.1",
     "@typescript-eslint/eslint-plugin": "^8.72.2",
     "@typescript-eslint/parser": "^8.72.2",
+    "@vitest/coverage-v8": "^5.1.0",
     "artillery": "^2.0.34",
     "eslint": "^10.14.0",
     "globals": "^15.15.0",

@@ -88,7 +88,18 @@ export function createRateLimiter(options: RateLimitOptions) {
     };
 }
 
-// Pre-configured limiters for common endpoints - using shared limiter instances
+/**
+ * Runtime switch for the rate limiter.
+ *
+ * The limits are enforced by default. The switch exists so a test can
+ * exercise the real limits without the rest of the suite tripping over
+ * them; it is never disabled in production.
+ */
+export const rateLimitControl = {enabled: true};
+
+/**
+ * Pre-configured limiters for common endpoints - using shared limiter instances
+ */
 const globalAuthLimiter = new RateLimiter();
 const registerLimiter = new RateLimiter();
 const loginLimiter = new RateLimiter();
@@ -113,26 +124,26 @@ function makeRateLimiter(limiter: RateLimiter, options: RateLimitOptions) {
         code = "RATE_LIMIT_EXCEEDED",
     } = options;
 
-    // In test environment, use very high limits to avoid interfering with tests
-    const isTest = process.env.NODE_ENV === "test" || process.env.VITEST === "true";
-    const testMaxRequests = isTest ? 10000 : maxRequests;
-    const testWindowMs = isTest ? 1000 : windowMs; // 1 second window in tests
-
     return async function rateLimiterMiddleware(
         req: Request,
         res: Response,
         next: NextFunction
     ) {
+        if (!rateLimitControl.enabled) {
+            next();
+            return;
+        }
+
         try {
             const key = `${bucket}:${keyGenerator(req)}`;
-            const windowSec = Math.ceil(testWindowMs / 1000);
+            const windowSec = Math.ceil(windowMs / 1000);
 
-            const result = await limiter.consume(key, testMaxRequests, windowSec);
+            const result = await limiter.consume(key, maxRequests, windowSec);
 
             // Set rate limit headers
-            res.setHeader("X-RateLimit-Limit", testMaxRequests);
-            res.setHeader("X-RateLimit-Remaining", Math.max(0, testMaxRequests - result.count));
-            res.setHeader("X-RateLimit-Reset", Math.ceil((Date.now() + testWindowMs) / 1000));
+            res.setHeader("X-RateLimit-Limit", maxRequests);
+            res.setHeader("X-RateLimit-Remaining", Math.max(0, maxRequests - result.count));
+            res.setHeader("X-RateLimit-Reset", Math.ceil((Date.now() + windowMs) / 1000));
 
             if (!result.allowed) {
                 const retryAfter = Math.ceil((result.resetAt - Date.now()) / 1000);
@@ -167,6 +178,16 @@ function makeRateLimiter(limiter: RateLimiter, options: RateLimitOptions) {
 
             next();
         } catch (error) {
+            /*
+             * The 429 the limiter raises is an expected outcome, not
+             * an internal failure: it is forwarded without an error
+             * log.
+             */
+            if (error instanceof AppError) {
+                next(error);
+                return;
+            }
+
             logger.error(
                 {message: (error as Error).message},
                 "Rate limiter error",

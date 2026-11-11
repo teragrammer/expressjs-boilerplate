@@ -118,24 +118,12 @@ export function idempotency(options: IdempotencyOptions) {
 
         try {
             /*
-             * Reserve the key. A unique index on (key, route, user_id)
-             * makes the reservation atomic.
+             * Look for an existing reservation first.
+             *
+             * The order matters: a request that arrives while another
+             * one holds the key must be recognised as a duplicate
+             * rather than mistaken for its own reservation.
              */
-            await db
-                .insertInto("idempotency_keys")
-                .values({
-                    key,
-                    user_id: userId,
-                    route,
-                    request_hash: requestHash,
-                    status: "in_progress",
-                    locked_at: now,
-                    created_at: now,
-                    expires_at: new Date(now.getTime() + IDEMPOTENCY_TTL_MS),
-                })
-                .onConflict((oc) => oc.doNothing())
-                .execute();
-
             const existing = await db
                 .selectFrom("idempotency_keys")
                 .selectAll()
@@ -151,63 +139,100 @@ export function idempotency(options: IdempotencyOptions) {
                 )
                 .executeTakeFirst();
 
-            if (!existing) {
-                // The reservation failed for an unexpected reason.
-                next();
-                return;
+            if (existing) {
+                if (existing.request_hash !== requestHash) {
+                    next(
+                        new AppError(
+                            Messages.DUPLICATE_DATA,
+                            "This idempotency key was already used with a different payload.",
+                        ),
+                    );
+                    return;
+                }
+
+                if (existing.status === "completed") {
+                    res.setHeader("Idempotency-Replayed", "true");
+                    res
+                        .status(existing.response_status ?? 200)
+                        .json(existing.response_body ?? {});
+                    return;
+                }
+
+                /*
+                 * An in-flight request: either wait for it to finish or
+                 * reject the duplicate. The lease bounds the wait.
+                 */
+                const lockedAt = existing.locked_at
+                    ? new Date(existing.locked_at).getTime()
+                    : now.getTime();
+
+                if (now.getTime() - lockedAt < leaseMs) {
+                    next(
+                        new AppError(
+                            Messages.DUPLICATE_DATA,
+                            "A request with this idempotency key is still in progress.",
+                        ),
+                    );
+                    return;
+                }
+
+                // The lease expired: take over the reservation.
+                await db
+                    .updateTable("idempotency_keys")
+                    .set({
+                        status: "in_progress",
+                        locked_at: now,
+                        updated_at: now,
+                    })
+                    .where("id", "=", existing.id)
+                    .execute();
+            } else {
+                /*
+                 * Reserve the key.
+                 *
+                 * A unique index on (key, route, user_id) makes the
+                 * reservation atomic; `RETURNING` yields no row when
+                 * another request won the race.
+                 */
+                const inserted = await db
+                    .insertInto("idempotency_keys")
+                    .values({
+                        key,
+                        user_id: userId,
+                        route,
+                        request_hash: requestHash,
+                        status: "in_progress",
+                        locked_at: now,
+                        created_at: now,
+                        updated_at: now,
+                        expires_at: new Date(
+                            now.getTime() + IDEMPOTENCY_TTL_MS,
+                        ),
+                    })
+                    .onConflict((oc) => oc.doNothing())
+                    .returning("id")
+                    .executeTakeFirst();
+
+                if (!inserted) {
+                    next(
+                        new AppError(
+                            Messages.DUPLICATE_DATA,
+                            "A request with this idempotency key is still in progress.",
+                        ),
+                    );
+                    return;
+                }
             }
-
-            if (existing.request_hash !== requestHash) {
-                next(
-                    new AppError(
-                        Messages.DUPLICATE_DATA,
-                        "This idempotency key was already used with a different payload.",
-                    ),
-                );
-                return;
-            }
-
-            if (existing.status === "completed") {
-                res.setHeader("Idempotency-Replayed", "true");
-                res
-                    .status(existing.response_status ?? 200)
-                    .json(existing.response_body ?? {});
-                return;
-            }
-
-            /*
-             * An in-flight request: either wait for it to finish or
-             * reject the duplicate. The lease bounds the wait.
-             */
-            const lockedAt = existing.locked_at
-                ? new Date(existing.locked_at).getTime()
-                : now.getTime();
-
-            if (now.getTime() - lockedAt < leaseMs) {
-                next(
-                    new AppError(
-                        Messages.DUPLICATE_DATA,
-                        "A request with this idempotency key is still in progress.",
-                    ),
-                );
-                return;
-            }
-
-            // The lease expired: take over the reservation.
-            await db
-                .updateTable("idempotency_keys")
-                .set({
-                    status: "in_progress",
-                    locked_at: now,
-                    updated_at: now,
-                })
-                .where("id", "=", existing.id)
-                .execute();
         } catch (error) {
             /*
              * A failure in the idempotency store must not block the
              * request: the endpoint behaves as if no key was sent.
              */
+            if (error instanceof AppError) {
+                next(error);
+                return;
+            }
+
             logger.error(
                 {message: (error as Error).message},
                 "Idempotency check failed; continuing without it",

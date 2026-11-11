@@ -9,12 +9,14 @@ import {
     Actor,
     assertCanChangePrivilegedFields,
 } from "../../../common/authz/policy";
+import {AuthenticationTokenRepository} from "../../auth/authentication/authentication-token.repository";
 
 export class UserService {
     // Dependency injection allows passing a mock repository during testing
     constructor(
         private userRepository: UserRepository,
         private readonly securityUtil: SecurityUtil,
+        private readonly authenticationTokenRepository: AuthenticationTokenRepository,
     ) {
     }
 
@@ -147,10 +149,23 @@ export class UserService {
         return user;
     }
 
+    /**
+     * Soft-deletes a user and revokes its sessions.
+     *
+     * The row is kept (with `deleted_at` set) so the account history
+     * and the audit trail stay intact, and every session is revoked so
+     * the deleted account cannot keep using an existing token.
+     */
     async softDelete(id: number): Promise<void> {
-        if (!await this.userRepository.softDelete(id)) {
-            throw new AppError(Messages.DELETE_FAILED);
+        const user = await this.userRepository.findAuthById(id);
+
+        if (!user) {
+            throw new AppError(Messages.DATA_NOT_FOUND);
         }
+
+        await this.userRepository.softDelete(id);
+
+        await this.authenticationTokenRepository.deleteAllByUserId(id);
     }
 
     async hardDelete(id: number): Promise<void> {

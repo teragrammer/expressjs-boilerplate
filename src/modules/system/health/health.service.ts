@@ -22,12 +22,11 @@ export interface ReadinessReport {
  */
 const READINESS_TTL_MS = 5_000;
 
-let cachedReport: {report: ReadinessReport; expiresAt: number} | null = null;
 
 /**
  * Checks PostgreSQL with a lightweight query.
  */
-async function checkDatabase(
+export async function probeDatabase(
     executor: DatabaseExecutor = db,
 ): Promise<DependencyStatus> {
     try {
@@ -44,7 +43,7 @@ async function checkDatabase(
 /**
  * Checks Redis when it is configured.
  */
-function checkRedis(): DependencyStatus {
+export function probeRedis(): DependencyStatus {
     if (!DBRedis.publisher) {
         return "disabled";
     }
@@ -55,6 +54,24 @@ function checkRedis(): DependencyStatus {
 }
 
 export class HealthService {
+    /**
+     * The cached readiness result.
+     *
+     * The cache belongs to the instance: two services with different
+     * probes must not share a result.
+     */
+    private cachedReport: {
+        report: ReadinessReport;
+        expiresAt: number;
+    } | null = null;
+
+    constructor(
+        private readonly databaseProbe: () => Promise<DependencyStatus> = () =>
+            probeDatabase(),
+        private readonly redisProbe: () => DependencyStatus = probeRedis,
+    ) {
+    }
+
     /**
      * Liveness: the process is up and the event loop is responsive.
      *
@@ -75,12 +92,15 @@ export class HealthService {
      * from the database.
      */
     async ready(): Promise<ReadinessReport> {
-        if (cachedReport && cachedReport.expiresAt > Date.now()) {
-            return cachedReport.report;
+        if (
+            this.cachedReport &&
+            this.cachedReport.expiresAt > Date.now()
+        ) {
+            return this.cachedReport.report;
         }
 
-        const database = await checkDatabase();
-        const redis = checkRedis();
+        const database = await this.databaseProbe();
+        const redis = this.redisProbe();
 
         const report: ReadinessReport = {
             status:
@@ -90,7 +110,7 @@ export class HealthService {
             dependencies: {database, redis},
         };
 
-        cachedReport = {
+        this.cachedReport = {
             report,
             expiresAt: Date.now() + READINESS_TTL_MS,
         };

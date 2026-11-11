@@ -77,7 +77,11 @@ export const outboxRepository = new OutboxRepository(db);
 const roleService = new RoleService(new RoleRepository());
 const dateUtil = new DateUtil();
 
-export const userService = new UserService(userRepository, securityUtil);
+export const userService = new UserService(
+    userRepository,
+    securityUtil,
+    authenticationTokenRepository,
+);
 export const tokenService = new TokenService();
 
 // Application services

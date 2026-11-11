@@ -8,6 +8,7 @@ import {userUpdateSchema} from "./validations/user-update.schema";
 import {UserController} from "./controllers/user.controller";
 import {UserService} from "./services/user.service";
 import {UserRepository} from "./user.repository";
+import {AuthenticationTokenRepository} from "../auth/authentication/authentication-token.repository";
 import {SecurityUtil} from "../../common/utils/security.util";
 import {__ENV} from "../../config/environment";
 
@@ -16,7 +17,8 @@ const userController = new UserController(new UserService(
     new SecurityUtil({
         bcryptSecret: __ENV.BCRYPT_SECRET,
         bcryptSaltRounds: Number(__ENV.BCRYPT_SALT_ROUND || 10),
-    })
+    }),
+    new AuthenticationTokenRepository(),
 ));
 
 export default () => {
