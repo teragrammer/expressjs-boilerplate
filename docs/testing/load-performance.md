@@ -19,10 +19,13 @@ Configuration files are in `tests/load/`.
 
 | Test | Duration | Arrival rate | Thresholds | Command |
 | --- | --- | --- | --- | --- |
-| Smoke | ~10s | 1/s | `http.response_time.p95` <= 1000ms | `npm run load:test:smoke` |
-| Default | ~4.5 min | 5 to 100/s | p95 <= 500ms, p99 <= 1000ms, 2xx >= 95% | `npm run load:test` |
-| Stress | ~4 min | 50 to 200/s | p95 <= 2000ms, p99 <= 5000ms | `npm run load:test:stress` |
-| Soak | ~45 min | 20 to 50/s | p95 <= 1000ms, p99 <= 2000ms | `npm run load:test:soak` |
+| Smoke | 10 s | 1/s | p95 ≤ 1000 ms, max ≤ 5000 ms, 2xx ≥ 90% | `npm run load:test:smoke` |
+| Default | 4.5 min | 5 → 100/s | p95 ≤ 400 ms, p99 ≤ 1000 ms, 2xx ≥ 99% | `npm run load:test` |
+| Stress | 4 min | 50 → 200/s | p95 ≤ 2000 ms, p99 ≤ 5000 ms, 2xx ≥ 95% | `npm run load:test:stress` |
+| Soak | 45 min | 20 → 50/s | p95 ≤ 1000 ms, p99 ≤ 2000 ms, 2xx ≥ 95% | `npm run load:test:soak` |
+
+The default profile runs warm-up (30 s at 5/s), ramp-up (60 s at 10/s), sustained
+(120 s at 50/s), spike (30 s at 100/s), and cool-down (30 s at 50/s).
 
 ## Prerequisites
 
@@ -37,10 +40,20 @@ Configuration files are in `tests/load/`.
    npm run db:migrate
    npm run db:seed
    ```
-   Seeding creates `admin`, `manager`, and `customer` users with password `pass1234`.
+   The seeder creates `admin`, `manager`, and `customer` users. It uses
+   `SEED_PASSWORD` when set; otherwise it generates a random password and logs it
+   once.
 3. Artillery is available. It is included as a dev dependency. `tests/load/run.sh`
    also checks for a global `artillery` command and installs one if it is missing.
-4. The default target URL is `http://localhost:4000`, matching the default `PORT`.
+4. `SEED_PASSWORD` is set. `run.sh` refuses to start without it. Set it to the same
+   value used for `npm run db:seed` so the credentials in `tests/load/data/users.csv`
+   match:
+   ```bash
+   export SEED_PASSWORD='<the seeded password>'
+   ```
+   `tests/load/data/users.csv` ships with the placeholder `pass1234`; update it when
+   the seeded password differs.
+5. The default target URL is `http://localhost:4000`, matching the default `PORT`.
 
 ## Commands
 
@@ -64,6 +77,8 @@ bash tests/load/run.sh tests/load/custom.yml
 | `TARGET_URL` | `http://localhost:4000` | Base URL of the API |
 | `OUTPUT_DIR` | `tests/load/reports` | Directory for generated reports |
 | `WORKERS` | auto | Number of Artillery workers |
+| `SEED_USERNAME` | `admin` | Seeded account used by the runner checks |
+| `SEED_PASSWORD` | required | Password of the seeded account |
 
 Example:
 
@@ -76,7 +91,6 @@ TARGET_URL=https://api.example.com npm run load:test
 Public endpoints:
 
 - `POST /api/v1/auth/login`
-- `POST /api/v1/auth/register`
 - `POST /api/v1/auth/password-recovery/send`
 
 Protected endpoints:
@@ -90,9 +104,9 @@ Protected endpoints:
 - `GET /api/v1/roles/:id`
 - `GET /api/v1/route/guards`
 - `PUT /api/v1/account/information`
-- `PUT /api/v1/account/password`
 
-The API does not expose a `/health` endpoint, so load tests do not call one.
+Load tests do not call the health probes; use `/health/live` and `/health/ready`
+for deployment checks.
 
 ## Test data
 
@@ -104,6 +118,8 @@ admin,pass1234,admin
 manager,pass1234,manager
 customer,pass1234,customer
 ```
+
+Replace the placeholder password with the value passed to `SEED_PASSWORD` when seeding.
 
 ## Reports
 
@@ -141,14 +157,15 @@ status and the npm script fails.
 ## Customization
 
 Edit the YAML configs to change phases, scenarios, or thresholds. Edit
-`tests/load/data/users.csv` to add users. The default password for seeded users is
-`pass1234`.
+`tests/load/data/users.csv` to add users. Keep the password aligned with the seeded
+accounts.
 
 ## Troubleshooting
 
+- `SEED_PASSWORD is not set`: export it before running `run.sh`.
 - `ECONNREFUSED`: ensure the server is running before starting the load test.
-- Many `401` responses: verify seeded users exist and credentials match
-  `tests/load/data/users.csv`.
+- Many `401` responses: verify the seeded users exist and that the CSV password matches
+  the seeded password.
 - High response times: check database connection pool settings, Redis availability,
   and application logs.
 - Global Artillery install failure: install it manually with
@@ -162,3 +179,6 @@ Edit the YAML configs to change phases, scenarios, or thresholds. Edit
   files to change phase durations or arrival rates.
 - Load tests mutate seeded data, especially the account information and user
   creation scenarios. Reseed the database between runs when clean state is needed.
+- Mail must be mocked; the recovery scenario would otherwise send real email.
+- The rate limiter is active. Repeated logins from one address are expected to be
+  throttled; `X-RateLimit-Limit` reports the budget.
