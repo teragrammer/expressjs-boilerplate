@@ -1,4 +1,4 @@
-// tests/integration/regression.spec.ts
+// tests/integration/system/regression.spec.ts
 /**
  * Regression suite for the P0 defects.
  *
@@ -9,12 +9,12 @@
 import {afterEach, beforeEach, describe, expect, it} from "vitest";
 import request from "supertest";
 
-import app from "../../src/app";
-import {db} from "../../src/config/database";
-import {securityUtil, tokenService} from "../../src/config/container";
-import {AuthenticationTokenRepository} from "../../src/modules/auth/authentication/authentication-token.repository";
-import {UserRepository} from "../../src/modules/users/user.repository";
-import {rateLimitControl} from "../../src/common/middleware/rate-limiter.middleware";
+import app from "../../../src/app";
+import {db} from "../../../src/config/database";
+import {securityUtil, tokenService} from "../../../src/config/container";
+import {AuthenticationTokenRepository} from "../../../src/modules/auth/authentication/authentication-token.repository";
+import {UserRepository} from "../../../src/modules/users/user.repository";
+import {rateLimitControl} from "../../../src/common/middleware/rate-limiter.middleware";
 
 const randomUsername = () => securityUtil.randomString(10);
 

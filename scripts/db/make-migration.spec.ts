@@ -5,7 +5,7 @@ import {afterEach, beforeEach, describe, expect, it} from "vitest";
 import {
     scaffoldMigration,
     validateMigrationName,
-} from "../../../scripts/db/make-migration";
+} from "./make-migration";
 
 describe("make-migration helpers", () => {
     let baseDir: string;

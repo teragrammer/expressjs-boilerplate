@@ -1,10 +1,10 @@
-// tests/integration/account.spec.ts
+// tests/integration/users/account.spec.ts
 import {afterEach, describe, expect, it} from "vitest";
 import request from "supertest";
 
-import app from "../../src/app";
-import {db} from "../../src/config/database";
-import {securityUtil, tokenService,} from "../../src/config/container";
+import app from "../../../src/app";
+import {db} from "../../../src/config/database";
+import {securityUtil, tokenService,} from "../../../src/config/container";
 
 const createAuthenticatedUser = async () => {
     const username = securityUtil.randomString(8);

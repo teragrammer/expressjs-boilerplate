@@ -1,4 +1,4 @@
-// tests/integration/tfa.spec.ts
+// tests/integration/auth/tfa.spec.ts
 /**
  * Integration coverage for the TFA lifecycle (F-08/F-09).
  *
@@ -9,23 +9,23 @@
 import {afterEach, beforeEach, describe, expect, it} from "vitest";
 import {createHash} from "node:crypto";
 
-import {db} from "../../src/config/database";
+import {db} from "../../../src/config/database";
 import {
     refreshTokenRepository,
     securityUtil,
     sessionService,
     settingService,
     tokenService,
-} from "../../src/config/container";
-import {AuthenticationTokenRepository} from "../../src/modules/auth/authentication/authentication-token.repository";
-import {TwoFactorAuthenticationRepository} from "../../src/modules/auth/two-factor-authentication/two-factor-authentication.repository";
-import {TfaRecoveryCodeRepository} from "../../src/modules/auth/two-factor-authentication/tfa-recovery-code.repository";
-import {TwoFactorAuthenticationService} from "../../src/modules/auth/two-factor-authentication/two-factor-authentication.service";
-import {RoleRepository} from "../../src/modules/system/roles/role.repository";
-import {RoleService} from "../../src/modules/system/roles/role.service";
-import {UserRepository} from "../../src/modules/users/user.repository";
-import {DateUtil} from "../../src/common/utils/date.util";
-import {SendMailInput} from "../../src/common/interfaces/mail.interface";
+} from "../../../src/config/container";
+import {AuthenticationTokenRepository} from "../../../src/modules/auth/authentication/authentication-token.repository";
+import {TwoFactorAuthenticationRepository} from "../../../src/modules/auth/two-factor-authentication/two-factor-authentication.repository";
+import {TfaRecoveryCodeRepository} from "../../../src/modules/auth/two-factor-authentication/tfa-recovery-code.repository";
+import {TwoFactorAuthenticationService} from "../../../src/modules/auth/two-factor-authentication/two-factor-authentication.service";
+import {RoleRepository} from "../../../src/modules/system/roles/role.repository";
+import {RoleService} from "../../../src/modules/system/roles/role.service";
+import {UserRepository} from "../../../src/modules/users/user.repository";
+import {DateUtil} from "../../../src/common/utils/date.util";
+import {SendMailInput} from "../../../src/common/interfaces/mail.interface";
 
 const randomUsername = () => securityUtil.randomString(10);
 

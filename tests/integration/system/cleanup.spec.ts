@@ -1,8 +1,8 @@
-// tests/integration/cleanup.spec.ts
+// tests/integration/system/cleanup.spec.ts
 import {randomUUID} from "node:crypto";
 import {describe, expect, it} from "vitest";
-import {db} from "../../src/config/database";
-import {CleanupJob} from "../../src/modules/jobs/cleanup.job";
+import {db} from "../../../src/config/database";
+import {CleanupJob} from "../../../src/modules/jobs/cleanup.job";
 
 /**
  * Regression coverage for the cleanup job.

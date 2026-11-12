@@ -1,9 +1,9 @@
-// tests/integration/register.spec.ts
+// tests/integration/auth/register.spec.ts
 import {afterEach, describe, expect, it} from "vitest";
 import request from "supertest";
-import app from "../../src/app";
-import {db} from "../../src/config/database";
-import {SecurityUtil} from "../../src/common/utils/security.util";
+import app from "../../../src/app";
+import {db} from "../../../src/config/database";
+import {SecurityUtil} from "../../../src/common/utils/security.util";
 
 describe("POST /api/v1/auth/register", () => {
     afterEach(async () => {

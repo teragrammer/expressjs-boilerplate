@@ -6,6 +6,7 @@ export default defineConfig({
         // Scan only files inside any __test__ folder ending with .test.ts or .spec.ts
         include: [
             '**/src/**/*.{test,spec}.ts',
+            'scripts/**/*.{test,spec}.ts',
             'tests/integration/**/*.{spec,test}.ts'
         ],
         setupFiles: ['./tests/integration/setup.ts'],
@@ -33,11 +34,15 @@ export default defineConfig({
                 'src/@types/**',
             ],
             thresholds: {
-                // Global floor: 70/60 statements/branches is the target.
-                statements: 68,
-                branches: 60,
-                functions: 68,
-                lines: 69,
+                /*
+                 * Global floor: the blueprint target is 70/60
+                 * statements/branches; the measured suite is slightly
+                 * higher and the thresholds are ratcheted to it.
+                 */
+                statements: 73,
+                branches: 66,
+                functions: 73,
+                lines: 73,
                 /*
                  * The security-critical modules are held to a higher
                  * standard than the global floor.

@@ -1,10 +1,10 @@
-// tests/integration/login.spec.ts
+// tests/integration/auth/login.spec.ts
 import {afterEach, describe, expect, it} from "vitest";
 import request from "supertest";
 
-import app from "../../src/app";
-import {db} from "../../src/config/database";
-import {securityUtil} from "../../src/config/container";
+import app from "../../../src/app";
+import {db} from "../../../src/config/database";
+import {securityUtil} from "../../../src/config/container";
 
 describe("POST /api/v1/auth/login", () => {
     afterEach(async () => {

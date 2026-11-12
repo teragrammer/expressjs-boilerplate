@@ -1,12 +1,12 @@
-// tests/integration/password-recovery.spec.ts
+// tests/integration/auth/password-recovery.spec.ts
 import {afterEach, beforeEach, describe, expect, it, vi} from "vitest";
 import request from "supertest";
 import sgMail from "@sendgrid/mail";
 
-import app from "../../src/app";
-import {db} from "../../src/config/database";
-import {securityUtil} from "../../src/config/container";
-import {drainOutbox} from "./helpers";
+import app from "../../../src/app";
+import {db} from "../../../src/config/database";
+import {securityUtil} from "../../../src/config/container";
+import {drainOutbox} from "../helpers";
 
 const createTestUser = async () => {
     const username = securityUtil.randomString(8);

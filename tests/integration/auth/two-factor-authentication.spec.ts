@@ -2,9 +2,9 @@ import {afterEach, beforeEach, describe, expect, it, vi,} from "vitest";
 import request from "supertest";
 import sgMail from "@sendgrid/mail";
 
-import app from "../../src/app";
-import {db} from "../../src/config/database";
-import {securityUtil, tokenService,} from "../../src/config/container";
+import app from "../../../src/app";
+import {db} from "../../../src/config/database";
+import {securityUtil, tokenService,} from "../../../src/config/container";
 
 interface TestUserContext {
     user: any;

@@ -1,4 +1,4 @@
-// tests/integration/session.spec.ts
+// tests/integration/auth/session.spec.ts
 /**
  * Integration tests for the session and token lifecycle (F-03, F-04,
  * F-11) and the verification flows (F-12).
@@ -6,9 +6,9 @@
 import {afterEach, beforeEach, describe, expect, it} from "vitest";
 import request from "supertest";
 
-import app from "../../src/app";
-import {db} from "../../src/config/database";
-import {securityUtil} from "../../src/config/container";
+import app from "../../../src/app";
+import {db} from "../../../src/config/database";
+import {securityUtil} from "../../../src/config/container";
 
 const randomUsername = () => securityUtil.randomString(10);
 
