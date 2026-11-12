@@ -16,6 +16,7 @@ FROM node:24-bookworm-slim AS builder
 WORKDIR /app
 
 COPY package.json package-lock.json ./
+COPY scripts/setup-skills.mjs ./scripts/setup-skills.mjs
 
 # Non-interactive build: skip the `prepare` hook, which restores agent skills
 # from external GitHub repositories and is not needed to compile the app.
