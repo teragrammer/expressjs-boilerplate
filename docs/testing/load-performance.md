@@ -40,14 +40,15 @@ The default profile runs warm-up (30 s at 5/s), ramp-up (60 s at 10/s), sustaine
    npm run db:migrate
    npm run db:seed
    ```
-   The seeder creates `admin`, `manager`, and `customer` users. It uses
-   `SEED_PASSWORD` when set; otherwise it generates a random password and logs it
-   once.
+   The seeder creates `admin`, `manager`, and `customer` users. `SEED_PASSWORD`
+   must be set explicitly (at least 12 characters); the seeder never generates or
+   logs a password, and it refuses to run in production.
 3. Artillery is available. It is included as a dev dependency. `tests/load/run.sh`
    also checks for a global `artillery` command and installs one if it is missing.
-4. `SEED_PASSWORD` is set. `run.sh` refuses to start without it. Set it to the same
-   value used for `npm run db:seed` so the credentials in `tests/load/data/users.csv`
-   match:
+4. `SEED_PASSWORD` is set. `run.sh` refuses to start without it. It can be
+   exported in the shell or defined in the project `.env` (exported values win).
+   Set it to the same value used for `npm run db:seed` so the credentials in
+   `tests/load/data/users.csv` match:
    ```bash
    export SEED_PASSWORD='<the seeded password>'
    ```
@@ -162,7 +163,8 @@ accounts.
 
 ## Troubleshooting
 
-- `SEED_PASSWORD is not set`: export it before running `run.sh`.
+- `SEED_PASSWORD is not set`: add it to `.env` or export it before running
+  `run.sh`.
 - `ECONNREFUSED`: ensure the server is running before starting the load test.
 - Many `401` responses: verify the seeded users exist and that the CSV password matches
   the seeded password.

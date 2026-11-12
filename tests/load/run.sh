@@ -15,7 +15,9 @@
 #   OUTPUT_DIR    - Report output directory (default: tests/load/reports)
 #   WORKERS       - Number of artillery workers (default: auto)
 #   SEED_USERNAME - Seeded account used for the run (default: admin)
-#   SEED_PASSWORD - Password of the seeded account (required)
+#   SEED_PASSWORD - Password of the seeded account (required; may come from .env)
+#
+# Variables exported in the shell take precedence over the project .env file.
 # ─────────────────────────────────────────────────────────────────────────────
 
 set -euo pipefail
@@ -23,7 +25,6 @@ set -euo pipefail
 # ── Configuration ──────────────────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-REPORT_DIR="${OUTPUT_DIR:-${SCRIPT_DIR}/reports}"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
 # Colors for output
@@ -48,6 +49,47 @@ log_warning() {
 
 log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
+}
+
+# ── Environment Loading ───────────────────────────────────────────────────
+# Read the project's dotenv file for values that were not exported in the
+# shell. Exported values always win, so CI can override any .env setting.
+load_env_file() {
+    local env_file="${PROJECT_ROOT}/.env"
+    [[ -f "${env_file}" ]] || return 0
+
+    local line key value
+    while IFS= read -r line || [[ -n "${line}" ]]; do
+        # Skip blank lines and comments.
+        [[ "${line}" =~ ^[[:space:]]*(#|$) ]] && continue
+
+        # Trim leading whitespace and an optional `export ` prefix.
+        line="${line#"${line%%[![:space:]]*}"}"
+        line="${line#export }"
+
+        [[ "${line}" == *=* ]] || continue
+
+        key="${line%%=*}"
+        key="${key%"${key##*[![:space:]]}"}"
+        [[ "${key}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+
+        # Do not overwrite a non-empty value exported by the caller.
+        [[ -n "${!key:-}" ]] && continue
+
+        value="${line#*=}"
+        value="${value#"${value%%[![:space:]]*}"}"
+        value="${value%"${value##*[![:space:]]}"}"
+
+        # Strip matching quotes, otherwise drop an inline ` # comment`.
+        if [[ "${value}" =~ ^\"(.*)\"$ || "${value}" =~ ^\'(.*)\'$ ]]; then
+            value="${BASH_REMATCH[1]}"
+        else
+            value="${value%%[[:space:]]#*}"
+            value="${value%"${value##*[![:space:]]}"}"
+        fi
+
+        export "${key}=${value}"
+    done < "${env_file}"
 }
 
 # ── Pre-flight Checks ─────────────────────────────────────────────────────
@@ -170,6 +212,9 @@ main() {
     echo "           Artillery Load Test Runner"
     echo "══════════════════════════════════════════════════════════════"
     echo ""
+
+    load_env_file
+    REPORT_DIR="${OUTPUT_DIR:-${SCRIPT_DIR}/reports}"
 
     check_prerequisites
 

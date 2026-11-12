@@ -17,6 +17,9 @@ export SEED_PASSWORD='<the seeded password>'
 export TARGET_URL=http://localhost:4000
 ```
 
+`run.sh` also reads the project `.env`, so `SEED_PASSWORD` can be defined
+there instead. Values exported in the shell take precedence over `.env`.
+
 ## Profiles
 
 | Command | Profile | Duration | Load | Purpose |
