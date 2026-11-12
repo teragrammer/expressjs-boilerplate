@@ -130,12 +130,9 @@ export function idempotency(options: IdempotencyOptions) {
                 .where("key", "=", key)
                 .where("route", "=", route)
                 .where((eb) =>
-                    eb.or([
-                        eb("user_id", "is", null),
-                        userId === null
-                            ? eb("user_id", "is", null)
-                            : eb("user_id", "=", userId),
-                    ]),
+                    userId === null
+                        ? eb("user_id", "is", null)
+                        : eb("user_id", "=", userId),
                 )
                 .executeTakeFirst();
 

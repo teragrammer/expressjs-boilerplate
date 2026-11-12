@@ -14,13 +14,16 @@ import {disconnectRedis} from "./config/redis";
 
 const DEFAULT_CLUSTER_WORKERS = Math.max(1, os.cpus().length);
 
+const parsedWorkers = Number(__ENV.CLUSTER_WORKERS);
 const clusterWorkers = Math.max(
     1,
-    Number(__ENV.CLUSTER_WORKERS ?? DEFAULT_CLUSTER_WORKERS),
+    Number.isFinite(parsedWorkers) && parsedWorkers > 0
+        ? parsedWorkers
+        : DEFAULT_CLUSTER_WORKERS,
 );
 
 const isClusterEnabled =
-    Boolean(__ENV.CLUSTER) && DEFAULT_CLUSTER_WORKERS > 1;
+    __ENV.CLUSTER === "true" && DEFAULT_CLUSTER_WORKERS > 1;
 
 /**
  * Fails fast when the configured pool would exhaust the database's
