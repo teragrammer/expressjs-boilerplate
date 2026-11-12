@@ -47,5 +47,5 @@ error lost the message permanently.
 
 ## Related
 
-- Section 10.7 of `docs/production-readiness-blueprint.md` (outbox/jobs).
+- Section 10.4 of `docs/production-readiness-blueprint.md` (cross-cutting components).
 - F-08 and F-20 of `docs/production-readiness-blueprint.md`.

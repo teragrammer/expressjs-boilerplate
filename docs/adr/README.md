@@ -35,3 +35,6 @@ requirement and its own ADR.
   every replica; splitting it out is a deployment change.
 - **Multi-tenancy.** There is no tenant requirement, so no tenant
   columns or scoping exist.
+
+See the [documentation index](../README.md) for runbooks, testing guides,
+and the API contract.

@@ -51,5 +51,5 @@ routine administrative actions with catastrophic side effects.
 
 ## Related
 
-- Section 5.4 of `docs/production-readiness-blueprint.md` (destructive defaults).
+- Section 5.1 of `docs/production-readiness-blueprint.md` (TD-9, destructive defaults).
 - F-05 and F-19 of `docs/production-readiness-blueprint.md`.
