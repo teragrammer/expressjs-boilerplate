@@ -23,11 +23,14 @@ export interface AuthenticationToken {
     ip: string | null;
     browser: string | null;
     os: string | null;
+    tfa_verified: boolean;
     created_at: Date | string | null;
     updated_at: Date | string | null;
 }
 
-export type CreateAuthenticationTokenInput = Omit<AuthenticationToken, "id" | "created_at" | "updated_at">;
+export type CreateAuthenticationTokenInput = Omit<AuthenticationToken, "id" | "created_at" | "updated_at" | "tfa_verified"> & {
+    tfa_verified?: boolean;
+};
 export type UpdateAuthenticationTokenInput = Partial<CreateAuthenticationTokenInput>;
 
 export interface JwtExtendedPayload extends JwtPayload {

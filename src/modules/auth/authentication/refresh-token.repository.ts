@@ -36,8 +36,11 @@ export class RefreshTokenRepository {
         this.db = db;
     }
 
-    async create(data: CreateRefreshTokenInput): Promise<RefreshTokenRow> {
-        return this.db
+    async create(
+        data: CreateRefreshTokenInput,
+        executor: DatabaseExecutor = this.db,
+    ): Promise<RefreshTokenRow> {
+        return executor
             .insertInto(REFRESH_TOKEN_TABLE)
             .values({
                 session_id: data.session_id,

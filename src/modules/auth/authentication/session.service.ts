@@ -9,6 +9,7 @@ import {RefreshTokenRepository} from "./refresh-token.repository";
 import {TokenService} from "./authentication-token.service";
 import {RoleService} from "../../system/roles/role.service";
 import {UserRepository} from "../../users/user.repository";
+import type {DatabaseExecutor} from "../../../config/database";
 
 /**
  * A freshly issued credential pair.
@@ -86,6 +87,7 @@ export class SessionService {
             ip: options.metadata?.ip ?? null,
             browser: options.metadata?.browser ?? null,
             os: options.metadata?.os ?? null,
+            tfa_verified: options.tfa,
         });
 
         const accessToken = this.tokenService.generateToken({
@@ -96,6 +98,21 @@ export class SessionService {
             bpa: role.is_bypass_authorization ? 1 : 0,
             av: user.authorization_version || 0,
         });
+
+        /*
+         * A refresh token must not be usable before the second factor
+         * is complete: otherwise `/auth/refresh` would be a TFA
+         * bypass. Pending-TFA sessions therefore receive only the
+         * short-lived access token.
+         */
+        if (!options.tfa) {
+            return {
+                accessToken,
+                refreshToken: "",
+                sessionId: session.id,
+                expiresAt,
+            };
+        }
 
         const refreshToken = randomBytes(32).toString("base64url");
 
@@ -137,6 +154,7 @@ export class SessionService {
             includeRefreshToken?: boolean;
             familyId?: string;
             metadata?: SessionMetadata;
+            executor?: DatabaseExecutor;
         },
     ): Promise<IssuedTokens> {
         const accessToken = this.tokenService.generateToken({
@@ -168,7 +186,7 @@ export class SessionService {
             expires_at: expiresAt,
             ip: options.metadata?.ip ?? null,
             user_agent: options.metadata?.userAgent ?? null,
-        });
+        }, options.executor);
 
         return {
             accessToken,
@@ -273,7 +291,12 @@ export class SessionService {
         const accessToken = this.tokenService.generateToken({
             uid: user.id,
             tid: stored.session_id,
-            tfa: true,
+            /*
+             * Preserve the durable session state. Hardcoding `true`
+             * here would let a pre-TFA refresh token bypass the second
+             * factor.
+             */
+            tfa: Boolean(session.tfa_verified),
             rol: role.slug,
             bpa: role.is_bypass_authorization ? 1 : 0,
             av: user.authorization_version || 0,

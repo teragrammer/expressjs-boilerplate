@@ -70,8 +70,12 @@ export class AuthenticationTokenRepository {
     /**
      * Partially updates an existing token record by its ID.
      */
-    public async update(id: number, data: UpdateAuthenticationTokenInput): Promise<AuthenticationToken | null> {
-        const updatedToken = await this.db
+    public async update(
+        id: number,
+        data: UpdateAuthenticationTokenInput,
+        executor: DatabaseExecutor = this.db,
+    ): Promise<AuthenticationToken | null> {
+        const updatedToken = await executor
             .updateTable(AUTHENTICATION_TOKEN_TABLE)
             .set({
                 ...data,
@@ -92,6 +96,23 @@ export class AuthenticationTokenRepository {
             .updateTable(AUTHENTICATION_TOKEN_TABLE)
             .set({
                 tries: sql<number>`tries + 1`,
+                updated_at: sql<Date>`now()`,
+            })
+            .where("id", "=", id)
+            .execute();
+    }
+
+    /**
+     * Marks the session as having completed the second factor.
+     */
+    public async markTfaVerified(
+        id: number,
+        executor: DatabaseExecutor = this.db,
+    ): Promise<void> {
+        await executor
+            .updateTable(AUTHENTICATION_TOKEN_TABLE)
+            .set({
+                tfa_verified: true,
                 updated_at: sql<Date>`now()`,
             })
             .where("id", "=", id)

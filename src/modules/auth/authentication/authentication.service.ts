@@ -91,6 +91,7 @@ export class AuthenticationService {
                     ip: metadata?.ip ?? null,
                     browser: metadata?.browser ?? null,
                     os: metadata?.os ?? null,
+                    tfa_verified: true,
                 },
                 trx,
             );
@@ -106,7 +107,7 @@ export class AuthenticationService {
             newUser.session.id,
             newUser.created,
             role,
-            false,
+            true,
             {
                 includeRefreshToken: true,
                 metadata: {

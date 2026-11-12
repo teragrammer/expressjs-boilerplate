@@ -123,6 +123,17 @@ describe("SessionService", () => {
             });
         });
 
+        it("does not issue a refresh token before the second factor", async () => {
+            const result = await service.issue(7, {tfa: false});
+
+            expect(result.refreshToken).toBe("");
+            expect(refreshTokenRepository.create).not.toHaveBeenCalled();
+
+            expect(authenticationTokenRepository.create).toHaveBeenCalledWith(
+                expect.objectContaining({tfa_verified: false}),
+            );
+        });
+
         it("fails when the user does not exist", async () => {
             userRepository.findAuthById.mockResolvedValue(null);
 
@@ -179,6 +190,30 @@ describe("SessionService", () => {
             expect(refreshTokenRepository.revoke).toHaveBeenCalledWith(
                 "old",
                 expect.any(String),
+            );
+        });
+
+        it("preserves the session TFA state when rotating", async () => {
+            refreshTokenRepository.findByHash.mockResolvedValue({
+                id: "old",
+                session_id: 42,
+                user_id: 7,
+                family_id: "family-1",
+                expires_at: new Date(Date.now() + 60_000),
+                revoked_at: null,
+                replaced_by: null,
+            });
+
+            authenticationTokenRepository.findById.mockResolvedValue({
+                id: 42,
+                user_id: 7,
+                tfa_verified: false,
+            });
+
+            await service.rotate("presented-token");
+
+            expect(tokenService.generateToken).toHaveBeenCalledWith(
+                expect.objectContaining({tfa: false}),
             );
         });
 

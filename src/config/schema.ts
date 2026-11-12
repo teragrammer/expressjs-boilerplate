@@ -102,6 +102,7 @@ export interface AuthenticationTokensTable {
     ip: string | null;
     browser: string | null;
     os: string | null;
+    tfa_verified: Generated<boolean>;
     created_at: NullableTimestamp;
     updated_at: NullableTimestamp;
 }
@@ -130,6 +131,13 @@ export interface TwoFactorAuthenticationsTable {
     expired_at: NullableTimestamp;
     created_at: GeneratedTimestamp;
     updated_at: GeneratedTimestamp;
+}
+
+export interface TfaRecoveryCodesTable {
+    id: Generated<number>;
+    user_id: number;
+    code_hash: string;
+    created_at: GeneratedTimestamp;
 }
 
 export interface RateLimitsTable {
@@ -229,6 +237,7 @@ export interface Database {
     authentication_tokens: AuthenticationTokensTable;
     password_recoveries: PasswordRecoveriesTable;
     two_factor_authentications: TwoFactorAuthenticationsTable;
+    tfa_recovery_codes: TfaRecoveryCodesTable;
     rate_limits: RateLimitsTable;
     refresh_tokens: RefreshTokensTable;
     verification_tokens: VerificationTokensTable;

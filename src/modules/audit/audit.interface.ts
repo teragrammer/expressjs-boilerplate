@@ -18,6 +18,7 @@ export const AUDIT_ACTIONS = {
     AUTH_TFA_ENABLED: "auth.tfa.enabled",
     AUTH_TFA_DISABLED: "auth.tfa.disabled",
     AUTH_TFA_VERIFIED: "auth.tfa.verified",
+    AUTH_TFA_RECOVERY_CODE_USED: "auth.tfa.recovery_code.used",
     USER_CREATED: "user.created",
     USER_UPDATED: "user.updated",
     USER_DELETED: "user.deleted",

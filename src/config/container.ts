@@ -10,6 +10,7 @@ import {DateUtil} from "../common/utils/date.util";
 import {SettingRepository} from "../modules/system/settings/setting.repository";
 import {RouteGuardRepository} from "../modules/system/route-guards/route-guard.repository";
 import {TwoFactorAuthenticationRepository} from "../modules/auth/two-factor-authentication/two-factor-authentication.repository";
+import {TfaRecoveryCodeRepository} from "../modules/auth/two-factor-authentication/tfa-recovery-code.repository";
 import {AuthenticationTokenRepository} from "../modules/auth/authentication/authentication-token.repository";
 import {RefreshTokenRepository} from "../modules/auth/authentication/refresh-token.repository";
 import {RoleRepository} from "../modules/system/roles/role.repository";
@@ -128,12 +129,13 @@ export const twoFactorAuthenticationService = new TwoFactorAuthenticationService
     securityUtil,
     new TwoFactorAuthenticationRepository(db),
     authenticationTokenRepository,
-    tokenService,
     dateUtil,
     settingService,
     mailService,
     roleService,
     userRepository,
+    sessionService,
+    new TfaRecoveryCodeRepository(db),
 );
 
 export const authService = new AuthenticationService(
