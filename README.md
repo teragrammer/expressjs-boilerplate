@@ -254,6 +254,24 @@ Run these from the repository root (they resolve paths relative to the current w
 After scaffolding a migration, register it in `src/config/migrator.ts` in timestamp order.
 After scaffolding a seeder, wire it into `scripts/db/seed.ts` in dependency order.
 
+#### Migration Naming Convention (Required)
+
+All Kysely migration files in `database/migrations/` must follow this format:
+
+`YYYYMMDDHHmmss_descriptive_action_and_table.ts`
+
+- `YYYYMMDDHHmmss` is a 14-digit timestamp (`YYYY` year, `MM` month, `DD` day, `HH` hour, `mm` minute, `ss` second).
+- The descriptive part uses lowercase `snake_case` and clearly states the action and affected table.
+- Every migration filename must have a unique timestamp prefix.
+- Preserve chronological execution order when registering migrations.
+
+Examples:
+- `20261111120000_create_users_table.ts`
+- `20261111121500_add_email_to_users.ts`
+- `20261111123000_create_organizations_table.ts`
+- `20261111124500_add_organization_id_to_users.ts`
+- `20261111130000_create_user_sessions_table.ts`
+
 ### Example API Requests
 
 - Log in (the refresh token is returned as an `HttpOnly` cookie)

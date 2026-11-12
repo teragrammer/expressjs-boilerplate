@@ -9,6 +9,7 @@ Express 5 + TypeScript REST API boilerplate. The database is **PostgreSQL** (`DB
 - `npm test` / `npm run test:run` — vitest. Always use these npm scripts instead of calling `npx vitest` directly: all tests share one database and the scripts enforce `--no-file-parallelism`.
 - `npm run db:migrate` / `db:seed` / `db:reset` — Kysely via ts-node scripts in `scripts/db/` with the static registry in `src/config/migrator.ts`; must run from the repo root (migration/seed directories resolve from `process.cwd()`).
 - `npm run make:migration` / `make:seed` — scaffold a new migration/seed file (register migrations in `src/config/migrator.ts`, wire seeds into `scripts/db/seed.ts`).
+- Migration files must be named `YYYYMMDDHHmmss_descriptive_action_and_table.ts` (14-digit timestamp + lowercase snake_case action/table), with a unique timestamp prefix. Register in `src/config/migrator.ts` in timestamp order.
 - Load tests: artillery against `tests/load/api.yml` (targets `localhost:3000`).
 
 ## Testing

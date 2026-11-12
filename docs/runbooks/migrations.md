@@ -12,6 +12,11 @@ it.
   the same change.
 - Migrations are registered explicitly in `src/config/migrator.ts`. A
   new file is not executed until it is registered, in timestamp order.
+- Migration files must be named `YYYYMMDDHHmmss_descriptive_action_and_table.ts`
+  (14-digit timestamp plus lowercase snake_case action and table name)
+  with a unique timestamp prefix. Examples:
+  `20261111120000_create_users_table.ts`,
+  `20261111121500_add_email_to_users.ts`.
 - Every migration has an `up` and a `down`. A `down` is the rollback
   path for an unreleased migration.
 

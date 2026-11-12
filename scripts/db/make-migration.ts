@@ -9,8 +9,13 @@ import path from "node:path";
  * generated file name stays sortable and filesystem-safe.
  */
 export function validateMigrationName(name: string | undefined): string {
-    if (!name || !/^[a-z0-9_]+$/.test(name)) {
-        throw new Error("Usage: npm run make:migration -- <snake_case_name>");
+    if (
+        !name ||
+        !/^(create|add|alter|drop|remove|update|rename)_[a-z0-9_]+$/.test(name)
+    ) {
+        throw new Error(
+            "Usage: npm run make:migration -- <action>_<description> (e.g. create_users_table, add_email_to_users)",
+        );
     }
 
     return name;
