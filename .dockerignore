@@ -24,7 +24,9 @@ coverage
 .agents
 
 # Documentation and tests
-docs
+# Only the OpenAPI contract is shipped: the API serves it at runtime.
+docs/*
+!docs/openapi.yaml
 README.md
 tests
 *.md
