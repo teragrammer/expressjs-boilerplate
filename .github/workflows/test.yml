@@ -19,6 +19,12 @@ jobs:
     name: Lint, typecheck and build
     runs-on: ubuntu-latest
 
+    # The OpenAPI lint imports the application routers, which validate
+    # the environment at module load. The test profile supplies safe,
+    # deterministic defaults so no secrets are needed for this job.
+    env:
+      NODE_ENV: test
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -88,6 +94,7 @@ jobs:
       JWT_SECRET: ci-jwt-secret-at-least-32-characters-long
       BCRYPT_SECRET: ci-bcrypt-secret-at-least-32-characters
       CRYPT0_SECRET: ci-crypto-secret-0123456789abcdef0123
+      SEED_PASSWORD: ci-seed-password-at-least-12-chars
       REDIS_HOST: localhost
       REDIS_PORT: 6379
 
