@@ -6,23 +6,26 @@ migrations as the application.
 
 ## Test files
 
+Tests are grouped by module; `setup.ts` and `helpers.ts` stay at the integration root.
+
 | File | Purpose |
 | --- | --- |
-| `tests/integration/account.spec.ts` | Account profile and password updates; TFA and authentication requirements |
-| `tests/integration/cleanup.spec.ts` | Cleanup job deletes expired sessions, recovery rows, OTPs, refresh tokens, verifications, rate limits, and idempotency keys |
-| `tests/integration/login.spec.ts` | Login with valid credentials |
-| `tests/integration/password-recovery.spec.ts` | Recovery send/validate flows; non-enumeration; SendGrid is mocked |
-| `tests/integration/register.spec.ts` | Registration success and validation failures |
-| `tests/integration/regression.spec.ts` | P0 regression suite (F-01 onward): validation, user CRUD, tokens, sessions, deletion, rate limits, recovery, TFA, errors |
-| `tests/integration/session.spec.ts` | Session and token lifecycle; refresh rotation/reuse; audit events |
-| `tests/integration/tfa.spec.ts` | TFA lifecycle: restricted tokens, OTP upgrade, lockout, enrollment, recovery codes |
-| `tests/integration/two-factor-authentication.spec.ts` | OTP send/validate and authentication requirements |
+| `tests/integration/users/account.spec.ts` | Account profile and password updates; TFA and authentication requirements |
+| `tests/integration/system/cleanup.spec.ts` | Cleanup job deletes expired sessions, recovery rows, OTPs, refresh tokens, verifications, rate limits, and idempotency keys |
+| `tests/integration/auth/login.spec.ts` | Login with valid credentials |
+| `tests/integration/auth/password-recovery.spec.ts` | Recovery send/validate flows; non-enumeration; SendGrid is mocked |
+| `tests/integration/auth/register.spec.ts` | Registration success and validation failures |
+| `tests/integration/system/regression.spec.ts` | P0 regression suite (F-01 onward): validation, user CRUD, tokens, sessions, deletion, rate limits, recovery, TFA, errors |
+| `tests/integration/auth/session.spec.ts` | Session and token lifecycle; refresh rotation/reuse; audit events |
+| `tests/integration/auth/tfa.spec.ts` | TFA lifecycle: restricted tokens, OTP upgrade, lockout, enrollment, recovery codes |
+| `tests/integration/auth/two-factor-authentication.spec.ts` | OTP send/validate and authentication requirements |
 | `tests/integration/helpers.ts` | Shared setup helpers |
 
 ## How the tests run
 
 - Vitest configuration: `vitest.config.ts`.
-- Included files: `src/**/*.spec.ts` and `tests/integration/**/*.spec.ts`.
+- Included files: `src/**/*.spec.ts`, `scripts/**/*.spec.ts`, and
+  `tests/integration/**/*.spec.ts`.
 - Global setup: `tests/integration/setup.ts` runs `migrateToLatest()` before all test
   files and closes the database connection afterward.
 - The rate limiter is disabled for the suite by default; the regression suite enables it
@@ -70,15 +73,15 @@ npx vitest run tests/integration --no-file-parallelism
 Run a single integration test file:
 
 ```bash
-npx vitest run tests/integration/account.spec.ts --no-file-parallelism
-npx vitest run tests/integration/login.spec.ts --no-file-parallelism
-npx vitest run tests/integration/register.spec.ts --no-file-parallelism
-npx vitest run tests/integration/password-recovery.spec.ts --no-file-parallelism
-npx vitest run tests/integration/regression.spec.ts --no-file-parallelism
-npx vitest run tests/integration/session.spec.ts --no-file-parallelism
-npx vitest run tests/integration/tfa.spec.ts --no-file-parallelism
-npx vitest run tests/integration/two-factor-authentication.spec.ts --no-file-parallelism
-npx vitest run tests/integration/cleanup.spec.ts --no-file-parallelism
+npx vitest run tests/integration/users/account.spec.ts --no-file-parallelism
+npx vitest run tests/integration/auth/login.spec.ts --no-file-parallelism
+npx vitest run tests/integration/auth/register.spec.ts --no-file-parallelism
+npx vitest run tests/integration/auth/password-recovery.spec.ts --no-file-parallelism
+npx vitest run tests/integration/system/regression.spec.ts --no-file-parallelism
+npx vitest run tests/integration/auth/session.spec.ts --no-file-parallelism
+npx vitest run tests/integration/auth/tfa.spec.ts --no-file-parallelism
+npx vitest run tests/integration/auth/two-factor-authentication.spec.ts --no-file-parallelism
+npx vitest run tests/integration/system/cleanup.spec.ts --no-file-parallelism
 ```
 
 Always use `--no-file-parallelism` because all tests share one database.

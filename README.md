@@ -68,7 +68,7 @@ environment configuration to help you kickstart your API development with best p
 The project includes unit, integration, and load/performance tests.
 
 - **Unit tests** — colocated with source as `src/**/*.spec.ts`.
-- **Integration tests** — `tests/integration/*.spec.ts`; run against PostgreSQL.
+- **Integration tests** — grouped under `tests/integration/{auth,users,system}/`; run against PostgreSQL.
   See [docs/testing/integration.md](docs/testing/integration.md).
 - **Load / performance tests** — Artillery configs in `tests/load/`.
   See [docs/testing/load-performance.md](docs/testing/load-performance.md).

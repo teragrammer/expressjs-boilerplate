@@ -124,7 +124,7 @@ Planning estimate: **12–16 person-weeks** for one senior engineer, or **6–8 
 | Contract | `openapi.yaml`, validated by `scripts/openapi-lint.ts` |
 | Decisions | `adr/` |
 | Procedures | `runbooks/` |
-| Regression suite | `tests/integration/regression.spec.ts`, `tests/integration/session.spec.ts` |
+| Regression suite | `tests/integration/system/regression.spec.ts`, `tests/integration/auth/session.spec.ts` |
 
 Verification commands: `npm run typecheck`, `npm run lint`, `npm run build`, `npm run test:run`, `npm run test:coverage`, `npm run openapi:lint`, `npm run audit:prod`.
 
@@ -2322,7 +2322,7 @@ Sources are grouped by the claim they support. Standards and vendor documentatio
 | `src/modules/audit/*`, `src/modules/jobs/*` | Audit, outbox, cleanup |
 | `src/shared/redis/*`, `src/shared/validations/*` | Cache crypto, pub/sub, validators |
 | `database/migrations/*`, `database/seeds/*` | Schema, constraints, indexes, seeds |
-| `tests/integration/*`, `src/**/*.spec.ts` | Test inventory/isolation |
+| `tests/integration/**/*`, `src/**/*.spec.ts`, `scripts/**/*.spec.ts` | Test inventory/isolation |
 | `tests/load/*` | Load profiles/thresholds |
 | `.github/workflows/test.yml`, `Dockerfile`, `compose.yml` | CI/container posture |
 

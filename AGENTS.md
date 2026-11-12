@@ -15,14 +15,15 @@ Express 5 + TypeScript REST API boilerplate. The database is **PostgreSQL** (`DB
 ## Testing
 
 - Every test run — including colocated unit tests — requires a reachable PostgreSQL: the global setup file `tests/integration/setup.ts` runs `migrate.latest()` before any test file executes.
-- Unit tests live next to source (`src/**/*.spec.ts`); integration tests live in `tests/integration/`.
+- Unit tests live next to source (`src/**/*.spec.ts`); integration tests live in `tests/integration/` grouped by module (`auth/`, `users/`, `system/`). `setup.ts` and `helpers.ts` stay at the integration root.
 - Single file: `npx vitest run path/to/file.spec.ts --no-file-parallelism`.
 
 ## Architecture
 
 - Entry flow: `src/index.ts` (optional cluster mode) → `src/app.ts` (Express app) → `src/routes/v1.ts` (module routers).
-- No DI framework: all services and repositories are manually wired in `src/config/container.ts`. Register new dependencies there.
+- No DI framework: all services and repositories (and controllers) are manually wired in `src/config/container.ts`. Register new dependencies there; route files only attach middleware and delegate to container instances.
 - Modules: `src/modules/{auth,users,system}`; `system` holds settings, roles, and route-guards. Redis cache/pub-sub lives in `src/shared/redis`.
+- `src/routes/` is for app-level router composition (`v1.ts`) and operational endpoints (`docs.ts`, `metrics.ts`) only. Domain routes belong next to their module under `src/modules/`.
 - Request extensions (typed in `src/@types/express/index.d.ts`): `req.credentials`, `req.sanitize.body/query`, `req.pagination`, `res.failed.message/fields`. Use these in controllers instead of raw `req.body` / `res.json`.
 - Async route handlers must be wrapped in `catchAsync` (`src/common/utils/catch-async.ts`), otherwise rejections never reach the error middleware.
 - Cluster mode: set `CLUSTER=true`; worker count defaults to CPU count (`CLUSTER_WORKERS` overrides).
