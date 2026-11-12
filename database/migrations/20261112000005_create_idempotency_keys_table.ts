@@ -1,4 +1,4 @@
-// database/migrations/20261112000005_add_idempotency_keys.ts
+// database/migrations/20261112000005_create_idempotency_keys_table.ts
 import {sql, type Kysely} from "kysely";
 
 export async function up(db: Kysely<any>): Promise<void> {

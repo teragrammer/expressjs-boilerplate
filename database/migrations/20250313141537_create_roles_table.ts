@@ -1,4 +1,4 @@
-// database/migrations/20250313141537_roles.ts
+// database/migrations/20250313141537_create_roles_table.ts
 import {sql, type Kysely} from "kysely";
 
 export async function up(db: Kysely<any>): Promise<void> {

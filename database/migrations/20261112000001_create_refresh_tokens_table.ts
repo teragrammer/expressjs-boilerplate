@@ -1,4 +1,4 @@
-// database/migrations/20261112000001_add_refresh_tokens.ts
+// database/migrations/20261112000001_create_refresh_tokens_table.ts
 import {sql, type Kysely} from "kysely";
 
 export async function up(db: Kysely<any>): Promise<void> {

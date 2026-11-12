@@ -1,4 +1,4 @@
-// database/migrations/20261111050942_add_rate_limit_table.ts
+// database/migrations/20261111050942_create_rate_limits_table.ts
 import {sql, type Kysely} from "kysely";
 
 export async function up(db: Kysely<any>): Promise<void> {

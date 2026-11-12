@@ -1,4 +1,4 @@
-// database/migrations/20250313141609_two_factor_authentications.ts
+// database/migrations/20250313141609_create_two_factor_authentications_table.ts
 import {sql, type Kysely} from "kysely";
 
 export async function up(db: Kysely<any>): Promise<void> {

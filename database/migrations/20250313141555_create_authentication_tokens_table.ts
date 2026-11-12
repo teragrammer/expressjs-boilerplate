@@ -1,4 +1,4 @@
-// database/migrations/20250313141555_authentication_tokens.ts
+// database/migrations/20250313141555_create_authentication_tokens_table.ts
 import {sql, type Kysely} from "kysely";
 
 export async function up(db: Kysely<any>): Promise<void> {

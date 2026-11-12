@@ -1,4 +1,4 @@
-// database/migrations/20261112000004_add_outbox_events.ts
+// database/migrations/20261112000004_create_outbox_events_table.ts
 import {sql, type Kysely} from "kysely";
 
 export async function up(db: Kysely<any>): Promise<void> {

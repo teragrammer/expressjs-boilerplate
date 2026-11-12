@@ -1,4 +1,4 @@
-// database/migrations/20250313141544_users.ts
+// database/migrations/20250313141544_create_users_table.ts
 import {sql, type Kysely} from "kysely";
 import {GENDERS, STATUSES} from "../../src/modules/users/user.interface";
 

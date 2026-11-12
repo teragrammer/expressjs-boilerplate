@@ -1,4 +1,4 @@
-// database/migrations/20251023075024_route_guards.ts
+// database/migrations/20251023075024_create_route_guards_table.ts
 import {sql, type Kysely} from "kysely";
 
 export async function up(db: Kysely<any>): Promise<void> {

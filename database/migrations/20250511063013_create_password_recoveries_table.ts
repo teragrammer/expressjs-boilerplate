@@ -1,4 +1,4 @@
-// database/migrations/20250511063013_password_recoveries.ts
+// database/migrations/20250511063013_create_password_recoveries_table.ts
 import {sql, type Kysely} from "kysely";
 import {TYPES} from "../../src/modules/auth/password-recovery/password-recovery.interface";
 

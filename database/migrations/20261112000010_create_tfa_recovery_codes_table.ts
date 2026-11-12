@@ -1,4 +1,4 @@
-// database/migrations/20261112000010_add_tfa_session_state_and_recovery_codes.ts
+// database/migrations/20261112000010_create_tfa_recovery_codes_table.ts
 import {sql, type Kysely} from "kysely";
 
 export async function up(db: Kysely<any>): Promise<void> {
