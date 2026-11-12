@@ -60,6 +60,15 @@ describe("AccountService", () => {
 
     let user: User;
 
+    /*
+     * The transaction runner is stubbed so the unit test does not
+     * need a database: the callback receives a sentinel executor.
+     */
+    const trx = {} as never;
+    const runInTransaction = async <T>(
+        callback: (executor: never) => Promise<T>,
+    ): Promise<T> => callback(trx);
+
     beforeEach(() => {
         mockUserRepository = {
             update: vi.fn(),
@@ -113,6 +122,7 @@ describe("AccountService", () => {
             mockSessionService as unknown as SessionService,
             mockVerificationService as unknown as VerificationService,
             mockPasswordRecoveryRepository as unknown as PasswordRecoveryRepository,
+            runInTransaction,
         );
 
         user = {
@@ -186,12 +196,14 @@ describe("AccountService", () => {
                 1,
                 data,
                 "Activated",
+                trx,
             );
 
             // The current session is refreshed, never replaced.
             expect(mockAuthTokenRepository.update).toHaveBeenCalledWith(
                 currentTid,
                 {expired_at: newExpiredAt},
+                trx,
             );
             expect(mockRoleService.findById).toHaveBeenCalledWith(
                 user.role_id,
@@ -206,7 +218,9 @@ describe("AccountService", () => {
                 false,
             );
 
-            expect(result).toBe("new.jwt.token");
+            expect(result).toEqual(
+                expect.objectContaining({accessToken: "new.jwt.token"}),
+            );
         });
 
         it("should throw a server error when the user cannot be updated", async () => {
@@ -350,13 +364,14 @@ describe("AccountService", () => {
             // Outstanding recovery codes are invalidated.
             expect(
                 mockPasswordRecoveryRepository.deleteAllByUserId,
-            ).toHaveBeenCalledWith(user.id);
+            ).toHaveBeenCalledWith(user.id, trx);
 
             // A new session is created and every other session revoked.
             expect(mockAuthTokenRepository.create).toHaveBeenCalledTimes(1);
             expect(mockAuthTokenRepository.deleteAllByUserId).toHaveBeenCalledWith(
                 user.id,
                 newSession.id,
+                trx,
             );
 
             expect(mockSessionService.issueForSession).toHaveBeenCalledWith(
@@ -364,10 +379,12 @@ describe("AccountService", () => {
                 expect.objectContaining({id: user.id}),
                 expect.objectContaining({slug: "customer"}),
                 false,
-                {includeRefreshToken: true},
+                {includeRefreshToken: true, executor: trx},
             );
 
-            expect(result).toBe("new.jwt.token");
+            expect(result).toEqual(
+                expect.objectContaining({accessToken: "new.jwt.token"}),
+            );
         });
 
         it("should throw when the user update fails", async () => {

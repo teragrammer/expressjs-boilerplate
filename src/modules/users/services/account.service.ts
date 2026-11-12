@@ -7,10 +7,15 @@ import {SecurityUtil} from "../../../common/utils/security.util";
 import {AuthenticationTokenRepository} from "../../auth/authentication/authentication-token.repository";
 import {RoleService} from "../../system/roles/role.service";
 import {DateUtil} from "../../../common/utils/date.util";
-import {SessionService} from "../../auth/authentication/session.service";
+import {
+    IssuedTokens,
+    SessionService,
+} from "../../auth/authentication/session.service";
 import {VerificationService} from "../../auth/verification/verification.service";
 import {PasswordRecoveryRepository} from "../../auth/password-recovery/password-recovery.repository";
 import {__ENV} from "../../../config/environment";
+import {type TransactionRunner} from "./user.service";
+import {withTransaction} from "../../../config/database";
 
 export class AccountService {
     constructor(
@@ -22,6 +27,7 @@ export class AccountService {
         private readonly sessionService: SessionService,
         private readonly verificationService: VerificationService,
         private readonly passwordRecoveryRepository: PasswordRecoveryRepository,
+        private readonly runInTransaction: TransactionRunner = withTransaction,
     ) {
     }
 
@@ -37,7 +43,7 @@ export class AccountService {
         data: UpdateUserDTO,
         currentTid: number,
         tfa = false,
-    ): Promise<string> {
+    ): Promise<IssuedTokens> {
         /*
          * The current contact values are read before the update so a
          * changed email/phone can be detected: the repository returns
@@ -45,43 +51,51 @@ export class AccountService {
          */
         const previous = await this.userRepository.findAuthById(id);
 
-        const user: User | null = await this.userRepository.update(
-            id,
-            data,
-            "Activated",
-        );
-
-        if (!user) {
-            throw new AppError(Messages.SERVER_ERROR);
-        }
-
-        /*
-         * A changed email or phone must be re-verified before it can be
-         * used, so the verification flag is reset and the pending value
-         * is sent for verification.
-         */
-        await this.handleContactChange(previous, user, data);
-
         // Keep the current session alive and refresh its expiry.
         const newExpiredAt = this.dateUtil.expiredAt(
             Number(__ENV.JWT_REFRESH_TOKEN_DAYS || 7),
             "days",
         );
 
-        await this.authenticationTokenRepository.update(currentTid, {
-            expired_at: newExpiredAt,
+        const user = await this.runInTransaction(async (trx) => {
+            const updated = await this.userRepository.update(
+                id,
+                data,
+                "Activated",
+                trx,
+            );
+
+            if (!updated) {
+                throw new AppError(Messages.SERVER_ERROR);
+            }
+
+            await this.authenticationTokenRepository.update(
+                currentTid,
+                {
+                    expired_at: newExpiredAt,
+                },
+                trx,
+            );
+
+            return updated;
         });
+
+        /*
+         * A changed email or phone must be re-verified before it can be
+         * used, so the verification flag is reset and the pending value
+         * is sent for verification. Delivery happens outside the
+         * transaction: a slow provider must not hold a connection.
+         */
+        await this.handleContactChange(previous, user, data);
 
         const role = await this.roleService.findById(user.role_id);
 
-        const issued = await this.sessionService.issueForSession(
+        return this.sessionService.issueForSession(
             currentTid,
             user,
             role,
             tfa,
         );
-
-        return issued.accessToken;
     }
 
     /**
@@ -90,13 +104,17 @@ export class AccountService {
      * Every other session is revoked, the current session is rotated to
      * a new session id, and outstanding recovery codes are invalidated
      * so a stale recovery token cannot be used afterwards.
+     *
+     * The whole operation is one transaction: a failure must not leave
+     * the account with a new password but live sessions, or with a
+     * rotated session but an unchanged password.
      */
     async password(
         user: User,
         data: SecurityAccountDTO,
         currentTid: number,
         tfa = false,
-    ): Promise<string> {
+    ): Promise<IssuedTokens> {
         // verify the current password
         if (
             !user.password ||
@@ -110,53 +128,65 @@ export class AccountService {
             data.password = await this.securityUtil.hash(data.new_password);
         }
 
-        // update the security details
-        if (!await this.userRepository.update(user.id, data, "Activated")) {
-            throw new AppError(Messages.UPDATE_FAILED);
-        }
-
-        /*
-         * Invalidate outstanding recovery codes: a password change means
-         * any recovery code issued earlier must not be redeemable.
-         */
-        await this.passwordRecoveryRepository.deleteAllByUserId(user.id);
-
-        /*
-         * Rotate the current session and revoke every other session for
-         * the user. The caller receives a token bound to the new session.
-         */
-        const newSession = await this.authenticationTokenRepository.create({
-            user_id: user.id,
-            expired_at: this.dateUtil.expiredAt(
-                Number(__ENV.JWT_REFRESH_TOKEN_DAYS || 7),
-                "days",
-            ),
-            ip: null,
-            browser: null,
-            os: null,
-        });
-
-        await this.authenticationTokenRepository.deleteAllByUserId(
-            user.id,
-            newSession.id,
-        );
-
-        // Update user object with new values for token
-        if (typeof data.username !== "undefined") {user.username = data.username;}
-        if (typeof data.email !== "undefined") {user.email = data.email;}
-        if (typeof data.phone !== "undefined") {user.phone = data.phone;}
-
         const role = await this.roleService.findById(user.role_id);
 
-        const issued = await this.sessionService.issueForSession(
-            newSession.id,
-            user,
-            role,
-            tfa,
-            {includeRefreshToken: true},
-        );
+        return this.runInTransaction(async (trx) => {
+            // update the security details
+            const updated = await this.userRepository.update(
+                user.id,
+                data,
+                "Activated",
+                trx,
+            );
 
-        return issued.accessToken;
+            if (!updated) {
+                throw new AppError(Messages.UPDATE_FAILED);
+            }
+
+            /*
+             * Invalidate outstanding recovery codes: a password change
+             * means any recovery code issued earlier must not be
+             * redeemable.
+             */
+            await this.passwordRecoveryRepository.deleteAllByUserId(
+                user.id,
+                trx,
+            );
+
+            /*
+             * Rotate the current session and revoke every other session
+             * for the user. The caller receives a token bound to the new
+             * session.
+             */
+            const newSession = await this.authenticationTokenRepository.create(
+                {
+                    user_id: user.id,
+                    expired_at: this.dateUtil.expiredAt(
+                        Number(__ENV.JWT_REFRESH_TOKEN_DAYS || 7),
+                        "days",
+                    ),
+                    ip: null,
+                    browser: null,
+                    os: null,
+                    tfa_verified: tfa,
+                },
+                trx,
+            );
+
+            await this.authenticationTokenRepository.deleteAllByUserId(
+                user.id,
+                newSession.id,
+                trx,
+            );
+
+            return this.sessionService.issueForSession(
+                newSession.id,
+                updated,
+                role,
+                tfa,
+                {includeRefreshToken: true, executor: trx},
+            );
+        });
     }
 
     /**

@@ -93,6 +93,7 @@ describe("AccountController", () => {
         res = {
             status: vi.fn().mockReturnThis(),
             json: vi.fn().mockReturnThis(),
+            cookie: vi.fn().mockReturnThis(),
         };
 
         next = vi.fn();
@@ -141,7 +142,7 @@ describe("AccountController", () => {
             const token = "mocked-jwt-token-string";
 
             req.sanitize!.data = validatedData;
-            mockInformation.mockResolvedValue(token);
+            mockInformation.mockResolvedValue({ accessToken: token, refreshToken: "", sessionId: 1, expiresAt: new Date() });
 
             await invoke("information");
 
@@ -169,7 +170,7 @@ describe("AccountController", () => {
             req.credentials!.jwt.uid = 42;
             req.sanitize!.data = validatedData;
 
-            mockInformation.mockResolvedValue("new-token");
+            mockInformation.mockResolvedValue({ accessToken: "new-token", refreshToken: "", sessionId: 1, expiresAt: new Date() });
 
             await invoke("information");
 
@@ -255,7 +256,7 @@ describe("AccountController", () => {
                 last_name: "Doe",
             };
 
-            mockInformation.mockResolvedValue(undefined);
+            mockInformation.mockResolvedValue({ accessToken: undefined, refreshToken: "", sessionId: 1, expiresAt: undefined });
 
             await invoke("information");
 
@@ -284,7 +285,7 @@ describe("AccountController", () => {
             const token = "mocked-password-update-token";
 
             req.sanitize!.data = validatedData;
-            mockPassword.mockResolvedValue(token);
+            mockPassword.mockResolvedValue({ accessToken: token, refreshToken: "refresh-token", sessionId: 1, expiresAt: new Date() });
 
             await invoke("password");
 
@@ -296,6 +297,7 @@ describe("AccountController", () => {
                 user,
                 validatedData,
                 45,  // currentTid
+                false,
             );
 
             expect(req.sanitize!.body.only).not.toHaveBeenCalled();
@@ -318,7 +320,7 @@ describe("AccountController", () => {
             req.credentials!.user.mockResolvedValue(authenticatedUser);
             req.sanitize!.data = validatedData;
 
-            mockPassword.mockResolvedValue("new-token");
+            mockPassword.mockResolvedValue({ accessToken: "new-token", refreshToken: "refresh-token", sessionId: 1, expiresAt: new Date() });
 
             await invoke("password");
 
@@ -329,6 +331,7 @@ describe("AccountController", () => {
                 authenticatedUser,
                 validatedData,
                 45,  // currentTid
+                false,
             );
 
             expectSuccessfulResponse("new-token");
@@ -356,6 +359,7 @@ describe("AccountController", () => {
                 user,
                 validatedData,
                 45,
+                false,
             );
 
             expectErrorForwarded(serviceError);
@@ -409,7 +413,7 @@ describe("AccountController", () => {
         it("should pass undefined sanitized data to the service without performing validation", async () => {
             req.sanitize!.data = undefined;
 
-            mockPassword.mockResolvedValue("token");
+            mockPassword.mockResolvedValue({ accessToken: "token", refreshToken: "refresh-token", sessionId: 1, expiresAt: new Date() });
 
             await invoke("password");
 
@@ -418,6 +422,7 @@ describe("AccountController", () => {
                 user,
                 undefined,
                 45,
+                false,
             );
 
             expectSuccessfulResponse("token");
