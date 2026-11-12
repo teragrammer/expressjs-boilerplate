@@ -17,6 +17,7 @@ export async function up(db: Kysely<any>): Promise<void> {
             col.notNull().defaultTo(0),
         )
         .addColumn("next_try_at", "timestamptz")
+        .addColumn("user_id", "integer")
         .addColumn("created_at", "timestamptz", (col) =>
             col.notNull().defaultTo(sql`now()`),
         )
@@ -30,6 +31,13 @@ export async function up(db: Kysely<any>): Promise<void> {
         .addCheckConstraint(
             "password_recoveries_type_check",
             sql`type in (${sql.raw(TYPE_CHECK_VALUES)})`,
+        )
+        .addForeignKeyConstraint(
+            "password_recoveries_user_id_fk",
+            ["user_id"],
+            "users",
+            ["id"],
+            (cb) => cb.onUpdate("cascade").onDelete("cascade"),
         )
         .execute();
 
@@ -55,6 +63,12 @@ export async function up(db: Kysely<any>): Promise<void> {
         .createIndex("idx_password_recoveries_next_try_at")
         .on("password_recoveries")
         .column("next_try_at")
+        .execute();
+
+    await db.schema
+        .createIndex("idx_password_recoveries_user_id")
+        .on("password_recoveries")
+        .column("user_id")
         .execute();
 }
 

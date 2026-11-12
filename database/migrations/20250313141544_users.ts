@@ -37,6 +37,9 @@ export async function up(db: Kysely<any>): Promise<void> {
         )
         .addColumn("failed_login_expired_at", "timestamptz")
         .addColumn("comments", "text")
+        .addColumn("authorization_version", "integer", (col) =>
+            col.notNull().defaultTo(0),
+        )
         .addColumn("created_at", "timestamptz", (col) =>
             col.notNull().defaultTo(sql`now()`),
         )
@@ -45,7 +48,7 @@ export async function up(db: Kysely<any>): Promise<void> {
         )
         .addColumn("deleted_at", "timestamptz")
         .addForeignKeyConstraint("users_role_id_fk", ["role_id"], "roles", ["id"], (cb) =>
-            cb.onUpdate("cascade").onDelete("cascade"),
+            cb.onUpdate("cascade").onDelete("restrict"),
         )
         .addCheckConstraint(
             "users_gender_check",
@@ -57,62 +60,55 @@ export async function up(db: Kysely<any>): Promise<void> {
         )
         .execute();
 
-    /*
-     * Browse:
-     *
-     * WHERE deleted_at IS NULL
-     *   AND role_id = ?
-     *   AND status = ?
-     *   AND id < ?
-     * ORDER BY id DESC
-     * LIMIT ?
-     */
     await db.schema
         .createIndex("idx_users_browse_role_status")
         .on("users")
         .columns(["deleted_at", "role_id", "status", "id"])
         .execute();
 
-    /*
-     * Browse:
-     *
-     * WHERE deleted_at IS NULL
-     *   AND status = ?
-     *   AND id < ?
-     * ORDER BY id DESC
-     * LIMIT ?
-     */
     await db.schema
         .createIndex("idx_users_browse_status")
         .on("users")
         .columns(["deleted_at", "status", "id"])
         .execute();
 
-    /*
-     * Browse:
-     *
-     * WHERE deleted_at IS NULL
-     *   AND role_id = ?
-     *   AND id < ?
-     * ORDER BY id DESC
-     * LIMIT ?
-     */
     await db.schema
         .createIndex("idx_users_browse_role")
         .on("users")
         .columns(["deleted_at", "role_id", "id"])
         .execute();
 
-    /*
-     * Supports queries that specifically filter by deleted_at.
-     */
     await db.schema
         .createIndex("idx_users_deleted_id")
         .on("users")
         .columns(["deleted_at", "id"])
         .execute();
+
+    await db.schema
+        .createIndex("idx_users_authorization_version")
+        .on("users")
+        .column("authorization_version")
+        .execute();
+
+    await sql`
+        CREATE INDEX idx_users_search_trgm
+        ON users USING gin (
+            (coalesce(first_name, '') || ' ' ||
+             coalesce(middle_name, '') || ' ' ||
+             coalesce(last_name, '') || ' ' ||
+             coalesce(username, '') || ' ' ||
+             coalesce(email, '') || ' ' ||
+             coalesce(phone, '')) gin_trgm_ops
+        )
+    `.execute(db);
 }
 
 export async function down(db: Kysely<any>): Promise<void> {
+    await sql`DROP INDEX IF EXISTS idx_users_search_trgm;`.execute(db);
+    await db.schema.dropIndex("idx_users_authorization_version").execute();
+    await db.schema.dropIndex("idx_users_deleted_id").execute();
+    await db.schema.dropIndex("idx_users_browse_role").execute();
+    await db.schema.dropIndex("idx_users_browse_status").execute();
+    await db.schema.dropIndex("idx_users_browse_role_status").execute();
     await db.schema.dropTable("users").execute();
 }

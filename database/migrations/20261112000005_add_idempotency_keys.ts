@@ -28,12 +28,10 @@ export async function up(db: Kysely<any>): Promise<void> {
         )
         .execute();
 
-    await db.schema
-        .createIndex("idx_idempotency_keys_key_route_user")
-        .on("idempotency_keys")
-        .columns(["key", "route", "user_id"])
-        .unique()
-        .execute();
+    await sql`
+        CREATE UNIQUE INDEX idx_idempotency_keys_key_route_user
+        ON idempotency_keys (key, route, COALESCE(user_id, 0))
+    `.execute(db);
 
     await db.schema
         .createIndex("idx_idempotency_keys_expires_at")

@@ -9,10 +9,13 @@ export async function up(db: Kysely<any>): Promise<void> {
         .addColumn("tries", "integer", (col) =>
             col.notNull().defaultTo(0),
         )
-        .addColumn("expired_at", "timestamptz")
+        .addColumn("expired_at", "timestamptz", (col) => col.notNull())
         .addColumn("ip", "varchar(100)")
         .addColumn("browser", "varchar(100)")
         .addColumn("os", "varchar(100)")
+        .addColumn("tfa_verified", "boolean", (col) =>
+            col.notNull().defaultTo(false),
+        )
         .addColumn("created_at", "timestamptz", (col) =>
             col.defaultTo(sql`now()`),
         )
@@ -24,7 +27,7 @@ export async function up(db: Kysely<any>): Promise<void> {
             ["user_id"],
             "users",
             ["id"],
-            (cb) => cb.onUpdate("cascade").onDelete("cascade"),
+            (cb) => cb.onUpdate("cascade").onDelete("restrict"),
         )
         .execute();
 

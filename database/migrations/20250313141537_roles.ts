@@ -27,8 +27,25 @@ export async function up(db: Kysely<any>): Promise<void> {
         .on("roles")
         .column("created_at")
         .execute();
+
+    await sql`
+        CREATE INDEX IF NOT EXISTS idx_roles_browse
+        ON roles (is_public, id)
+    `.execute(db);
+
+    await sql`
+        CREATE INDEX idx_roles_search_trgm
+        ON roles USING gin (
+            (coalesce(name, '') || ' ' ||
+             coalesce(slug, '') || ' ' ||
+             coalesce(description, '')) gin_trgm_ops
+        )
+    `.execute(db);
 }
 
 export async function down(db: Kysely<any>): Promise<void> {
+    await sql`DROP INDEX IF EXISTS idx_roles_search_trgm;`.execute(db);
+    await sql`DROP INDEX IF EXISTS idx_roles_browse;`.execute(db);
+    await db.schema.dropIndex("idx_roles_created_at").execute();
     await db.schema.dropTable("roles").execute();
 }

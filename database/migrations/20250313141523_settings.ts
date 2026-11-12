@@ -5,6 +5,8 @@ import {DATA_TYPES} from "../../src/modules/system/settings/setting.model";
 const TYPE_CHECK_VALUES = DATA_TYPES.map((type) => `'${type}'`).join(", ");
 
 export async function up(db: Kysely<any>): Promise<void> {
+    await sql`CREATE EXTENSION IF NOT EXISTS pg_trgm;`.execute(db);
+
     await db.schema
         .createTable("settings")
         .addColumn("id", "serial", (col) => col.primaryKey())
@@ -32,8 +34,25 @@ export async function up(db: Kysely<any>): Promise<void> {
             sql`type in (${sql.raw(TYPE_CHECK_VALUES)})`,
         )
         .execute();
+
+    await db.schema
+        .createIndex("idx_settings_browse")
+        .on("settings")
+        .columns(["is_disabled", "is_public", "id"])
+        .execute();
+
+    await sql`
+        CREATE INDEX idx_settings_search_trgm
+        ON settings USING gin (
+            (coalesce(name, '') || ' ' ||
+             coalesce(slug, '') || ' ' ||
+             coalesce(description, '')) gin_trgm_ops
+        )
+    `.execute(db);
 }
 
 export async function down(db: Kysely<any>): Promise<void> {
+    await sql`DROP INDEX IF EXISTS idx_settings_search_trgm;`.execute(db);
+    await db.schema.dropIndex("idx_settings_browse").execute();
     await db.schema.dropTable("settings").execute();
 }

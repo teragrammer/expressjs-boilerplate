@@ -24,7 +24,7 @@ export async function up(db: Kysely<any>): Promise<void> {
             ["token_id"],
             "authentication_tokens",
             ["id"],
-            (cb) => cb.onUpdate("cascade").onDelete("cascade"),
+            (cb) => cb.onUpdate("cascade").onDelete("restrict"),
         )
         .execute();
 

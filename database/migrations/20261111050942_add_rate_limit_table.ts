@@ -1,3 +1,4 @@
+// database/migrations/20261111050942_add_rate_limit_table.ts
 import {sql, type Kysely} from "kysely";
 
 export async function up(db: Kysely<any>): Promise<void> {
@@ -12,7 +13,6 @@ export async function up(db: Kysely<any>): Promise<void> {
         .addColumn("updated_at", "timestamptz", (col) => col.notNull().defaultTo(sql`now()`))
         .execute();
 
-    // Unique index on key + bucket for atomic upserts
     await db.schema
         .createIndex("idx_rate_limits_key_bucket")
         .on("rate_limits")
@@ -20,7 +20,6 @@ export async function up(db: Kysely<any>): Promise<void> {
         .unique()
         .execute();
 
-    // Index for cleanup of expired entries
     await db.schema
         .createIndex("idx_rate_limits_expires_at")
         .on("rate_limits")
