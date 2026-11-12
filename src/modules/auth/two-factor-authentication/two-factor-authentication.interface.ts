@@ -1,5 +1,6 @@
 // src/modules/auth/two-factor-authentication/two-factor-authentication.interface.ts
 import {User} from "../../users/user.interface";
+import type {IssuedTokens} from "../authentication/session.service";
 
 export enum TfaPolicy {
     DISABLED = "disabled",
@@ -23,6 +24,12 @@ export interface SendOtpInput {
     tokenId: number;
     email?: string;
     tfaCleared: boolean;
+}
+
+export interface SendEnrollmentOtpInput {
+    userId: number;
+    tokenId: number;
+    email?: string;
 }
 
 export interface SendOtpResult {
@@ -52,3 +59,16 @@ export interface EnrollTfaResult {
     enrolled: boolean;
     recoveryCodes?: string[];
 }
+
+export interface RedeemRecoveryCodeInput {
+    userId: number;
+    sessionId: number;
+    code: string;
+    meta: {
+        ip: string | null;
+        browser: string | null;
+        os: string | null;
+    };
+}
+
+export type VerifyOtpResult = IssuedTokens;

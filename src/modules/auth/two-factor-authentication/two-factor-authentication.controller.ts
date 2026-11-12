@@ -7,6 +7,12 @@ import {User} from "../../users/user.interface";
 import {getClientIp, getUserAgentInfo} from "../../../common/utils/request-info";
 import {AuditService} from "../../audit/audit.service";
 import {AUDIT_ACTIONS} from "../../audit/audit.interface";
+import {setRefreshTokenCookie} from "../../../common/utils/refresh-token-cookie";
+import {__ENV} from "../../../config/environment";
+import {IssuedTokens} from "../authentication/session.service";
+
+const REFRESH_COOKIE_MAX_AGE_MS =
+    Number(__ENV.JWT_REFRESH_TOKEN_DAYS || 7) * 24 * 60 * 60 * 1000;
 
 export class TwoFactorAuthenticationController {
     constructor(
@@ -32,6 +38,29 @@ export class TwoFactorAuthenticationController {
         });
     });
 
+    /**
+     * Sends the enrollment OTP.
+     *
+     * Unlike the login challenge, this endpoint is used by an already
+     * authenticated user who does not have TFA enabled yet.
+     */
+    enrollSend = catchAsync(async (req: Request, res: Response): Promise<void> => {
+        assertCredentials(req);
+        const {jwt} = req.credentials;
+        const user: User = await req.credentials.user();
+
+        const result = await this.tfaService.sendEnrollmentOtp({
+            userId: user.id,
+            tokenId: jwt.tid,
+            email: user.email || undefined,
+        });
+
+        res.status(200).json({
+            id: result.id,
+            next_try: result.nextTry,
+        });
+    });
+
     validate = catchAsync(async (req: Request, res: Response): Promise<void> => {
         assertCredentials(req);
         const {jwt} = req.credentials;
@@ -44,7 +73,7 @@ export class TwoFactorAuthenticationController {
          */
         const {code} = req.sanitize.data as {code: string};
 
-        const token = await this.tfaService.verifyOtp({
+        const issued = await this.tfaService.verifyOtp({
             tokenId: jwt.tid,
             code,
             user,
@@ -56,11 +85,53 @@ export class TwoFactorAuthenticationController {
             tfaCleared: jwt.tfa,
         });
 
+        this.attachRefreshToken(res, issued);
+
         await this.auditService.success(AUDIT_ACTIONS.AUTH_TFA_VERIFIED, {
             request: req,
         });
 
-        res.status(200).json({token});
+        res.status(200).json({
+            token: issued.accessToken,
+            access_token: issued.accessToken,
+            expires_at: issued.expiresAt,
+        });
+    });
+
+    /**
+     * Redeems a single-use recovery code when the second factor is
+     * unavailable.
+     */
+    recovery = catchAsync(async (req: Request, res: Response): Promise<void> => {
+        assertCredentials(req);
+        const {jwt} = req.credentials;
+        const user: User = await req.credentials.user();
+
+        const {code} = req.sanitize.data as {code: string};
+
+        const issued = await this.tfaService.redeemRecoveryCode({
+            userId: user.id,
+            sessionId: jwt.tid,
+            code,
+            meta: {
+                ip: getClientIp(req),
+                browser: req.useragent?.browser ?? null,
+                os: req.useragent?.os ?? null,
+            },
+        });
+
+        this.attachRefreshToken(res, issued);
+
+        await this.auditService.success(
+            AUDIT_ACTIONS.AUTH_TFA_RECOVERY_CODE_USED,
+            {request: req},
+        );
+
+        res.status(200).json({
+            token: issued.accessToken,
+            access_token: issued.accessToken,
+            expires_at: issued.expiresAt,
+        });
     });
 
     enroll = catchAsync(async (req: Request, res: Response): Promise<void> => {
@@ -108,4 +179,16 @@ export class TwoFactorAuthenticationController {
             message: "Two-factor authentication disabled successfully.",
         });
     });
+
+    private attachRefreshToken(res: Response, issued: IssuedTokens): void {
+        if (!issued.refreshToken) {
+            return;
+        }
+
+        setRefreshTokenCookie(
+            res,
+            issued.refreshToken,
+            REFRESH_COOKIE_MAX_AGE_MS,
+        );
+    }
 }

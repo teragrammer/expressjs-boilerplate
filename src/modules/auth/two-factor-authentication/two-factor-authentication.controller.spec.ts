@@ -15,7 +15,11 @@ describe("TwoFactorAuthenticationController Unit Tests", () => {
 
     let tfaService: {
         sendOtp: ReturnType<typeof vi.fn>;
+        sendEnrollmentOtp: ReturnType<typeof vi.fn>;
         verifyOtp: ReturnType<typeof vi.fn>;
+        enrollTfa: ReturnType<typeof vi.fn>;
+        redeemRecoveryCode: ReturnType<typeof vi.fn>;
+        disableTfa: ReturnType<typeof vi.fn>;
     };
 
     let controller: TwoFactorAuthenticationController;
@@ -56,7 +60,11 @@ describe("TwoFactorAuthenticationController Unit Tests", () => {
 
         tfaService = {
             sendOtp: vi.fn(),
+            sendEnrollmentOtp: vi.fn(),
             verifyOtp: vi.fn(),
+            enrollTfa: vi.fn(),
+            redeemRecoveryCode: vi.fn(),
+            disableTfa: vi.fn(),
         };
 
         auditService = {
@@ -79,6 +87,7 @@ describe("TwoFactorAuthenticationController Unit Tests", () => {
 
         mockRes = {
             status: statusMock,
+            cookie: vi.fn(),
         };
 
         mockReq = {
@@ -348,9 +357,14 @@ describe("TwoFactorAuthenticationController Unit Tests", () => {
         it(
             "should execute verifyOtp and respond with the renewed token on success",
             async () => {
-                tfaService.verifyOtp.mockResolvedValueOnce(
-                    "mocked-jwt-output-string",
-                );
+                const expiresAt = new Date("2030-01-01T00:00:00.000Z");
+
+                tfaService.verifyOtp.mockResolvedValueOnce({
+                    accessToken: "mocked-jwt-output-string",
+                    refreshToken: "mocked-refresh-token",
+                    sessionId: 100,
+                    expiresAt,
+                });
 
                 await executeController(
                     controller.validate,
@@ -375,8 +389,16 @@ describe("TwoFactorAuthenticationController Unit Tests", () => {
 
                 expect(statusMock).toHaveBeenCalledWith(200);
 
+                expect(mockRes.cookie).toHaveBeenCalledWith(
+                    "refresh_token",
+                    "mocked-refresh-token",
+                    expect.objectContaining({httpOnly: true}),
+                );
+
                 expect(jsonMock).toHaveBeenCalledWith({
                     token: "mocked-jwt-output-string",
+                    access_token: "mocked-jwt-output-string",
+                    expires_at: expiresAt,
                 });
 
                 expect(nextMock).not.toHaveBeenCalled();

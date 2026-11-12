@@ -202,8 +202,11 @@ export class TwoFactorAuthenticationRepository {
     /**
      * Consumes the OTP after successful verification.
      */
-    public async deleteById(id: number): Promise<boolean> {
-        const result = await this.db
+    public async deleteById(
+        id: number,
+        executor: DatabaseExecutor = this.db,
+    ): Promise<boolean> {
+        const result = await executor
             .deleteFrom(TWO_FACTOR_AUTHENTICATION_TABLE)
             .where("id", "=", id)
             .executeTakeFirst();

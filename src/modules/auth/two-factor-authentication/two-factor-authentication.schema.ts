@@ -21,3 +21,14 @@ export const disableTfaSchema = Joi.object({
             "any.required": "The current password is required.",
         }),
 });
+
+export const recoveryCodeSchema = Joi.object({
+    code: Joi.string()
+        .pattern(/^[A-Za-z0-9]{4}-[A-Za-z0-9]{4}$/)
+        .required()
+        .messages({
+            "string.pattern.base":
+                "A recovery code must look like ABCD-EFGH.",
+            "any.required": "A recovery code is required.",
+        }),
+});
