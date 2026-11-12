@@ -72,6 +72,7 @@ type DatabaseEnvironment = {
     DB_SSL_CA?: string;
     DB_SSL_CERT?: string;
     DB_SSL_KEY?: string;
+    DB_SSL_REJECT_UNAUTHORIZED?: boolean;
     DB_POOL_MIN?: number | string;
     DB_POOL_MAX?: number | string;
 };
@@ -91,6 +92,7 @@ function mockEnvironment(
             DB_SSL_CA: "",
             DB_SSL_CERT: "",
             DB_SSL_KEY: "",
+            DB_SSL_REJECT_UNAUTHORIZED: true,
 
             DB_POOL_MIN: 2,
             DB_POOL_MAX: 10,
@@ -223,10 +225,125 @@ describe("Database configuration", () => {
                     ca: "certificate:/certs/ca.pem",
                     cert: "certificate:/certs/client.crt",
                     key: "certificate:/certs/client.key",
+                    rejectUnauthorized: true,
                 },
             });
 
             expect(mockReadFileSync).toHaveBeenCalledTimes(3);
+        });
+
+        it("supports CA-only TLS without a client certificate", async () => {
+            const {buildPoolConfig} = await importDatabaseModule({
+                DB_SSL: true,
+                DB_SSL_CA: "/certs/ca.pem",
+                DB_SSL_CERT: "",
+                DB_SSL_KEY: "",
+            });
+
+            mockReadFileSync.mockClear();
+
+            const config = buildPoolConfig();
+
+            expect(config).toMatchObject({
+                ssl: {
+                    ca: "certificate:/certs/ca.pem",
+                    cert: undefined,
+                    key: undefined,
+                    rejectUnauthorized: true,
+                },
+            });
+
+            expect(mockReadFileSync).toHaveBeenCalledTimes(1);
+            expect(mockReadFileSync).toHaveBeenCalledWith(
+                "/certs/ca.pem",
+                "utf8",
+            );
+        });
+
+        it("supports client certificates without a custom CA", async () => {
+            const {buildPoolConfig} = await importDatabaseModule({
+                DB_SSL: true,
+                DB_SSL_CA: "",
+                DB_SSL_CERT: "/certs/client.crt",
+                DB_SSL_KEY: "/certs/client.key",
+            });
+
+            mockReadFileSync.mockClear();
+
+            const config = buildPoolConfig();
+
+            expect(config).toMatchObject({
+                ssl: {
+                    ca: undefined,
+                    cert: "certificate:/certs/client.crt",
+                    key: "certificate:/certs/client.key",
+                    rejectUnauthorized: true,
+                },
+            });
+
+            expect(mockReadFileSync).toHaveBeenCalledTimes(2);
+        });
+
+        it("uses the parsed rejectUnauthorized value rather than process.env", async () => {
+            const original = process.env.DB_SSL_REJECT_UNAUTHORIZED;
+
+            process.env.DB_SSL_REJECT_UNAUTHORIZED = "true";
+
+            try {
+                const {buildPoolConfig} = await importDatabaseModule({
+                    DB_SSL: true,
+                    DB_SSL_CA: "/certs/ca.pem",
+                    DB_SSL_REJECT_UNAUTHORIZED: false,
+                });
+
+                mockReadFileSync.mockClear();
+                mockLogger.warn.mockClear();
+
+                const config = buildPoolConfig();
+
+                expect(config).toMatchObject({
+                    ssl: {
+                        rejectUnauthorized: false,
+                    },
+                });
+
+                expect(mockLogger.warn).toHaveBeenCalledWith(
+                    "Database TLS certificate verification is disabled " +
+                    "(DB_SSL_REJECT_UNAUTHORIZED=false).",
+                );
+            } finally {
+                if (original === undefined) {
+                    delete process.env.DB_SSL_REJECT_UNAUTHORIZED;
+                } else {
+                    process.env.DB_SSL_REJECT_UNAUTHORIZED = original;
+                }
+            }
+        });
+
+        it("refuses a client certificate without a matching key", async () => {
+            await expect(
+                importDatabaseModule({
+                    DB_SSL: true,
+                    DB_SSL_CERT: "/certs/client.crt",
+                    DB_SSL_KEY: "",
+                }),
+            ).rejects.toThrow(
+                "Database TLS initialization failed: " +
+                "DB_SSL_CERT and DB_SSL_KEY must be configured together",
+            );
+        });
+
+        it("refuses a client key without a matching certificate", async () => {
+            await expect(
+                importDatabaseModule({
+                    DB_SSL: true,
+                    DB_SSL_CERT: "",
+                    DB_SSL_KEY: "/certs/client.key",
+                }),
+            ).rejects.toThrow(
+                "Database TLS initialization failed: " +
+                "DB_SSL_CERT and DB_SSL_KEY must be configured together",
+            );
         });
 
         it("throws when the CA certificate cannot be loaded", async () => {
@@ -284,6 +401,42 @@ describe("Database configuration", () => {
 
             expect(config.min).toBe(2);
             expect(config.max).toBe(10);
+        });
+    });
+
+    describe("connection budget", () => {
+        it("accepts a projection that fits inside the limit", async () => {
+            const {validateConnectionBudget, assertConnectionBudget} =
+                await importDatabaseModule();
+
+            const options = {
+                poolMax: 10,
+                workers: 6,
+                maxConnections: 100,
+            };
+
+            expect(validateConnectionBudget(options)).toEqual({
+                valid: true,
+                projected: 60,
+                recommended: 13,
+            });
+
+            expect(() => assertConnectionBudget(options)).not.toThrow();
+        });
+
+        it("fails closed when the projection exceeds the limit", async () => {
+            const {assertConnectionBudget} =
+                await importDatabaseModule();
+
+            expect(() =>
+                assertConnectionBudget({
+                    poolMax: 50,
+                    workers: 6,
+                    maxConnections: 100,
+                }),
+            ).toThrowError(
+                /Connection budget exceeded: 6 worker\(s\) x DB_POOL_MAX=50/,
+            );
         });
     });
 

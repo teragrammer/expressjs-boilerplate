@@ -37,7 +37,31 @@ if (!url) {
   const auth = `${encodeURIComponent(user)}:${encodeURIComponent(pass || "")}`;
   const ssl = process.env.DB_SSL === "true";
   url = `postgresql://${auth}@${host}:${port}/${name}`;
-  if (ssl) url += "?sslmode=no-verify";
+  if (ssl) {
+    /*
+     * Full verification: the server certificate and hostname must match
+     * a trusted CA. DB_SSL_REJECT_UNAUTHORIZED is intentionally not
+     * consulted here; tooling must not inherit an insecure override.
+     */
+    const params = new URLSearchParams({ sslmode: "verify-full" });
+    if (process.env.DB_SSL_CA) {
+      params.set("sslrootcert", process.env.DB_SSL_CA);
+    }
+    url += `?${params.toString()}`;
+  }
+} else {
+  try {
+    const parsed = new URL(url);
+    if (parsed.searchParams.get("sslmode") === "no-verify") {
+      console.error(
+        "Postgres MCP: sslmode=no-verify is not allowed; use sslmode=verify-full with a trusted CA.",
+      );
+      process.exit(1);
+    }
+  } catch {
+    console.error("Postgres MCP: DATABASE_URL is not a valid URL");
+    process.exit(1);
+  }
 }
 
 const result = spawnSync("npx", ["-y", "@modelcontextprotocol/server-postgres", url], {

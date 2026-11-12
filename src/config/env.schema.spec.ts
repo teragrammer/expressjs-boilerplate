@@ -1,16 +1,21 @@
 // src/config/env.schema.spec.ts
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import {describe, expect, it} from "vitest";
 
 import {
+    assertExplicitNodeEnv,
     createEnvSchema,
     DEFAULT_CLUSTER_WORKERS,
+    findUnknownApplicationVariables,
     isLoopbackHost,
     isTestEnvironment,
     normalizeEnvironment,
     validateProductionConfig,
 } from "./env.schema";
 
-const secret = "a".repeat(32);
+const secret = "a1b2c3d4e5f60718293a4b5c6d7e8f90";
 
 const validProductionSourceEnv: NodeJS.ProcessEnv = {
     JWT_SECRET: secret,
@@ -19,15 +24,17 @@ const validProductionSourceEnv: NodeJS.ProcessEnv = {
     CORS_ORIGINS: "https://example.com",
     DB_HOST: "db.example.com",
     DB_USER: "app",
-    DB_PASS: "password",
+    DB_PASS: "s3cure-database-password",
     DB_NAME: "app",
     SENDGRID_API_KEY: "sendgrid-key",
+    MAIL_FROM_ADDRESS: "noreply@example.com",
 };
 
 const validProductionEnv = {
     ...validProductionSourceEnv,
     EMAIL_ENABLED: true,
     DB_SSL: true,
+    DB_SSL_REJECT_UNAUTHORIZED: true,
     REDIS_HOST: "redis.example.com",
     REDIS_TLS: true,
 };
@@ -52,6 +59,59 @@ describe("DEFAULT_CLUSTER_WORKERS", () => {
     it("should always be at least one", () => {
         expect(DEFAULT_CLUSTER_WORKERS).toBeGreaterThanOrEqual(1);
         expect(Number.isInteger(DEFAULT_CLUSTER_WORKERS)).toBe(true);
+    });
+});
+
+describe("assertExplicitNodeEnv", () => {
+    it("should reject a missing NODE_ENV outside the test runner", () => {
+        expect(() => assertExplicitNodeEnv({}, false)).toThrowError(
+            /NODE_ENV must be explicitly set/,
+        );
+    });
+
+    it("should reject an empty NODE_ENV outside the test runner", () => {
+        expect(() =>
+            assertExplicitNodeEnv({NODE_ENV: "   "}, false),
+        ).toThrowError(/NODE_ENV must be explicitly set/);
+    });
+
+    it("should accept an explicit NODE_ENV", () => {
+        expect(() =>
+            assertExplicitNodeEnv({NODE_ENV: "production"}, false),
+        ).not.toThrow();
+    });
+
+    it("should skip the requirement in the test runner", () => {
+        expect(() => assertExplicitNodeEnv({}, true)).not.toThrow();
+    });
+});
+
+describe("findUnknownApplicationVariables", () => {
+    it("should report only application-looking unknown names", () => {
+        const unknown = findUnknownApplicationVariables(
+            {
+                DB_HOST: "localhost",
+                DB_POOL_MAXIMUM: "10",
+                CLUSTER_WORKERS: "2",
+                NODE_OPTIONS: "--max-old-space-size=512",
+                PATH: "/usr/bin",
+            },
+            new Set(["DB_HOST", "CLUSTER_WORKERS"]),
+        );
+
+        expect(unknown).toEqual(["DB_POOL_MAXIMUM"]);
+    });
+
+    it("should return names in a deterministic order", () => {
+        const unknown = findUnknownApplicationVariables(
+            {
+                REDIS_PORT_TYPO: "6379",
+                DB_HOST_TYPO: "localhost",
+            },
+            new Set(),
+        );
+
+        expect(unknown).toEqual(["DB_HOST_TYPO", "REDIS_PORT_TYPO"]);
     });
 });
 
@@ -264,5 +324,128 @@ describe("validateProductionConfig", () => {
                 sourceEnv,
             ),
         ).toThrowError(/SENDGRID_API_KEY/);
+    });
+
+    it("should require a sender address when email is enabled", () => {
+        const sourceEnv = {...validProductionSourceEnv};
+        delete sourceEnv.MAIL_FROM_ADDRESS;
+
+        expect(() =>
+            validateProductionConfig(
+                validProductionEnv,
+                sourceEnv,
+            ),
+        ).toThrowError(/MAIL_FROM_ADDRESS/);
+    });
+
+    it("should reject example and placeholder secrets", () => {
+        const sourceEnv = {
+            ...validProductionSourceEnv,
+            JWT_SECRET:
+                "your-super-secret-jwt-key-change-in-production-min-32-chars",
+            BCRYPT_SECRET:
+                "your-bcrypt-pepper-change-in-production-min-32-chars",
+            CRYPT0_SECRET:
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            DB_PASS: "postgres",
+        };
+
+        expect(() =>
+            validateProductionConfig(validProductionEnv, sourceEnv),
+        ).toThrowError(/JWT_SECRET.*placeholder/);
+
+        expect(() =>
+            validateProductionConfig(validProductionEnv, sourceEnv),
+        ).toThrowError(/BCRYPT_SECRET.*placeholder/);
+
+        expect(() =>
+            validateProductionConfig(validProductionEnv, sourceEnv),
+        ).toThrowError(/CRYPT0_SECRET.*placeholder/);
+
+        expect(() =>
+            validateProductionConfig(validProductionEnv, sourceEnv),
+        ).toThrowError(/DB_PASS.*default or placeholder/);
+    });
+
+    it("should require certificate verification when DB_SSL is enabled", () => {
+        expect(() =>
+            validateProductionConfig(
+                {
+                    ...validProductionEnv,
+                    DB_SSL_REJECT_UNAUTHORIZED: false,
+                },
+                validProductionSourceEnv,
+            ),
+        ).toThrowError(/DB_SSL_REJECT_UNAUTHORIZED/);
+    });
+
+    it("should reject SEED_PASSWORD in production", () => {
+        expect(() =>
+            validateProductionConfig(validProductionEnv, {
+                ...validProductionSourceEnv,
+                SEED_PASSWORD: "a-shared-seed-password",
+            }),
+        ).toThrowError(/SEED_PASSWORD/);
+    });
+
+    it("should require DB certificate and key to be configured together", () => {
+        expect(() =>
+            validateProductionConfig(
+                {
+                    ...validProductionEnv,
+                    DB_SSL_CERT: "/certs/client.crt",
+                    DB_SSL_KEY: "",
+                },
+                validProductionSourceEnv,
+            ),
+        ).toThrowError(/DB_SSL_CERT and DB_SSL_KEY/);
+    });
+
+    it("should require REDIS certificate and key to be configured together", () => {
+        expect(() =>
+            validateProductionConfig(
+                {
+                    ...validProductionEnv,
+                    REDIS_TLS_CERT: "/certs/client.crt",
+                    REDIS_TLS_KEY: "",
+                },
+                validProductionSourceEnv,
+            ),
+        ).toThrowError(/REDIS_TLS_CERT and REDIS_TLS_KEY/);
+    });
+
+    it("should reject unreadable TLS files in production", () => {
+        expect(() =>
+            validateProductionConfig(
+                {
+                    ...validProductionEnv,
+                    DB_SSL_CA: "/nonexistent/ca.pem",
+                },
+                validProductionSourceEnv,
+            ),
+        ).toThrowError(/DB_SSL_CA.*readable file/);
+    });
+
+    it("should accept readable TLS files in production", () => {
+        const directory = fs.mkdtempSync(
+            path.join(os.tmpdir(), "env-schema-"),
+        );
+        const caPath = path.join(directory, "ca.pem");
+
+        fs.writeFileSync(caPath, "test-ca");
+
+        try {
+            expect(() =>
+                validateProductionConfig(
+                    {
+                        ...validProductionEnv,
+                        DB_SSL_CA: caPath,
+                    },
+                    validProductionSourceEnv,
+                ),
+            ).not.toThrow();
+        } finally {
+            fs.rmSync(directory, {recursive: true, force: true});
+        }
     });
 });

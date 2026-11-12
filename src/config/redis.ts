@@ -1,6 +1,7 @@
 // src/config/redis.ts
 import Redis, {RedisOptions} from "ioredis";
 import * as fs from "fs";
+import type {ConnectionOptions} from "tls";
 import {__ENV} from "./environment";
 import {logger} from "./logger";
 
@@ -30,12 +31,35 @@ export function buildRedisConfig(): RedisOptions | null {
 
     if (__ENV.REDIS_TLS) {
         try {
-            config.tls = {
-                ca: fs.readFileSync(__ENV.REDIS_TLS_CA).toString(),
-                cert: fs.readFileSync(__ENV.REDIS_TLS_CERT).toString(),
-                key: fs.readFileSync(__ENV.REDIS_TLS_KEY).toString(),
-                rejectUnauthorized: __ENV.NODE_ENV === "production",
+            const caPath = __ENV.REDIS_TLS_CA;
+            const certPath = __ENV.REDIS_TLS_CERT;
+            const keyPath = __ENV.REDIS_TLS_KEY;
+
+            if (Boolean(certPath) !== Boolean(keyPath)) {
+                throw new Error(
+                    "REDIS_TLS_CERT and REDIS_TLS_KEY must be configured together",
+                );
+            }
+
+            /*
+             * Redis encryption is only useful when the server identity is
+             * verified. Do not relax this outside production: a staging or
+             * development process can still reach a shared Redis instance.
+             */
+            const tls: ConnectionOptions = {
+                rejectUnauthorized: true,
+                ca: caPath
+                    ? fs.readFileSync(caPath).toString()
+                    : undefined,
+                cert: certPath
+                    ? fs.readFileSync(certPath).toString()
+                    : undefined,
+                key: keyPath
+                    ? fs.readFileSync(keyPath).toString()
+                    : undefined,
             };
+
+            config.tls = tls;
         } catch (error: any) {
             logger.error(`CRITICAL: Failed to load TLS certificates for Redis: ${error.message}`);
             throw new Error(`Redis TLS initialization failed: ${error.message}`, { cause: error });

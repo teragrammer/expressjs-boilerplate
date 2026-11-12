@@ -1,7 +1,9 @@
 // src/config/environment.ts
 import dotenv from "dotenv";
 import {
+    assertExplicitNodeEnv,
     createEnvSchema,
+    findUnknownApplicationVariables,
     isTestEnvironment,
     normalizeEnvironment,
     validateProductionConfig,
@@ -17,7 +19,15 @@ dotenv.config();
  */
 const isTest = isTestEnvironment();
 
-const {value: env, error} = createEnvSchema(isTest).validate(
+/*
+ * Fail closed if a deployment forgets NODE_ENV: defaulting to
+ * development would silently disable production safeguards.
+ */
+assertExplicitNodeEnv(process.env, isTest);
+
+const schema = createEnvSchema(isTest);
+
+const {value: env, error} = schema.validate(
     normalizeEnvironment(),
     {
         abortEarly: false,
@@ -31,6 +41,22 @@ if (error) {
         .join("; ");
 
     throw new Error(`Invalid environment configuration: ${messages}`);
+}
+
+const knownKeys = new Set(Object.keys(schema.describe().keys));
+const unknownVariables = findUnknownApplicationVariables(
+    process.env,
+    knownKeys,
+);
+
+if (unknownVariables.length > 0) {
+    /*
+     * Names only: values may contain secrets and must never be logged.
+     */
+    process.emitWarning(
+        "Unknown application environment variable(s) ignored: " +
+        unknownVariables.join(", "),
+    );
 }
 
 /*

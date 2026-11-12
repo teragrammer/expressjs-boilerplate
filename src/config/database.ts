@@ -45,16 +45,40 @@ export function buildPoolConfig(): PoolConfig {
 
     if (__ENV.DB_SSL) {
         try {
-            config.ssl = {
-                ca: __ENV.DB_SSL_CA
-                    ? fs.readFileSync(__ENV.DB_SSL_CA, "utf8")
+            const caPath = __ENV.DB_SSL_CA;
+            const certPath = __ENV.DB_SSL_CERT;
+            const keyPath = __ENV.DB_SSL_KEY;
+
+            if (Boolean(certPath) !== Boolean(keyPath)) {
+                throw new Error(
+                    "DB_SSL_CERT and DB_SSL_KEY must be configured together",
+                );
+            }
+
+            const rejectUnauthorized =
+                __ENV.DB_SSL_REJECT_UNAUTHORIZED !== false;
+
+            const ssl: NonNullable<PoolConfig["ssl"]> = {
+                rejectUnauthorized,
+                ca: caPath
+                    ? fs.readFileSync(caPath, "utf8")
                     : undefined,
-                cert: fs.readFileSync(__ENV.DB_SSL_CERT, "utf8"),
-                key: fs.readFileSync(__ENV.DB_SSL_KEY, "utf8"),
-                rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED === undefined
-                    ? true
-                    : __ENV.DB_SSL_REJECT_UNAUTHORIZED,
+                cert: certPath
+                    ? fs.readFileSync(certPath, "utf8")
+                    : undefined,
+                key: keyPath
+                    ? fs.readFileSync(keyPath, "utf8")
+                    : undefined,
             };
+
+            if (!rejectUnauthorized) {
+                logger.warn(
+                    "Database TLS certificate verification is disabled " +
+                    "(DB_SSL_REJECT_UNAUTHORIZED=false).",
+                );
+            }
+
+            config.ssl = ssl;
         } catch (error) {
             const message =
                 error instanceof Error ? error.message : String(error);
@@ -150,6 +174,35 @@ export function validateConnectionBudget(
         projected,
         recommended,
     };
+}
+
+/**
+ * Enforces the connection budget and fails the boot when it is exceeded.
+ *
+ * Logging a warning and continuing would let a cluster deployment exhaust
+ * PostgreSQL's connection limit and turn a startup error into an outage.
+ */
+export function assertConnectionBudget(
+    options: {
+        poolMax: number;
+        workers: number;
+        maxConnections: number;
+        reserve?: number;
+    },
+): {valid: boolean; projected: number; recommended: number} {
+    const budget = validateConnectionBudget(options);
+
+    if (!budget.valid) {
+        throw new Error(
+            `Connection budget exceeded: ${options.workers} worker(s) x ` +
+            `DB_POOL_MAX=${options.poolMax} projects to ` +
+            `${budget.projected} connections against a limit of ` +
+            `${options.maxConnections}. ` +
+            `Recommended DB_POOL_MAX is ${budget.recommended}.`,
+        );
+    }
+
+    return budget;
 }
 
 /**

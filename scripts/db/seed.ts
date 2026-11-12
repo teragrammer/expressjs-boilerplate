@@ -1,6 +1,8 @@
 // scripts/db/seed.ts
 import {closeDatabase, db} from "../../src/config/database";
+import {__ENV} from "../../src/config/environment";
 import {disconnectRedis} from "../../src/config/redis";
+import {assertSeedingAllowed} from "../../src/config/seed-guard";
 import {seed as seedSettings} from "../../database/seeds/settings";
 import {seed as seedUsers} from "../../database/seeds/users";
 
@@ -24,6 +26,15 @@ async function shutdown(code: number): Promise<never> {
  * Runs all database seeders in dependency order.
  */
 export async function main(): Promise<void> {
+    /*
+     * Check before the first seeder runs so a production invocation does
+     * not partially apply unrelated seed data before failing.
+     */
+    assertSeedingAllowed({
+        nodeEnv: __ENV.NODE_ENV,
+        seedPassword: __ENV.SEED_PASSWORD,
+    });
+
     await seedSettings(db);
     await seedUsers(db);
     // eslint-disable-next-line no-console

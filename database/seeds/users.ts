@@ -3,7 +3,7 @@ import type {Kysely} from "kysely";
 import type {Database} from "../../src/config/schema";
 import {securityUtil} from "../../src/config/container";
 import {__ENV} from "../../src/config/environment";
-import {logger} from "../../src/config/logger";
+import {assertSeedingAllowed} from "../../src/config/seed-guard";
 import {CANONICAL_ROUTES} from "../../src/modules/system/route-guards/route-guard.catalog";
 
 /**
@@ -12,12 +12,16 @@ import {CANONICAL_ROUTES} from "../../src/modules/system/route-guards/route-guar
  * The seed is idempotent: roles are upserted by slug and users are
  * upserted by username, so running the seeder twice is safe.
  *
- * The password never defaults to a shared weak value. It comes from
- * `SEED_PASSWORD`; when that is unset a random password is generated
- * and logged once, so a deployment can never end up with a known
- * default credential.
+ * The password never defaults to a shared weak value and is never
+ * generated or logged: `SEED_PASSWORD` must be set explicitly, and the
+ * seeder refuses to run in production.
  */
 export async function seed(db: Kysely<Database>): Promise<void> {
+    assertSeedingAllowed({
+        nodeEnv: __ENV.NODE_ENV,
+        seedPassword: __ENV.SEED_PASSWORD,
+    });
+
     const roleDefinitions = [
         {
             name: "Administrator",
@@ -85,18 +89,7 @@ export async function seed(db: Kysely<Database>): Promise<void> {
         }
     }
 
-    const configuredPassword = __ENV.SEED_PASSWORD;
-
-    const password = configuredPassword
-        ? configuredPassword
-        : securityUtil.randomString(16);
-
-    if (!configuredPassword) {
-        logger.warn(
-            "SEED_PASSWORD is not set; a random password was generated " +
-            "for the seeded accounts: " + password,
-        );
-    }
+    const password = __ENV.SEED_PASSWORD;
 
     const hashedPassword = await securityUtil.hash(password);
 

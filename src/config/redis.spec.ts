@@ -271,7 +271,7 @@ describe("Redis configuration", () => {
             );
         });
 
-        it("disables TLS certificate verification outside production", async () => {
+        it("verifies TLS certificates in every environment", async () => {
             const {buildRedisConfig} =
                 await importRedisModule({
                     REDIS_TLS: true,
@@ -285,11 +285,65 @@ describe("Redis configuration", () => {
 
             const config = buildRedisConfig();
 
-            expect(config?.tls).toMatchObject({
-                rejectUnauthorized: false,
+            expect(config?.tls).toEqual({
+                ca: "certificate:/certs/ca.pem",
+                cert: "certificate:/certs/client.crt",
+                key: "certificate:/certs/client.key",
+                rejectUnauthorized: true,
             });
 
             expect(mockReadFileSync).toHaveBeenCalledTimes(3);
+        });
+
+        it("supports CA-only TLS without a client certificate", async () => {
+            const {buildRedisConfig} =
+                await importRedisModule({
+                    REDIS_TLS: true,
+                    REDIS_TLS_CA: "/certs/ca.pem",
+                    REDIS_TLS_CERT: "",
+                    REDIS_TLS_KEY: "",
+                });
+
+            mockReadFileSync.mockClear();
+
+            const config = buildRedisConfig();
+
+            expect(config?.tls).toEqual({
+                ca: "certificate:/certs/ca.pem",
+                cert: undefined,
+                key: undefined,
+                rejectUnauthorized: true,
+            });
+
+            expect(mockReadFileSync).toHaveBeenCalledTimes(1);
+        });
+
+        it("refuses a client certificate without a matching key", async () => {
+            const {buildRedisConfig} =
+                await importRedisModule({
+                    REDIS_TLS: true,
+                    REDIS_TLS_CERT: "/certs/client.crt",
+                    REDIS_TLS_KEY: "",
+                });
+
+            expect(() => buildRedisConfig()).toThrow(
+                "Redis TLS initialization failed: " +
+                "REDIS_TLS_CERT and REDIS_TLS_KEY must be configured together",
+            );
+        });
+
+        it("refuses a client key without a matching certificate", async () => {
+            const {buildRedisConfig} =
+                await importRedisModule({
+                    REDIS_TLS: true,
+                    REDIS_TLS_CERT: "",
+                    REDIS_TLS_KEY: "/certs/client.key",
+                });
+
+            expect(() => buildRedisConfig()).toThrow(
+                "Redis TLS initialization failed: " +
+                "REDIS_TLS_CERT and REDIS_TLS_KEY must be configured together",
+            );
         });
 
         it("throws when TLS certificates cannot be loaded", async () => {

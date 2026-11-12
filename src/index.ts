@@ -1,59 +1,23 @@
 // src/index.ts
-import os from "node:os";
 import cluster from "node:cluster";
 
 import app, {bootstrap} from "./app";
 import {logger} from "./config/logger";
 import {__ENV} from "./config/environment";
 import {
+    assertConnectionBudget,
     checkDbConnection,
     closeDatabase,
-    validateConnectionBudget,
 } from "./config/database";
+import {
+    isClusterEnabled as resolveIsClusterEnabled,
+    resolveClusterWorkers,
+} from "./config/cluster";
 import {disconnectRedis} from "./config/redis";
 
-const DEFAULT_CLUSTER_WORKERS = Math.max(1, os.cpus().length);
+const clusterWorkers = resolveClusterWorkers(__ENV.CLUSTER_WORKERS);
 
-const parsedWorkers = Number(__ENV.CLUSTER_WORKERS);
-const clusterWorkers = Math.max(
-    1,
-    Number.isFinite(parsedWorkers) && parsedWorkers > 0
-        ? parsedWorkers
-        : DEFAULT_CLUSTER_WORKERS,
-);
-
-const isClusterEnabled =
-    __ENV.CLUSTER === "true" && DEFAULT_CLUSTER_WORKERS > 1;
-
-/**
- * Fails fast when the configured pool would exhaust the database's
- * connection budget across all workers of this process.
- */
-function assertConnectionBudget(): void {
-    const workers = isClusterEnabled ? clusterWorkers : 1;
-
-    const budget = validateConnectionBudget({
-        poolMax: Number(__ENV.DB_POOL_MAX),
-        workers,
-        maxConnections: Number(__ENV.DB_MAX_CONNECTIONS_TOTAL),
-    });
-
-    if (!budget.valid) {
-        logger.warn(
-            `Connection budget exceeded: ${workers} worker(s) x ` +
-            `DB_POOL_MAX=${__ENV.DB_POOL_MAX} projects to ` +
-            `${budget.projected} connections against a limit of ` +
-            `${__ENV.DB_MAX_CONNECTIONS_TOTAL}. ` +
-            `Recommended DB_POOL_MAX is ${budget.recommended}.`,
-        );
-        return;
-    }
-
-    logger.info(
-        `Connection budget OK: ${budget.projected} of ` +
-        `${__ENV.DB_MAX_CONNECTIONS_TOTAL} connections reserved.`,
-    );
-}
+const isClusterEnabled = resolveIsClusterEnabled(__ENV.CLUSTER);
 
 /**
  * Application entry point.
@@ -66,6 +30,21 @@ function assertConnectionBudget(): void {
  * - The current process bootstraps and starts the HTTP server.
  */
 async function main(): Promise<void> {
+    const workers = isClusterEnabled ? clusterWorkers : 1;
+
+    const budget = assertConnectionBudget({
+        poolMax: Number(__ENV.DB_POOL_MAX),
+        workers,
+        maxConnections: Number(__ENV.DB_MAX_CONNECTIONS_TOTAL),
+    });
+
+    logger.info(
+        `Environment: ${__ENV.NODE_ENV}; cluster: ` +
+        `${isClusterEnabled ? `enabled (${clusterWorkers} workers)` : "disabled"}; ` +
+        `connection budget: ${budget.projected} of ` +
+        `${__ENV.DB_MAX_CONNECTIONS_TOTAL} reserved.`,
+    );
+
     if (isClusterEnabled && cluster.isPrimary) {
         startPrimary();
         return;
@@ -218,8 +197,6 @@ async function startWorker(): Promise<void> {
             process.exit(1);
         }
 
-        assertConnectionBudget();
-
         const server = app.listen(__ENV.PORT, () => {
             logger.info(
                 `[Worker ${process.pid}] Server online on port ${__ENV.PORT}`,
@@ -351,4 +328,15 @@ async function closeDependencies(): Promise<void> {
     );
 }
 
-void main();
+void main().catch((error: unknown) => {
+    const message =
+        error instanceof Error
+            ? error.message
+            : "Unknown initialization error";
+
+    logger.error(
+        `[Worker ${process.pid}] Critical startup failure: ${message}`,
+    );
+
+    process.exit(1);
+});
