@@ -1,8 +1,18 @@
 // src/modules/jobs/cleanup.job.ts
-import {sql} from "kysely";
+import {Kysely, sql, type RawBuilder} from "kysely";
 import {__ENV} from "../../config/environment";
 import {logger} from "../../config/logger";
 import {db} from "../../config/database";
+import type {Database} from "../../config/schema";
+
+type CleanupTable =
+    | "authentication_tokens"
+    | "password_recoveries"
+    | "two_factor_authentications"
+    | "refresh_tokens"
+    | "verification_tokens"
+    | "rate_limits"
+    | "idempotency_keys";
 
 /**
  * Scheduled maintenance.
@@ -14,6 +24,11 @@ import {db} from "../../config/database";
  */
 export class CleanupJob {
     private timer?: NodeJS.Timeout;
+
+    constructor(
+        private readonly dbInstance: Kysely<Database> = db,
+    ) {
+    }
 
     /**
      * Runs one cleanup pass.
@@ -28,68 +43,44 @@ export class CleanupJob {
         idempotencyKeys: number;
     }> {
         const sessions = await this.deleteBatched(
-            () =>
-                db
-                    .deleteFrom("authentication_tokens")
-                    .where("expired_at", "<", sql<Date>`now()`),
+            "authentication_tokens",
+            sql<boolean>`expired_at < now()`,
             1000,
         );
 
         const recoveries = await this.deleteBatched(
-            () =>
-                db
-                    .deleteFrom("password_recoveries")
-                    .where("expired_at", "<", sql<Date>`now()`),
+            "password_recoveries",
+            sql<boolean>`expired_at < now()`,
             500,
         );
 
         const tfa = await this.deleteBatched(
-            () =>
-                db
-                    .deleteFrom("two_factor_authentications")
-                    .where((eb) =>
-                        eb.or([
-                            eb("expired_at", "<", sql<Date>`now()`),
-                            eb("expired_tries_at", "<", sql<Date>`now()`),
-                        ]),
-                    ),
+            "two_factor_authentications",
+            sql<boolean>`expired_at < now() or expired_tries_at < now()`,
             500,
         );
 
         const refreshTokens = await this.deleteBatched(
-            () =>
-                db
-                    .deleteFrom("refresh_tokens")
-                    .where("expires_at", "<", sql<Date>`now()`),
+            "refresh_tokens",
+            sql<boolean>`expires_at < now()`,
             500,
         );
 
         const verifications = await this.deleteBatched(
-            () =>
-                db
-                    .deleteFrom("verification_tokens")
-                    .where((eb) =>
-                        eb.or([
-                            eb("expires_at", "<", sql<Date>`now()`),
-                            eb("consumed_at", "is not", null),
-                        ]),
-                    ),
+            "verification_tokens",
+            sql<boolean>`expires_at < now() or consumed_at is not null`,
             500,
         );
 
         const rateLimits = await this.deleteBatched(
-            () =>
-                db
-                    .deleteFrom("rate_limits")
-                    .where("expires_at", "<", sql<Date>`now()`),
+            "rate_limits",
+            sql<boolean>`expires_at < now()`,
             1000,
         );
 
         const idempotencyKeys = await this.deleteBatched(
-            () =>
-                db
-                    .deleteFrom("idempotency_keys")
-                    .where("expires_at", "<", sql<Date>`now()`),
+            "idempotency_keys",
+            sql<boolean>`expires_at < now()`,
             500,
         );
 
@@ -119,25 +110,30 @@ export class CleanupJob {
 
     /**
      * Deletes rows in bounded batches to avoid long locks.
+     *
+     * PostgreSQL does not support `DELETE ... LIMIT`, so the batch is
+     * selected by `ctid` in a subquery. `ctid` is a physical row
+     * identifier and is safe to use inside the same statement.
      */
     private async deleteBatched(
-        buildQuery: () => {
-            limit: (value: number) => {
-                executeTakeFirst: () => Promise<{
-                    numDeletedRows: number | bigint;
-                }>;
-            };
-        },
+        table: CleanupTable,
+        predicate: RawBuilder<boolean>,
         batchSize: number,
     ): Promise<number> {
         let total = 0;
 
         for (;;) {
-            const result = await buildQuery()
-                .limit(batchSize)
-                .executeTakeFirst();
+            const result = await sql`
+                DELETE FROM ${sql.table(table)}
+                WHERE ctid IN (
+                    SELECT ctid
+                    FROM ${sql.table(table)}
+                    WHERE ${predicate}
+                    LIMIT ${batchSize}
+                )
+            `.execute(this.dbInstance);
 
-            const deleted = Number(result.numDeletedRows);
+            const deleted = Number(result.numAffectedRows ?? 0);
 
             total += deleted;
 
