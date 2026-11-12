@@ -232,9 +232,14 @@ export class UserService {
             throw new AppError(Messages.DATA_NOT_FOUND);
         }
 
-        await this.userRepository.softDelete(id);
-
-        await this.authenticationTokenRepository.deleteAllByUserId(id);
+        await this.runInTransaction(async (trx) => {
+            await this.userRepository.softDelete(id, trx);
+            await this.authenticationTokenRepository.deleteAllByUserId(
+                id,
+                undefined,
+                trx,
+            );
+        });
     }
 
     async hardDelete(id: number): Promise<void> {

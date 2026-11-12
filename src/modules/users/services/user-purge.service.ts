@@ -7,6 +7,8 @@ import {AUDIT_ACTIONS} from "../../audit/audit.interface";
 import {AppError} from "../../../common/utils/errors";
 import Messages from "../../../common/utils/messages";
 import {Actor} from "../../../common/authz/policy";
+import {type TransactionRunner} from "../services/user.service";
+import {withTransaction} from "../../../config/database";
 
 /**
  * Roles allowed to permanently remove a user.
@@ -28,6 +30,7 @@ export class UserPurgeService {
         private readonly userRepository: UserRepository,
         private readonly authenticationTokenRepository: AuthenticationTokenRepository,
         private readonly auditService: AuditService,
+        private readonly runInTransaction: TransactionRunner = withTransaction,
     ) {
     }
 
@@ -66,9 +69,15 @@ export class UserPurgeService {
         }
 
         // Revoke the sessions before the row disappears.
-        await this.authenticationTokenRepository.deleteAllByUserId(id);
+        await this.runInTransaction(async (trx) => {
+            await this.authenticationTokenRepository.deleteAllByUserId(
+                id,
+                undefined,
+                trx,
+            );
 
-        await this.userRepository.hardDelete(id);
+            await this.userRepository.hardDelete(id, trx);
+        });
 
         await this.auditService.success(AUDIT_ACTIONS.USER_DELETED, {
             request,

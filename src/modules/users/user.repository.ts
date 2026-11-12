@@ -144,7 +144,15 @@ export class UserRepository {
     ): Promise<User | null> {
         const existingRow = await executor
             .selectFrom(USER_TABLE)
-            .select("id")
+            .select([
+                "id",
+                "email",
+                "phone",
+                "role_id",
+                "status",
+                "password",
+                "authorization_version",
+            ])
             .where("id", "=", id)
             .where("deleted_at", "is", null)
             .executeTakeFirst();
@@ -152,6 +160,32 @@ export class UserRepository {
         if (!existingRow) {
             return null;
         }
+
+        /*
+         * Security-relevant changes must invalidate tokens issued
+         * before the change. The version is persisted here, not only
+         * computed by the service layer, so every repository caller
+         * (account updates, TFA changes, admin tools) participates.
+         */
+        const securityChanged =
+            (data.role_id !== undefined &&
+                data.role_id !== existingRow.role_id) ||
+            (data.status !== undefined &&
+                data.status !== existingRow.status) ||
+            (typeof data.password === "string" &&
+                data.password !== existingRow.password);
+
+        const authorizationVersion =
+            data.authorization_version !== undefined
+                ? data.authorization_version
+                : securityChanged
+                    ? Number(existingRow.authorization_version) + 1
+                    : undefined;
+
+        const emailChanged =
+            data.email !== undefined && data.email !== existingRow.email;
+        const phoneChanged =
+            data.phone !== undefined && data.phone !== existingRow.phone;
 
         let query = executor
             .updateTable(USER_TABLE)
@@ -174,15 +208,19 @@ export class UserRepository {
                 ...(data.phone !== undefined && {
                     phone: data.phone,
                 }),
-                ...(data.is_phone_verified !== undefined && {
-                    is_phone_verified: data.is_phone_verified,
-                }),
+                ...(data.is_phone_verified !== undefined
+                    ? {is_phone_verified: data.is_phone_verified}
+                    : phoneChanged
+                        ? {is_phone_verified: false}
+                        : {}),
                 ...(data.email !== undefined && {
                     email: data.email,
                 }),
-                ...(data.is_email_verified !== undefined && {
-                    is_email_verified: data.is_email_verified,
-                }),
+                ...(data.is_email_verified !== undefined
+                    ? {is_email_verified: data.is_email_verified}
+                    : emailChanged
+                        ? {is_email_verified: false}
+                        : {}),
                 ...(data.has_tfa !== undefined && {
                     has_tfa: data.has_tfa,
                 }),
@@ -209,6 +247,9 @@ export class UserRepository {
                 }),
                 ...(data.comments !== undefined && {
                     comments: data.comments,
+                }),
+                ...(authorizationVersion !== undefined && {
+                    authorization_version: authorizationVersion,
                 }),
                 updated_at: new Date(),
             })
@@ -320,6 +361,8 @@ export class UserRepository {
             .updateTable(USER_TABLE)
             .set({
                 password,
+                authorization_version:
+                    sql<number>`authorization_version + 1`,
                 updated_at: sql<Date>`now()`,
             })
             .where("id", "=", id)
@@ -348,11 +391,13 @@ export class UserRepository {
             : null;
     }
 
-    async softDelete(id: number): Promise<boolean> {
-        const result = await this.db
+    async softDelete(id: number, executor: DatabaseExecutor = this.db): Promise<boolean> {
+        const result = await executor
             .updateTable(USER_TABLE)
             .set({
                 deleted_at: new Date(),
+                authorization_version:
+                    sql<number>`authorization_version + 1`,
                 updated_at: new Date(),
             })
             .where("id", "=", id)
@@ -362,8 +407,8 @@ export class UserRepository {
         return Number(result.numUpdatedRows) > 0;
     }
 
-    async hardDelete(id: number): Promise<boolean> {
-        const result = await this.db
+    async hardDelete(id: number, executor: DatabaseExecutor = this.db): Promise<boolean> {
+        const result = await executor
             .deleteFrom(USER_TABLE)
             .where("id", "=", id)
             .executeTakeFirst();
