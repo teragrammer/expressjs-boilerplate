@@ -2,6 +2,8 @@
 import {sql} from "kysely";
 import {db as defaultDb, type DatabaseExecutor} from "../../config/database";
 import {logger} from "../../config/logger";
+import {AppError} from "../utils/errors";
+import Messages from "../utils/messages";
 
 export interface RateLimitResult {
     allowed: boolean;
@@ -21,7 +23,12 @@ export class RateLimiter {
      * Attempts to consume a request from the rate limit bucket.
      * Uses atomic upsert to handle concurrent requests safely.
      */
-    async consume(key: string, maxRequests: number, windowSec: number): Promise<RateLimitResult> {
+    async consume(
+        key: string,
+        maxRequests: number,
+        windowSec: number,
+        failClosed = false,
+    ): Promise<RateLimitResult> {
         const expiresAt = new Date(Date.now() + windowSec * 1000);
         const now = new Date();
 
@@ -58,6 +65,13 @@ export class RateLimiter {
             };
         } catch (error) {
             logger.error(`Rate limiter consume error for key ${key}: ${error}`);
+
+            if (failClosed) {
+                throw new AppError(
+                    Messages.SERVICE_UNAVAILABLE,
+                    "Rate limiting is temporarily unavailable.",
+                );
+            }
 
             // Fail open - allow request if rate limiter fails
             return {

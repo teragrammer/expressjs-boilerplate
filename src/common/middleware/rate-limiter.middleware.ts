@@ -4,6 +4,8 @@ import {AppError} from "../utils/errors";
 import Messages from "../utils/messages";
 import {RateLimiter} from "./rate-limiter";
 import {logger} from "../../config/logger";
+import {createHash} from "node:crypto";
+import {rateLimitRejectionsTotal} from "../metrics/metrics";
 
 export interface RateLimitOptions {
     bucket: string;
@@ -14,11 +16,21 @@ export interface RateLimitOptions {
     skipFailedRequests?: boolean;
     message?: string;
     code?: string;
+    failClosed?: boolean;
 }
 
 const defaultKeyGenerator = (req: Request): string => {
     return req.ip || "unknown";
 };
+
+/**
+ * Hashes an identifier for the log.
+ *
+ * The hash lets an operator correlate the throttled client across
+ * requests without the log recording the identifier itself.
+ */
+const hashIdentifier = (value: string): string =>
+    createHash("sha256").update(value).digest("hex").slice(0, 16);
 
 export function createRateLimiter(options: RateLimitOptions) {
     const {
@@ -30,6 +42,7 @@ export function createRateLimiter(options: RateLimitOptions) {
         skipFailedRequests = false,
         message = "Too many requests, please try again later.",
         code = "RATE_LIMIT_EXCEEDED",
+        failClosed = false,
     } = options;
 
     const limiter = new RateLimiter();
@@ -40,10 +53,19 @@ export function createRateLimiter(options: RateLimitOptions) {
         next: NextFunction
     ) {
         try {
-            const key = `${bucket}:${keyGenerator(req)}`;
+            const rawIdentifier = keyGenerator(req);
+            const hashedIdentifier = createHash("sha256")
+                .update(rawIdentifier)
+                .digest("hex");
+            const key = `${bucket}:${hashedIdentifier}`;
             const windowSec = Math.ceil(windowMs / 1000);
 
-            const result = await limiter.consume(key, maxRequests, windowSec);
+            const result = await limiter.consume(
+                key,
+                maxRequests,
+                windowSec,
+                failClosed,
+            );
 
             // Set rate limit headers
             res.setHeader("X-RateLimit-Limit", maxRequests);
@@ -53,6 +75,22 @@ export function createRateLimiter(options: RateLimitOptions) {
             if (!result.allowed) {
                 const retryAfter = Math.ceil((result.resetAt - Date.now()) / 1000);
                 res.setHeader("Retry-After", Math.max(1, retryAfter));
+
+                /*
+                 * The rejected identifier is hashed so the log can
+                 * show which client was throttled without recording
+                 * the identifier itself.
+                 */
+                logger.warn(
+                    {
+                        bucket,
+                        key: hashIdentifier(key),
+                        count: result.count,
+                    },
+                    "Rate limit exceeded",
+                );
+
+                rateLimitRejectionsTotal.inc({bucket});
 
                 throw new AppError(
                     Messages.RATE_LIMIT_EXCEEDED,
@@ -122,6 +160,7 @@ function makeRateLimiter(limiter: RateLimiter, options: RateLimitOptions) {
         skipFailedRequests = false,
         message = "Too many requests, please try again later.",
         code = "RATE_LIMIT_EXCEEDED",
+        failClosed = false,
     } = options;
 
     return async function rateLimiterMiddleware(
@@ -135,10 +174,19 @@ function makeRateLimiter(limiter: RateLimiter, options: RateLimitOptions) {
         }
 
         try {
-            const key = `${bucket}:${keyGenerator(req)}`;
+            const rawIdentifier = keyGenerator(req);
+            const hashedIdentifier = createHash("sha256")
+                .update(rawIdentifier)
+                .digest("hex");
+            const key = `${bucket}:${hashedIdentifier}`;
             const windowSec = Math.ceil(windowMs / 1000);
 
-            const result = await limiter.consume(key, maxRequests, windowSec);
+            const result = await limiter.consume(
+                key,
+                maxRequests,
+                windowSec,
+                failClosed,
+            );
 
             // Set rate limit headers
             res.setHeader("X-RateLimit-Limit", maxRequests);
@@ -148,6 +196,22 @@ function makeRateLimiter(limiter: RateLimiter, options: RateLimitOptions) {
             if (!result.allowed) {
                 const retryAfter = Math.ceil((result.resetAt - Date.now()) / 1000);
                 res.setHeader("Retry-After", Math.max(1, retryAfter));
+
+                /*
+                 * The rejected identifier is hashed so the log can
+                 * show which client was throttled without recording
+                 * the identifier itself.
+                 */
+                logger.warn(
+                    {
+                        bucket,
+                        key: hashIdentifier(key),
+                        count: result.count,
+                    },
+                    "Rate limit exceeded",
+                );
+
+                rateLimitRejectionsTotal.inc({bucket});
 
                 throw new AppError(
                     Messages.RATE_LIMIT_EXCEEDED,
@@ -204,6 +268,7 @@ export const authRateLimiters = {
         maxRequests: 10,
         windowMs: 60 * 1000, // 10 per minute
         keyGenerator: (req) => `ip:${req.ip}:user:${req.body?.username || "unknown"}`,
+failClosed: true,
         message: "Too many login attempts, please try again later.",
     }),
 
@@ -211,6 +276,7 @@ export const authRateLimiters = {
         bucket: "auth:register",
         maxRequests: 5,
         windowMs: 60 * 60 * 1000, // 5 per hour
+failClosed: true,
         message: "Too many registration attempts, please try again later.",
     }),
 
@@ -219,6 +285,7 @@ export const authRateLimiters = {
         maxRequests: 3,
         windowMs: 15 * 60 * 1000, // 3 per 15 minutes
         keyGenerator: (req) => `ip:${req.ip}:target:${req.body?.send_to || "unknown"}`,
+failClosed: true,
         message: "Too many password recovery requests, please try again later.",
     }),
 
@@ -227,6 +294,7 @@ export const authRateLimiters = {
         maxRequests: 5,
         windowMs: 60 * 60 * 1000, // 5 per hour
         keyGenerator: (req) => `ip:${req.ip}:target:${req.body?.send_to || "unknown"}`,
+failClosed: true,
         message: "Too many validation attempts, please try again later.",
     }),
 
@@ -235,6 +303,7 @@ export const authRateLimiters = {
         maxRequests: 3,
         windowMs: 10 * 60 * 1000, // 3 per 10 minutes
         keyGenerator: (req) => `user:${req.credentials?.jwt?.uid || "unknown"}`,
+failClosed: true,
         message: "Too many OTP requests, please try again later.",
     }),
 
@@ -243,6 +312,7 @@ export const authRateLimiters = {
         maxRequests: 5,
         windowMs: 60 * 60 * 1000, // 5 per hour
         keyGenerator: (req) => `user:${req.credentials?.jwt?.uid || "unknown"}`,
+failClosed: true,
         message: "Too many OTP validation attempts, please try again later.",
     }),
 
@@ -250,6 +320,7 @@ export const authRateLimiters = {
         bucket: "auth:logout",
         maxRequests: 20,
         windowMs: 60 * 1000, // 20 per minute
+failClosed: true,
         message: "Too many logout attempts.",
     }),
 
@@ -257,6 +328,7 @@ export const authRateLimiters = {
         bucket: "auth:refresh",
         maxRequests: 30,
         windowMs: 60 * 1000, // 30 per minute
+failClosed: true,
         message: "Too many token refresh attempts, please try again later.",
     }),
 
@@ -266,6 +338,7 @@ export const authRateLimiters = {
         windowMs: 15 * 60 * 1000, // 3 per 15 minutes
         keyGenerator: (req) =>
             `user:${req.credentials?.jwt?.uid || "unknown"}`,
+failClosed: true,
         message: "Too many verification requests, please try again later.",
     }),
 
@@ -275,6 +348,7 @@ export const authRateLimiters = {
         windowMs: 15 * 60 * 1000, // 5 per 15 minutes
         keyGenerator: (req) =>
             `user:${req.credentials?.jwt?.uid || "unknown"}`,
+failClosed: true,
         message: "Too many verification attempts, please try again later.",
     }),
 
@@ -282,6 +356,7 @@ export const authRateLimiters = {
         bucket: "auth:global",
         maxRequests: 100,
         windowMs: 60 * 1000, // 100 per minute global
+failClosed: true,
         message: "Too many authentication requests, please try again later.",
     }),
 };
