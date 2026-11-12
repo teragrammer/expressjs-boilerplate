@@ -38,7 +38,7 @@ export default () => {
             );
 
             res.status(200).json({
-                sent: true,
+                sent: result.sent,
                 expires_at: result.expiresAt,
             });
         }),
@@ -97,7 +97,7 @@ export default () => {
             );
 
             res.status(200).json({
-                sent: true,
+                sent: result.sent,
                 expires_at: result.expiresAt,
             });
         }),

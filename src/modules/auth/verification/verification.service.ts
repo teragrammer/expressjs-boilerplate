@@ -113,7 +113,10 @@ export class VerificationService {
             });
         }
 
-        return {sent: true, expiresAt};
+        return {
+            sent: channel === "email",
+            expiresAt,
+        };
     }
 
     /**
