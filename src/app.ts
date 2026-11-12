@@ -3,6 +3,7 @@ import express, {Request, Response,} from "express";
 
 import v1 from "./routes/v1";
 import metricsRoutes from "./routes/metrics";
+import docsRoutes from "./routes/docs";
 import healthRoutes from "./modules/system/health/health.routes";
 import errors from "./common/utils/messages";
 
@@ -43,6 +44,12 @@ app.use("/health", healthRoutes());
 app.use(metricsRoutes());
 
 app.use("/api/v1", v1());
+
+/*
+ * OpenAPI contract and Swagger UI. Mounted at the application root so
+ * the documentation is reachable without a version prefix.
+ */
+app.use(docsRoutes());
 
 app.use((_req: Request, res: Response) => {
     res.status(404).json({

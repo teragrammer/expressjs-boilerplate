@@ -237,6 +237,7 @@ The Postgres MCP server reads `DB_*` values from `.env` (or `DATABASE_URL`). For
 ### Documentation
 
 - [`docs/openapi.yaml`](docs/openapi.yaml) — the API contract
+- Swagger UI: `http://localhost:4000/api-docs` (OpenAPI spec: `/openapi.yaml`, `/openapi.json`)
 - [`docs/adr/`](docs/adr/) — the architecture decision records
 - [`docs/runbooks/`](docs/runbooks/) — deployment, migrations, incident
   response and backup procedures

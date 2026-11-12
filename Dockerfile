@@ -23,6 +23,7 @@ RUN npm ci
 COPY tsconfig.json ./
 COPY src ./src
 COPY database ./database
+COPY docs ./docs
 RUN npm run build
 
 # Prune to the production dependency tree.
@@ -47,6 +48,7 @@ COPY --from=builder --chown=node:node /app/node_modules ./node_modules
 COPY --from=builder --chown=node:node /app/dist ./dist
 COPY --from=builder --chown=node:node /app/package.json ./package.json
 COPY --from=builder --chown=node:node /app/database ./database
+COPY --from=builder --chown=node:node /app/docs ./docs
 
 # Run as the unprivileged `node` user shipped with the base image.
 USER node

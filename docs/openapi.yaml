@@ -3,6 +3,9 @@ openapi: 3.1.0
 info:
   title: Express API Boilerplate
   version: 1.0.0
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
   description: |
     REST API for an authenticated application.
 
@@ -45,16 +48,91 @@ security:
 
 tags:
   - name: Auth
+    description: Authentication, sessions, password recovery and two-factor authentication.
   - name: Account
+    description: The caller's own profile, credentials and verification flows.
   - name: Users
+    description: User management (administrator operations).
   - name: Settings
+    description: Application settings.
   - name: Roles
+    description: Role management.
   - name: Route Guards
+    description: Route-to-role authorization grants.
   - name: Audit
+    description: Append-only audit trail.
   - name: Health
+    description: Liveness and readiness probes.
   - name: Metrics
+    description: Prometheus metrics.
 
 paths:
+  /health/live:
+    get:
+      tags: [Health]
+      summary: Liveness probe
+      description: |
+        Returns 200 when the process is up. No dependency is contacted.
+      servers:
+        - url: /
+      security: []
+      responses:
+        "200":
+          description: The process is up
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: alive
+                  uptimeSeconds:
+                    type: integer
+
+  /health/ready:
+    get:
+      tags: [Health]
+      summary: Readiness probe
+      description: |
+        Returns 200 when every required dependency is up and 503 otherwise.
+      servers:
+        - url: /
+      security: []
+      responses:
+        "200":
+          description: All dependencies are up
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadinessReport"
+        "503":
+          description: One or more dependencies are down
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadinessReport"
+
+  /metrics:
+    get:
+      tags: [Metrics]
+      summary: Prometheus metrics
+      description: |
+        Exposes Prometheus metrics in text format. Restrict this endpoint
+        to an operator network.
+      servers:
+        - url: /
+      security: []
+      responses:
+        "200":
+          description: The metrics in Prometheus text format
+          content:
+            text/plain:
+              schema:
+                type: string
+        "404":
+          description: Metrics are disabled
+
   /auth/register:
     post:
       tags: [Auth]
@@ -225,8 +303,7 @@ paths:
                   message:
                     type: string
                   data:
-                    type: object
-                    nullable: true
+                    type: [object, "null"]
                     properties:
                       next_resend_at:
                         type: string
@@ -362,6 +439,57 @@ paths:
         "400":
           $ref: "#/components/responses/BadRequest"
 
+  /auth/tfa/enroll/send:
+    post:
+      tags: [Auth]
+      summary: Send an enrollment OTP
+      responses:
+        "200":
+          description: The OTP was sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  next_try:
+                    type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /auth/tfa/recovery:
+    post:
+      tags: [Auth]
+      summary: Redeem a recovery code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code:
+                  type: string
+      responses:
+        "200":
+          description: The recovery code was redeemed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  access_token:
+                    type: string
+                  expires_at:
+                    type: string
+                    format: date-time
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
   /auth/tfa/disable:
     post:
       tags: [Auth]
@@ -401,13 +529,11 @@ paths:
                 first_name:
                   type: string
                 middle_name:
-                  type: string
-                  nullable: true
+                  type: [string, "null"]
                 last_name:
                   type: string
                 address:
-                  type: string
-                  nullable: true
+                  type: [string, "null"]
       responses:
         "200":
           description: The profile was updated
@@ -448,14 +574,11 @@ paths:
                   type: string
                   format: password
                 username:
-                  type: string
-                  nullable: true
+                  type: [string, "null"]
                 email:
-                  type: string
-                  nullable: true
+                  type: [string, "null"]
                 phone:
-                  type: string
-                  nullable: true
+                  type: [string, "null"]
       responses:
         "200":
           description: The credentials were changed
@@ -600,8 +723,7 @@ paths:
                   hasMore:
                     type: boolean
                   nextCursor:
-                    type: integer
-                    nullable: true
+                    type: [integer, "null"]
         "403":
           $ref: "#/components/responses/Forbidden"
     post:
@@ -1195,11 +1317,9 @@ components:
         session_id:
           type: integer
         ip:
-          type: string
-          nullable: true
+          type: [string, "null"]
         user_agent:
-          type: string
-          nullable: true
+          type: [string, "null"]
         created_at:
           type: string
           format: date-time
@@ -1216,8 +1336,7 @@ components:
           minLength: 2
           maxLength: 100
         middle_name:
-          type: string
-          nullable: true
+          type: [string, "null"]
         last_name:
           type: string
           minLength: 2
@@ -1242,29 +1361,22 @@ components:
         id:
           type: integer
         first_name:
-          type: string
-          nullable: true
+          type: [string, "null"]
         middle_name:
-          type: string
-          nullable: true
+          type: [string, "null"]
         last_name:
-          type: string
-          nullable: true
+          type: [string, "null"]
         gender:
-          type: string
-          nullable: true
+          type: [string, "null"]
           enum: [Male, Female, Other]
         address:
-          type: string
-          nullable: true
+          type: [string, "null"]
         phone:
-          type: string
-          nullable: true
+          type: [string, "null"]
         is_phone_verified:
           type: boolean
         email:
-          type: string
-          nullable: true
+          type: [string, "null"]
         is_email_verified:
           type: boolean
         has_tfa:
@@ -1272,14 +1384,12 @@ components:
         role_id:
           type: integer
         username:
-          type: string
-          nullable: true
+          type: [string, "null"]
         status:
           type: string
           enum: [Activated, Suspended, Deactivated, Pending]
         comments:
-          type: string
-          nullable: true
+          type: [string, "null"]
         authorization_version:
           type: integer
         created_at:
@@ -1297,18 +1407,15 @@ components:
           type: string
           maxLength: 100
         middle_name:
-          type: string
-          nullable: true
+          type: [string, "null"]
         last_name:
           type: string
           maxLength: 100
         email:
           type: string
           format: email
-          nullable: true
         phone:
-          type: string
-          nullable: true
+          type: [string, "null"]
         username:
           type: string
           maxLength: 16
@@ -1324,11 +1431,9 @@ components:
           enum: [Activated, Suspended, Deactivated, Pending]
           description: Administrator-only field
         address:
-          type: string
-          nullable: true
+          type: [string, "null"]
         comments:
-          type: string
-          nullable: true
+          type: [string, "null"]
 
     UpdateUserRequest:
       type: object
@@ -1338,18 +1443,15 @@ components:
           type: string
           maxLength: 100
         middle_name:
-          type: string
-          nullable: true
+          type: [string, "null"]
         last_name:
           type: string
           maxLength: 100
         email:
           type: string
           format: email
-          nullable: true
         phone:
-          type: string
-          nullable: true
+          type: [string, "null"]
         username:
           type: string
           maxLength: 16
@@ -1361,11 +1463,9 @@ components:
           enum: [Activated, Suspended, Deactivated, Pending]
           description: Administrator-only field
         address:
-          type: string
-          nullable: true
+          type: [string, "null"]
         comments:
-          type: string
-          nullable: true
+          type: [string, "null"]
 
     Setting:
       type: object
@@ -1377,11 +1477,9 @@ components:
         slug:
           type: string
         value:
-          type: string
-          nullable: true
+          type: [string, "null"]
         description:
-          type: string
-          nullable: true
+          type: [string, "null"]
         type:
           type: string
           enum: [string, integer, float, boolean, array]
@@ -1399,11 +1497,9 @@ components:
         slug:
           type: string
         value:
-          type: string
-          nullable: true
+          type: [string, "null"]
         description:
-          type: string
-          nullable: true
+          type: [string, "null"]
         type:
           type: string
           enum: [string, integer, float, boolean, array]
@@ -1422,8 +1518,7 @@ components:
         slug:
           type: string
         description:
-          type: string
-          nullable: true
+          type: [string, "null"]
         is_public:
           type: boolean
         is_bypass_authorization:
@@ -1438,8 +1533,7 @@ components:
         slug:
           type: string
         description:
-          type: string
-          nullable: true
+          type: [string, "null"]
         is_public:
           type: integer
           enum: [0, 1]
@@ -1459,6 +1553,24 @@ components:
         role_slug:
           type: string
 
+    ReadinessReport:
+      type: object
+      required: [status, dependencies]
+      properties:
+        status:
+          type: string
+          enum: [ready, not_ready]
+        dependencies:
+          type: object
+          required: [database, redis]
+          properties:
+            database:
+              type: string
+              enum: [up, down, disabled]
+            redis:
+              type: string
+              enum: [up, down, disabled]
+
     AuditEvent:
       type: object
       properties:
@@ -1468,30 +1580,24 @@ components:
           type: string
           format: date-time
         actor_user_id:
-          type: integer
-          nullable: true
+          type: [integer, "null"]
         actor_type:
           type: string
         action:
           type: string
         target_type:
-          type: string
-          nullable: true
+          type: [string, "null"]
         target_id:
-          type: string
-          nullable: true
+          type: [string, "null"]
         outcome:
           type: string
           enum: [success, failure]
         request_id:
-          type: string
-          nullable: true
+          type: [string, "null"]
         ip:
-          type: string
-          nullable: true
+          type: [string, "null"]
         user_agent:
-          type: string
-          nullable: true
+          type: [string, "null"]
         metadata:
           type: object
           additionalProperties: true

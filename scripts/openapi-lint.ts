@@ -411,7 +411,10 @@ async function main(): Promise<void> {
     }
 
     for (const route of documented) {
-        if (route.startsWith("GET /health")) {continue;}
+        if (
+            route.startsWith("GET /health") ||
+            route === "GET /metrics"
+        ) {continue;}
 
         const separator = route.indexOf(" ");
         const method = route.slice(0, separator);
@@ -437,6 +440,8 @@ async function main(): Promise<void> {
     console.log(
         `OpenAPI contract is valid: ${documented.size} documented operations match the application routes.`,
     );
+
+    process.exit(0);
 }
 
 void main().catch((error: unknown) => {
