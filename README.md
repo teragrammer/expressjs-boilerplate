@@ -194,7 +194,7 @@ opencode mcp list    # verify the MCP servers
 opencode             # start OpenCode
 ```
 
-`npm install` runs the `prepare` script, which executes `npm run setup` (`npx skills experimental_install`). To restore or repair the skill installation manually:
+`npm install` runs the `prepare` script, which executes `npm run setup` (`npx skills experimental_install`). The hook is skipped when `CI` is set or `NODE_ENV=production` (for example in GitHub Actions and Docker builds), so dependency installation does not depend on cloning skill repositories. To restore or repair the skill installation manually:
 
 ```sh
 npm run setup        # restore skills from skills-lock.json

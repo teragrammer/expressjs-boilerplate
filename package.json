@@ -26,7 +26,7 @@
     "load:test:smoke": "bash tests/load/run.sh smoke",
     "load:test:stress": "bash tests/load/run.sh stress",
     "load:test:soak": "bash tests/load/run.sh soak",
-    "prepare": "npm run setup:skills"
+    "prepare": "node scripts/setup-skills.mjs"
   },
   "keywords": [],
   "author": "",

@@ -15,8 +15,13 @@ FROM node:24-bookworm-slim AS builder
 
 WORKDIR /app
 
-# Install the full dependency tree (including dev dependencies) once.
 COPY package.json package-lock.json ./
+
+# Non-interactive build: skip the `prepare` hook, which restores agent skills
+# from external GitHub repositories and is not needed to compile the app.
+ENV CI=true
+
+# Install the full dependency tree (including dev dependencies) once.
 RUN npm ci
 
 # Compile the application.
