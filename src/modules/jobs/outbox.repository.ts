@@ -54,7 +54,19 @@ export class OutboxRepository {
                 const events = await trx
                     .selectFrom(OUTBOX_EVENT_TABLE)
                     .selectAll()
-                    .where("status", "=", "pending")
+                    .where((eb) =>
+                        eb.or([
+                            eb("status", "=", "pending"),
+                            eb.and([
+                                eb("status", "=", "processing"),
+                                eb(
+                                    "locked_at",
+                                    "<",
+                                    sql<Date>`now() - interval '5 minutes'`,
+                                ),
+                            ]),
+                        ]),
+                    )
                     .where("available_at", "<=", sql<Date>`now()`)
                     .orderBy("id", "asc")
                     .limit(limit)
