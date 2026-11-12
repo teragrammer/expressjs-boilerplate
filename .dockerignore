@@ -9,6 +9,10 @@ coverage
 .env
 .env.*
 !.env.example
+.ssl/
+*.pem
+*.key
+*.crt
 
 # Version control and tooling
 .git

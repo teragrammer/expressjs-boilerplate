@@ -295,23 +295,23 @@ All paths are prefixed with `/api/v1`. The machine-readable contract is [`openap
 
 | Variable | Default / behavior | Notes |
 | --- | --- | --- |
-| `NODE_ENV` | `development` | `production` enables fail-closed rules |
+| `NODE_ENV` | required | Must be set explicitly; `production` enables fail-closed rules |
 | `PORT` / `PORT_EXPOSE` | `4000` / `5000` | HTTP port and exposed port |
 | `HAS_PROXY` | `false` | Required for correct `req.ip` behind a proxy |
 | `CORS_ORIGINS` | empty | Production requires an explicit allowlist; wildcard + credentials rejected |
-| `CLUSTER` / `CLUSTER_WORKERS` | `false` / CPU count | Empty value is rejected; positive integer required |
+| `CLUSTER` / `CLUSTER_WORKERS` | `false` / CPU count | Empty or unset defaults to CPU count; positive integer otherwise |
 | `DB_*` | host/user/pass/name | Validated at boot; production requires TLS for remote endpoints |
-| `DB_POOL_MIN` / `MAX` | `2` / `10` per worker | Boot check compares total with `DB_MAX_CONNECTIONS_TOTAL` |
-| `DB_SSL` / `DB_SSL_REJECT_UNAUTHORIZED` | `false` / `true` when SSL enabled | CA/cert/key paths validated |
-| `REDIS_*` | optional | Without `REDIS_HOST`, app runs in database-only fallback mode |
+| `DB_POOL_MIN` / `MAX` | `2` / `10` per worker | Boot fails if total exceeds `DB_MAX_CONNECTIONS_TOTAL` |
+| `DB_SSL` / `DB_SSL_REJECT_UNAUTHORIZED` | `false` / `true` when SSL enabled | Production requires verification; CA/cert/key paths validated and cert/key must be paired |
+| `REDIS_*` | optional | Without `REDIS_HOST`, app runs in database-only fallback mode; TLS certificates are always verified |
 | `SENDGRID_API_KEY` | empty | Required when email features are enabled |
-| `JWT_SECRET` | required | Minimum length enforced; rotating it invalidates sessions |
+| `JWT_SECRET` | required | Minimum length and non-placeholder enforced; rotating it invalidates sessions |
 | `JWT_ACCESS_TOKEN_MINUTES` | `15` | Short-lived access token |
-| `BCRYPT_SECRET` | required | Server-side pepper |
+| `BCRYPT_SECRET` | required | Server-side pepper; non-placeholder enforced |
 | `BCRYPT_SALT_ROUND` | `12` | Validated integer |
-| `CRYPT0_SECRET` | required | 32 bytes; HKDF-derived AES-256-GCM cache key |
+| `CRYPT0_SECRET` | required | 32 bytes; HKDF-derived AES-256-GCM cache key; non-placeholder enforced |
 | `CRYPT0_CIPHER` | `aes-256-gcm` | Authenticated encryption |
-| `SEED_PASSWORD` | optional | Seed accounts use it or a generated random password |
+| `SEED_PASSWORD` | required for seeding | Never generated or logged; seeding is refused in production |
 
 ### 2.8 Testing and Deployment Assets
 
@@ -431,7 +431,7 @@ Layering:
 | `compose.yml` image name contained `mysql` | Renamed; PostgreSQL is the database |
 | README described a production build | Multi-stage production image and `dist` output |
 | Load-test thresholds described as results | Thresholds are targets; runs are recorded separately |
-| Cluster workers documented as CPU count | `CLUSTER_WORKERS` defaults to CPU count; empty is rejected |
+| Cluster workers documented as CPU count | `CLUSTER_WORKERS` defaults to CPU count; empty is normalized to the default |
 
 ---
 
@@ -631,7 +631,7 @@ Each finding was mapped to OWASP Top 10:2025, OWASP API Security Top 10:2023, an
 | S-20 | Medium | Supply-chain controls missing | CI audit/scan/SBOM; signing when deploying |
 | S-21 | Medium | Redis cache crypto expensive/weakly validated | HKDF + AES-256-GCM; 32-byte key |
 | S-22 | Medium | Route guards lacked uniqueness/index | Unique `(role_id, route)`; index |
-| S-23 | High in production | Seed accounts used a weak shared password | `SEED_PASSWORD` or random generated password |
+| S-23 | High in production | Seed accounts used a weak shared password | Explicit `SEED_PASSWORD`; never generated, logged, or used in production |
 | S-24 | Medium | Coarse role checks lacked object/field authorization | Ownership + field-level policy (F-27 partial) |
 | S-25 | Low/Medium | Password policy diverged from modern guidance | Partial: recommendation recorded; current policy is 8–32 with composition rules |
 | S-26 | Low | XSS sanitizer could mutate secrets | Passwords excluded from sanitization |
@@ -1094,10 +1094,10 @@ The ordering is deliberate: P0 repairs security/correctness invariants; P1 makes
 
 **Implementation.**
 - Joi schema for every variable: required strings, integer ranges, booleans as exact `"true"`/`"false"`, URLs, paths, secret lengths.
-- Production rules: non-placeholder secrets, explicit `CORS_ORIGINS`, TLS for remote DB/Redis, no empty/NaN `CLUSTER_WORKERS`, `SENDGRID_API_KEY` when email is enabled.
+- Production rules: non-placeholder secrets, explicit `CORS_ORIGINS`, TLS for remote DB/Redis, `DB_SSL_REJECT_UNAUTHORIZED=true`, readable TLS files, `SENDGRID_API_KEY` and `MAIL_FROM_ADDRESS` when email is enabled.
 - Remove or implement dead variables (`JWT_TFA`, `CRYPTO_IV`).
 - Parse once; export a typed, frozen object; reject `NaN` integers.
-- `CLUSTER_WORKERS` defaults to CPU count; empty rejected.
+- `CLUSTER_WORKERS` defaults to CPU count when empty or unset.
 - `.env.example` documents every variable; startup logs a redacted summary.
 
 **Tests.** Valid config accepted; missing/short secrets rejected; `NaN` workers rejected; production rejects wildcard CORS/missing TLS; boot fails clearly.
@@ -1589,7 +1589,7 @@ Follow Section 7.7. Minimum acceptance:
 ### 9.11 Test Data and Privacy
 
 - Generated synthetic data; never production PII.
-- Seed credentials from `SEED_PASSWORD` or generated; never a shared weak default.
+- Seed credentials from an explicit `SEED_PASSWORD`; never generated, logged, or used in production.
 - Mask emails/phones in logs and reports.
 - Isolated, destroyed test databases.
 - No `.env`, tokens, or provider keys in the repository.
@@ -2021,7 +2021,7 @@ Status values: **Done** (verified), **Partial** (incomplete/defective), **Missin
 | D1 | Migrations run successfully | Done | `npm run db:migrate` |
 | D2 | Migration rollback/compensating plan | Done | Every migration has `down`; runbook |
 | D3 | Seeds idempotent and safe to re-run | Done | Upserts; F-25 |
-| D4 | No weak/default production credentials | Done | `SEED_PASSWORD`/random; F-09 |
+| D4 | No weak/default production credentials | Done | Explicit `SEED_PASSWORD`; seeder refuses production; F-09 |
 | D5 | Unique/FK/check constraints enforced | Done | F-13 |
 | D6 | Transactions for multi-step writes | Done | F-15 |
 | D7 | DB errors mapped to stable codes | Done | F-15 |

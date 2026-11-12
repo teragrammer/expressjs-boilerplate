@@ -16,6 +16,9 @@ services:
       EMAIL_ENABLED: "false"
     ports:
       - "${PORT_EXPOSE}:${PORT}"
+    volumes:
+      # Runtime-only TLS material. Never bake keys into the image.
+      - ./.ssl:/app/.ssl:ro
     healthcheck:
       test:
         - CMD

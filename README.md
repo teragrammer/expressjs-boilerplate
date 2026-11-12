@@ -230,7 +230,7 @@ Verify MCP servers:
 opencode mcp list
 ```
 
-The Postgres MCP server reads `DB_*` values from `.env` (or `DATABASE_URL`). For self-signed PostgreSQL TLS it uses `sslmode=no-verify`; adjust `scripts/mcp/postgres.mjs` or set `DATABASE_URL` for stricter TLS.
+The Postgres MCP server reads `DB_*` values from `.env` (or `DATABASE_URL`). TLS connections use `sslmode=verify-full`; when `DB_SSL_CA` is set it is passed as `sslrootcert`. For a self-signed server, point `DB_SSL_CA` at the issuing CA (or use a `DATABASE_URL` that names a trusted CA). `sslmode=no-verify` is rejected by the helper.
 
 #### Troubleshooting
 

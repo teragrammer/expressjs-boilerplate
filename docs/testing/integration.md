@@ -47,8 +47,8 @@ Tests are grouped by module; `setup.ts` and `helpers.ts` stay at the integration
    npm run db:seed
    ```
    The seeder creates the `admin`, `manager`, and `customer` users and the canonical
-   route guards. It uses `SEED_PASSWORD` when set; otherwise it generates a random
-   password and logs it once.
+   route guards. `SEED_PASSWORD` must be set explicitly (at least 12 characters);
+   the seeder never generates or logs a password, and it refuses to run in production.
 4. Redis is optional. If `REDIS_HOST` is not set, the app runs in database-only
    fallback mode.
 
