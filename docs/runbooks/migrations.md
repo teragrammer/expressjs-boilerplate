@@ -90,7 +90,7 @@ SELECT name, executed_at FROM kysely_migration ORDER BY name;
 ## Emergency: a migration is stuck
 
 - Check for a blocked lock:
-  `SELECT * FROM pg_stat_activity WHERE state = 'wait_event_type = 'Lock'';`
+  `SELECT * FROM pg_stat_activity WHERE wait_event_type = 'Lock';`
 - The pool sets `lock_timeout` (5 s by default) and
   `statement_timeout` (15 s), so a stuck migration fails rather than
   holding a connection indefinitely.

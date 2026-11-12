@@ -1,10 +1,8 @@
 # Runbook: Backup and restore
 
-## Scope
+## Scope and responsibility
 
 How to protect the database and how to recover from data loss.
-
-## Scope and responsibility
 
 The database is the system of record. The application never stores a
 copy of the business data outside PostgreSQL (the Redis cache is a
