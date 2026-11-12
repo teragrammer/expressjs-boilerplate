@@ -1,6 +1,7 @@
 // __test__/modules/system/controllers/setting.controller.spec.ts
 
 import {beforeEach, describe, expect, it, vi,} from "vitest";
+import {createHash} from "node:crypto";
 import {NextFunction, Request, Response,} from "express";
 
 import {SettingController} from "./setting.controller";
@@ -152,6 +153,7 @@ describe("SettingController", () => {
             status: vi.fn().mockReturnThis(),
             json: vi.fn().mockReturnThis(),
             send: vi.fn().mockReturnThis(),
+            setHeader: vi.fn().mockReturnThis(),
         };
 
         next = vi.fn();
@@ -160,6 +162,8 @@ describe("SettingController", () => {
             params: {
                 id: "1",
             },
+
+            headers: {},
 
             sanitize: {
                 body: {
@@ -777,6 +781,36 @@ describe("SettingController", () => {
                 200,
                 initializerResult.pub,
             );
+
+            expect(res.setHeader).toHaveBeenCalledWith(
+                "Cache-Control",
+                "public, max-age=60, must-revalidate",
+            );
+
+            expect(res.setHeader).toHaveBeenCalledWith(
+                "ETag",
+                expect.stringMatching(/^"[a-f0-9]{32}"$/),
+            );
+        });
+
+        it("should return 304 when the client ETag matches", async () => {
+            mockGetCache.mockResolvedValue(initializerResult);
+
+            const etag = `"${createHash("sha256")
+                .update(JSON.stringify(initializerResult.pub))
+                .digest("hex")
+                .slice(0, 32)}"`;
+
+            req.headers = {"if-none-match": etag};
+
+            await invoke("values");
+
+            expect(res.status).toHaveBeenCalledTimes(1);
+            expect(res.status).toHaveBeenCalledWith(304);
+            expect(res.send).toHaveBeenCalledTimes(1);
+            expect(res.send).toHaveBeenCalledWith();
+            expect(res.json).not.toHaveBeenCalled();
+            expect(next).not.toHaveBeenCalled();
         });
 
         it("should forward service errors to the next middleware", async () => {

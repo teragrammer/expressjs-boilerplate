@@ -1,4 +1,5 @@
 // src/modules/system/settings/setting.controller.ts
+import {createHash} from "node:crypto";
 import {Request, Response} from "express";
 import {Messages} from "../../../common/utils/messages";
 import catchAsync from "../../../common/utils/catch-async";
@@ -97,7 +98,28 @@ export class SettingController {
     values = catchAsync(async (req: Request, res: Response): Promise<any> => {
         const settings = await this.settingService.getCache();
 
-        res.status(200).json(settings.pub);
+        /*
+         * The public settings change rarely and are polled by
+         * clients, so the response is cacheable and carries an ETag.
+         */
+        const payload = settings.pub;
+        const etag = `"${createHash("sha256")
+            .update(JSON.stringify(payload))
+            .digest("hex")
+            .slice(0, 32)}"`;
+
+        res.setHeader("ETag", etag);
+        res.setHeader(
+            "Cache-Control",
+            "public, max-age=60, must-revalidate",
+        );
+
+        if (req.headers["if-none-match"] === etag) {
+            res.status(304).send();
+            return;
+        }
+
+        res.status(200).json(payload);
     });
 
     view = catchAsync(async (req: Request, res: Response): Promise<void> => {
