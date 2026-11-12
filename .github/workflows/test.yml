@@ -41,6 +41,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: OpenAPI lint
+        run: npm run openapi:lint
+
       - name: Dependency audit (production)
         run: npm run audit:prod
 

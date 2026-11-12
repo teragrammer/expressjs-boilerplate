@@ -1,5 +1,7 @@
 .idea/
 .dist/
+dist/
+coverage/
 .ssl/
 node_modules/
 
