@@ -170,23 +170,36 @@ $ npm run start
 
 This repository is configured for [OpenCode](https://opencode.ai) as the primary coding agent.
 
+**Version-controlled configuration**
+
 - Project configuration: `opencode.json` (MCP servers, commands).
-- Project skills: `.agents/skills/` (OpenCode-compatible; `.opencode/` is gitignored).
 - Skills lock: `skills-lock.json` (reproducible skill installs).
 - MCP helper: `scripts/mcp/postgres.mjs`.
+- Local skill: `.agents/skills/auto-commit/SKILL.md` (not published in a skill repository).
+
+**Local-only files (gitignored)**
+
+- `.opencode/` — local OpenCode commands, skills, and state. Shared commands belong in `opencode.json`.
+- `.agents/skills/*` — skills materialized by the `skills` CLI. They are restored from `skills-lock.json`, so they are not committed. The local `auto-commit` skill is the exception and remains tracked.
 
 #### Install / Initialize
 
+From a fresh clone, install the OpenCode CLI from <https://opencode.ai> if you do not already have it, then run:
+
 ```sh
-npm install          # also runs "prepare" -> restores skills from skills-lock.json
-npm run setup        # manual skill restore
-npm run setup:check  # verify installed skills without changes
+cp .env.example .env
+npm install          # installs dependencies and restores skills from skills-lock.json
+npm run setup:check  # verify the installed skill set without changing it
+opencode mcp list    # verify the MCP servers
+opencode             # start OpenCode
 ```
 
-Manual skill install:
+`npm install` runs the `prepare` script, which executes `npm run setup` (`npx skills experimental_install`). To restore or repair the skill installation manually:
 
 ```sh
-npx skills experimental_install
+npm run setup        # restore skills from skills-lock.json
+npm run setup:check  # dry run; report missing or changed skills
+npx skills experimental_install  # equivalent direct CLI command
 ```
 
 #### Installed Skills
@@ -199,7 +212,7 @@ Skills are sourced from open-source repositories via the `skills` CLI:
 - `mattpocock/skills` — improve-codebase-architecture, domain-modeling, grill-with-docs, pr
 - `wshobson/agents` — postgresql-table-design, typescript-advanced-types
 - `github/awesome-copilot` — postgresql-code-review
-- Local — auto-commit
+- Local — auto-commit (checked in at `.agents/skills/auto-commit/SKILL.md`)
 
 #### MCP Servers
 
@@ -224,7 +237,7 @@ The Postgres MCP server reads `DB_*` values from `.env` (or `DATABASE_URL`). For
 - Missing skills: run `npm run setup`.
 - MCP server not connecting: ensure the package can be fetched (`npx -y ...`) and required env vars are set.
 - Postgres MCP: set `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASS`, `DB_NAME` (or `DATABASE_URL`).
-- `.opencode/` is gitignored; keep shared skills in `.agents/skills/` and config in `opencode.json`.
+- `.opencode/` and generated skills in `.agents/skills/` are gitignored. Keep shared commands and MCP servers in `opencode.json`, and restore generated skills from `skills-lock.json`. The local `auto-commit` skill is the exception and remains tracked.
 
 ### Operational Endpoints
 

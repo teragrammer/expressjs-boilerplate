@@ -12,3 +12,10 @@ tests/load/reports/
 
 # OpenCode local configuration and state
 .opencode/
+
+# Skills installed by the `skills` CLI (restored from skills-lock.json).
+# Keep the local auto-commit skill under version control.
+.agents/*
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/auto-commit/
