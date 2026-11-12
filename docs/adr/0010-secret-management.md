@@ -53,6 +53,6 @@ rotation story for the signing or encryption keys.
 
 ## Related
 
-- Section 6.8 of `docs/features.md` (configuration and transport
+- Section 6.8 of `docs/production-readiness-blueprint.md` (configuration and transport
   security).
-- F-09 and F-10 of `docs/features.md`.
+- F-09 and F-10 of `docs/production-readiness-blueprint.md`.

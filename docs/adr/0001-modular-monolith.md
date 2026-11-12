@@ -37,5 +37,5 @@ authentication service, an ORM or a DI framework.
 
 ## Related
 
-- Section 10.3 of `docs/features.md` (module boundaries).
+- Section 10.3 of `docs/production-readiness-blueprint.md` (module boundaries).
 - ADR-003 (authorization model).

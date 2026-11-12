@@ -49,5 +49,5 @@ restart silently disabled invalidation for the lifetime of the process.
 
 ## Related
 
-- Section 7.4 of `docs/features.md` (performance findings).
-- F-16 of `docs/features.md`.
+- Section 7.4 of `docs/production-readiness-blueprint.md` (performance findings).
+- F-16 of `docs/production-readiness-blueprint.md`.

@@ -49,5 +49,5 @@ responses leaked no structure to build on.
 
 ## Related
 
-- Section 6.7 of `docs/features.md` (error handling).
-- F-15 of `docs/features.md`.
+- Section 6.7 of `docs/production-readiness-blueprint.md` (error handling).
+- F-15 of `docs/production-readiness-blueprint.md`.

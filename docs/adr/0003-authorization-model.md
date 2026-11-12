@@ -54,5 +54,5 @@ seed data, so non-admin roles had no permissions by default.
 
 ## Related
 
-- Section 6.5 of `docs/features.md` (authorization deep dive).
-- F-13 and F-27 of `docs/features.md`.
+- Section 6.5 of `docs/production-readiness-blueprint.md` (authorization deep dive).
+- F-13 and F-27 of `docs/production-readiness-blueprint.md`.

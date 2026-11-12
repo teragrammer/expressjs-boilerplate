@@ -51,5 +51,5 @@ broke authorization.
 
 ## Related
 
-- Section 6.6 of `docs/features.md` (token and session deep dive).
-- F-03, F-04 and F-11 of `docs/features.md`.
+- Section 6.6 of `docs/production-readiness-blueprint.md` (token and session deep dive).
+- F-03, F-04 and F-11 of `docs/production-readiness-blueprint.md`.

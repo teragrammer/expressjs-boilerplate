@@ -57,6 +57,6 @@ with a failure. There were no metrics and no audit trail.
 
 ## Related
 
-- Section 6.10 of `docs/features.md` (logging, monitoring and audit).
-- Section 7.6 of `docs/features.md` (performance budgets).
-- F-17, F-18 and F-19 of `docs/features.md`.
+- Section 6.10 of `docs/production-readiness-blueprint.md` (logging, monitoring and audit).
+- Section 7.6 of `docs/production-readiness-blueprint.md` (performance budgets).
+- F-17, F-18 and F-19 of `docs/production-readiness-blueprint.md`.

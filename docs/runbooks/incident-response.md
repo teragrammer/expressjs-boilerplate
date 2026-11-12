@@ -69,7 +69,7 @@ What to do when the service misbehaves in production.
 ### The service is slow
 
 1. Compare `app_http_request_duration_seconds` with the budgets in
-   `docs/features.md` (Section 7.6).
+   `docs/production-readiness-blueprint.md` (Section 7.6).
 2. Login is bcrypt-dominated: 200–400 ms per attempt at cost 12.
    A rise in login latency usually means the CPU is saturated by
    bcrypt, not that the database is slow.

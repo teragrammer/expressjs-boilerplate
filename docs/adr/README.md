@@ -1,5 +1,8 @@
 # Architecture Decision Records
 
+Feature identifiers F-01 through F-30 and their original specifications
+are defined in [`docs/production-readiness-blueprint.md`](../production-readiness-blueprint.md)
+(Section 8).
 These ADRs record the decisions that shape the platform. Each one
 states the context, the decision, the alternatives that were considered
 and the consequences.

@@ -4,7 +4,7 @@
  *
  * Every test in this file corresponds to a defect that was fixed; it
  * exists to keep the defect from coming back. The defect identifiers
- * refer to the assessment in `docs/features.md`.
+ * refer to the assessment in `docs/production-readiness-blueprint.md`.
  */
 import {afterEach, beforeEach, describe, expect, it} from "vitest";
 import request from "supertest";
@@ -13,6 +13,7 @@ import app from "../../src/app";
 import {db} from "../../src/config/database";
 import {securityUtil, tokenService} from "../../src/config/container";
 import {AuthenticationTokenRepository} from "../../src/modules/auth/authentication/authentication-token.repository";
+import {UserRepository} from "../../src/modules/users/user.repository";
 import {rateLimitControl} from "../../src/common/middleware/rate-limiter.middleware";
 
 const randomUsername = () => securityUtil.randomString(10);
@@ -360,6 +361,60 @@ describe("P0 regression suite", () => {
                 .set("Authorization", `Bearer ${loginResponse.body.token}`);
 
             expect(response.status).toBe(401);
+        });
+
+        it("persists the authorization version from the repository", async () => {
+            const {user} = await createUser();
+            const managerRole = await getRole("manager");
+            const repository = new UserRepository(db);
+
+            const updated = await repository.update(user.id, {
+                role_id: managerRole.id,
+            });
+
+            expect(updated).not.toBeNull();
+            expect(updated!.role_id).toBe(managerRole.id);
+            expect(updated!.authorization_version).toBe(
+                user.authorization_version + 1,
+            );
+
+            const stored = await db
+                .selectFrom("users")
+                .select("authorization_version")
+                .where("id", "=", user.id)
+                .executeTakeFirstOrThrow();
+
+            expect(stored.authorization_version).toBe(
+                user.authorization_version + 1,
+            );
+        });
+
+        it("resets contact verification when the value changes", async () => {
+            const {user} = await createUser();
+            const repository = new UserRepository(db);
+
+            await db
+                .updateTable("users")
+                .set({
+                    is_email_verified: true,
+                    is_phone_verified: true,
+                })
+                .where("id", "=", user.id)
+                .execute();
+
+            await repository.update(user.id, {
+                email: `changed-${user.username}@example.com`,
+                phone: "+15550000001",
+            });
+
+            const stored = await db
+                .selectFrom("users")
+                .select(["is_email_verified", "is_phone_verified"])
+                .where("id", "=", user.id)
+                .executeTakeFirstOrThrow();
+
+            expect(stored.is_email_verified).toBe(false);
+            expect(stored.is_phone_verified).toBe(false);
         });
     });
 

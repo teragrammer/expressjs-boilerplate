@@ -58,5 +58,5 @@ replicas against the same schema change.
 
 ## Related
 
-- Section 10.9 of `docs/features.md` (deployment topology).
-- F-21, F-22 and F-23 of `docs/features.md`.
+- Section 10.9 of `docs/production-readiness-blueprint.md` (deployment topology).
+- F-21, F-22 and F-23 of `docs/production-readiness-blueprint.md`.
