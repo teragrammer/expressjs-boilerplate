@@ -81,7 +81,7 @@ Public endpoints:
 
 Protected endpoints:
 
-- `GET /api/v1/auth/logout`
+- `POST /api/v1/auth/logout`
 - `GET /api/v1/users`
 - `GET /api/v1/users/:id`
 - `GET /api/v1/settings`

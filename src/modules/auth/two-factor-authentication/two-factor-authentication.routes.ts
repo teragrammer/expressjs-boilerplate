@@ -4,6 +4,7 @@ import {Router} from "express";
 import {TwoFactorAuthenticationController} from "./two-factor-authentication.controller";
 import {
     disableTfaSchema,
+    recoveryCodeSchema,
     verifyOtpSchema,
 } from "./two-factor-authentication.schema";
 
@@ -35,16 +36,6 @@ export default () => {
         twoFactorAuthenticationController.send,
     );
 
-    /*
-     * Deprecated alias for the pre-1.0 `GET /auth/tfa/send`.
-     */
-    router.get(
-        "/tfa/send",
-        authRateLimiters.tfaSend,
-        AuthenticationMiddleware(),
-        twoFactorAuthenticationController.send,
-    );
-
     router.post(
         "/tfa/validate",
         [
@@ -57,6 +48,15 @@ export default () => {
 
     // TFA Enrollment - requires authentication and a valid OTP
     router.post(
+        "/tfa/enroll/send",
+        [
+            authRateLimiters.tfaSend,
+            AuthenticationMiddleware(),
+        ],
+        twoFactorAuthenticationController.enrollSend,
+    );
+
+    router.post(
         "/tfa/enroll",
         [
             authRateLimiters.tfaValidate,
@@ -64,6 +64,21 @@ export default () => {
             validate(verifyOtpSchema, ["code"]),
         ],
         twoFactorAuthenticationController.enroll,
+    );
+
+    /*
+     * Recovery-code redemption. The caller is authenticated but has
+     * not completed the second factor, so only this endpoint and the
+     * challenge endpoints accept the pending-TFA token.
+     */
+    router.post(
+        "/tfa/recovery",
+        [
+            authRateLimiters.tfaValidate,
+            AuthenticationMiddleware(),
+            validate(recoveryCodeSchema, ["code"]),
+        ],
+        twoFactorAuthenticationController.recovery,
     );
 
     // TFA Disable - requires authentication and password verification

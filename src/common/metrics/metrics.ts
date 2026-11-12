@@ -1,5 +1,5 @@
 // src/common/metrics/metrics.ts
-import client from "prom-client";
+import * as client from "@prometheus-io/client";
 import {__ENV} from "../../config/environment";
 
 /**

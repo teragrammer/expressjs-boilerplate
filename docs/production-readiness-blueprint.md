@@ -258,8 +258,8 @@ All paths are prefixed with `/api/v1`.
 | --- | --- | --- | --- | --- |
 | POST | `/auth/register` | Public | — | Creates a customer user and returns a JWT |
 | POST | `/auth/login` | Public | — | Returns a JWT; does not require TFA |
-| GET | `/auth/logout` | Bearer | — | Deletes the current session; state-changing GET |
-| GET | `/auth/tfa/send` | Bearer | — | Sends OTP; state-changing GET |
+| POST | `/auth/logout` | Bearer | — | Deletes the current session |
+| POST | `/auth/tfa/send` | Bearer | — | Sends OTP |
 | POST | `/auth/tfa/validate` | Bearer | — | Verifies OTP; returns a new JWT with `tfa: true` |
 | POST | `/auth/password-recovery/send` | Public | — | Sends recovery code; leaks existence via response shape |
 | POST | `/auth/password-recovery/validate` | Public | — | Resets password; does not revoke sessions |
@@ -852,7 +852,7 @@ No dynamic application security testing (DAST), penetration test, dependency aud
 | S-14 | **Medium** | PII/secrets may be logged | A09 / API8 / V16 | `logger.error("Unhandled...", err)` logs full error; no redaction | Structured logs with redaction paths; never log tokens/passwords/codes/SQL params | P1 |
 | S-15 | **Medium** | No audit trail for security/admin events | A09 / API8 / V16 | No audit table/events | Append-only audit log: login, logout, failed login, password reset, role/status change, user/role/setting deletion | P1 |
 | S-16 | **Medium** | Email/phone verification is not implemented | A07 / API2 / V6 | `is_email_verified`/`is_phone_verified` exist but are never set by a verification flow | Verification tokens, expiry, resend limits, verify endpoints, reset flags on change | P1 |
-| S-17 | **Medium** | State-changing operations use GET | A02 / API8 / V4, V13 | `GET /auth/logout`, `GET /auth/tfa/send` | Use POST; if cookies are introduced, add CSRF protection | P1 |
+| S-17 | **Medium** | State-changing operations use GET | A02 / API8 / V4, V13 | Resolved: GET aliases removed | Use POST; if cookies are introduced, add CSRF protection | P1 |
 | S-18 | **Medium** | Hard delete and no retention policy | A01, A09 / API5 / V8, V14 | `hardDelete` for users/settings/roles/route guards; `softDelete` unused | Soft delete users by default; retention/erasure policy; audit; restrict destructive admin actions | P1 |
 | S-19 | **Medium** | Database errors become generic 500s | A10 / API8 / V16 | No mapping for `23505`, `23503`, `23502`, `40001`, `40P01` | Typed error mapping; return 409/400/503; keep internal details out of responses | P1 |
 | S-20 | **Medium** | Supply chain controls are missing | A03, A08 / API8, API10 / V13, V15 | CI uses action tags, no audit/CodeQL/image scan/SBOM | `npm audit`, CodeQL, dependency review, pinned action SHAs, image digest, Trivy, SBOM, signing | P1 |
@@ -1769,7 +1769,7 @@ The ordering is deliberate. P0 features repair security and correctness invarian
 3. Keep Helmet, add HSTS in production, and set a Content Security Policy appropriate to any HTML surface (API JSON may use a restrictive default).
 4. Set explicit JSON/urlencoded body limits and reject unsupported content types where appropriate.
 5. Set `trust proxy` only when `HAS_PROXY=true` and document the expected proxy topology.
-6. Change `GET /auth/logout` and `GET /auth/tfa/send` to POST; keep backward-compatible aliases only if a deprecation window is required.
+6. `GET /auth/logout` and `GET /auth/tfa/send` are removed; only POST is supported.
 7. Add `server.headersTimeout`, `requestTimeout`, and `keepAliveTimeout` appropriate to the deployment.
 
 **Security considerations.** CORS is not authentication; do not rely on it to protect data. If cookies are introduced, add CSRF protection (SameSite + token). HSTS requires HTTPS everywhere, including subdomains if `includeSubDomains`. Validate `Origin` for state-changing requests when credentials are used.
@@ -3258,7 +3258,7 @@ This checklist is intentionally conservative. A checked box requires evidence, n
 | S22 | Least-privilege DB roles (runtime vs. migration) | Missing | Platform task; the runtime role is not separated yet |
 | S23 | Security headers/HSTS/CSP configured for deployment | Done | Helmet with a restrictive CSP; F-10 |
 | S24 | Body limits and proxy trust configured | Done | Explicit body limits and `trust proxy` toggle; F-10 |
-| S25 | State-changing operations use POST | Done | POST is primary; the GET aliases are deprecated; F-10 |
+| S25 | State-changing operations use POST | Done | GET aliases removed; only POST is supported; F-10 |
 | S26 | Audit log covers auth/admin events | Done | `audit_logs` with a read API; F-19 |
 | S27 | Logs redact secrets/PII | Done | Pino redaction of secrets, tokens and codes; F-17 |
 | S28 | Penetration test completed | Not verified | Schedule before launch |
@@ -3332,7 +3332,7 @@ This checklist is intentionally conservative. A checked box requires evidence, n
 | P8 | API versioning/deprecation policy | Partial | `/v1` only |
 | P9 | Health/readiness endpoints | Done | `/health/live` and `/health/ready`; F-18 |
 | P10 | Graceful shutdown | Done | The workers drain and the primary forwards the signals; F-18 |
-| P11 | State-changing GETs removed | Done | POST is primary; the GET aliases are deprecated; F-10 |
+| P11 | State-changing GETs removed | Done | GET aliases removed; only POST is supported; F-10 |
 | P12 | CORS behavior documented | Done | The allowlist and the error envelope are documented; F-24 |
 | P13 | Rate-limit headers documented | Done | The rate-limit headers are documented; F-24/F-06 |
 | P14 | No stack traces/schema leakage in errors | Done | Structured, redacted logs; the response carries no internals; F-17 |

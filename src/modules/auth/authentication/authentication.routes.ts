@@ -78,19 +78,6 @@ export default () => {
         authenticationController.logout,
     );
 
-    /*
-     * Deprecated alias for the pre-1.0 `GET /auth/logout`.
-     *
-     * State-changing operations must use POST; the alias exists only
-     * for a deprecation window and is documented as such.
-     */
-    router.get(
-        "/logout",
-        authRateLimiters.logout,
-        AuthenticationMiddleware(),
-        authenticationController.logout,
-    );
-
     router.post(
         "/logout-all",
         AuthenticationMiddleware(),

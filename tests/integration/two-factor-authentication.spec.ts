@@ -235,7 +235,7 @@ describe("Two-factor authentication", () => {
         }
     });
 
-    describe("GET /api/v1/auth/tfa/send", () => {
+    describe("POST /api/v1/auth/tfa/send", () => {
         it("should send an OTP to the authenticated user's email", async () => {
             const {
                 user,
@@ -268,7 +268,7 @@ describe("Two-factor authentication", () => {
                 .mockResolvedValue([] as any);
 
             const response = await request(app)
-                .get("/api/v1/auth/tfa/send")
+                .post("/api/v1/auth/tfa/send")
                 .set(
                     "Authorization",
                     `Bearer ${token}`,
@@ -397,6 +397,8 @@ describe("Two-factor authentication", () => {
 
             expect(response.body).toEqual({
                 token: expect.any(String),
+                access_token: expect.any(String),
+                expires_at: expect.any(String),
             });
 
             const verifiedToken =

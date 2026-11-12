@@ -226,19 +226,6 @@ paths:
           description: The session was revoked
         "401":
           $ref: "#/components/responses/Unauthorized"
-    get:
-      tags: [Auth]
-      summary: Revoke the current session (deprecated)
-      deprecated: true
-      description: |
-        Deprecated alias for `POST /auth/logout`. State-changing
-        operations must use POST; this alias exists only for a
-        deprecation window.
-      responses:
-        "204":
-          description: The session was revoked
-        "401":
-          $ref: "#/components/responses/Unauthorized"
 
   /auth/logout-all:
     post:
@@ -360,20 +347,6 @@ paths:
                     type: integer
                   next_try:
                     type: string
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "429":
-          $ref: "#/components/responses/RateLimited"
-    get:
-      tags: [Auth]
-      summary: Send a one-time password (deprecated)
-      deprecated: true
-      description: |
-        Deprecated alias for `POST /auth/tfa/send`. Sending an OTP is a
-        state-changing operation and must use POST.
-      responses:
-        "200":
-          description: The code was sent
         "401":
           $ref: "#/components/responses/Unauthorized"
         "429":
