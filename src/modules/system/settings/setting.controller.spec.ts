@@ -1,4 +1,4 @@
-// __test__/modules/system/controllers/setting.controller.spec.ts
+// src/modules/system/settings/setting.controller.spec.ts
 
 import {beforeEach, describe, expect, it, vi,} from "vitest";
 import {createHash} from "node:crypto";

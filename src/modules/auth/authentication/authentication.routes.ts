@@ -3,9 +3,6 @@ import {Router} from "express";
 
 import {loginSchema} from "./login.schema";
 import {registerSchema} from "./register.schema";
-import {AuthenticationController} from "./authentication.controller";
-import {AuthenticationRefreshController} from "./authentication-refresh.controller";
-import {RegisterController} from "./register.controller";
 
 import {AuthenticationMiddleware} from "../../../common/middleware/authentication.middleware";
 import {validate} from "../../../common/middleware/validate.middleware";
@@ -13,24 +10,10 @@ import {authRateLimiters} from "../../../common/middleware/rate-limiter.middlewa
 import {idempotency} from "../../../common/middleware/idempotency.middleware";
 
 import {
-    authService,
-    sessionService,
-    refreshTokenRepository,
-    auditService,
+    authenticationController,
+    authenticationRefreshController,
+    registerController,
 } from "../../../config/container";
-
-const authenticationController = new AuthenticationController(
-    authService,
-    sessionService,
-    refreshTokenRepository,
-    auditService,
-);
-
-const authenticationRefreshController =
-    new AuthenticationRefreshController(sessionService, auditService);
-
-const registerController =
-    new RegisterController(authService, auditService);
 
 export default () => {
     const router = Router();

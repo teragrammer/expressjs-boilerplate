@@ -1,20 +1,20 @@
 // src/modules/users/user.service.ts
-import {UserRepository} from "../user.repository";
-import {BrowseUsersQuery, BrowseUsersResult, CreateUserDTO, UpdateUserDTO, User} from "../user.interface";
-import {AppError} from "../../../common/utils/errors";
-import Messages from "../../../common/utils/messages";
-import {SecurityUtil} from "../../../common/utils/security.util";
+import {UserRepository} from "./user.repository";
+import {BrowseUsersQuery, BrowseUsersResult, CreateUserDTO, UpdateUserDTO, User} from "./user.interface";
+import {AppError} from "../../common/utils/errors";
+import Messages from "../../common/utils/messages";
+import {SecurityUtil} from "../../common/utils/security.util";
 import {
     type DatabaseExecutor,
     withTransaction,
-} from "../../../config/database";
+} from "../../config/database";
 import type {Transaction} from "kysely";
-import type {Database} from "../../../config/schema";
+import type {Database} from "../../config/schema";
 import {
     Actor,
     assertCanChangePrivilegedFields,
-} from "../../../common/authz/policy";
-import {AuthenticationTokenRepository} from "../../auth/authentication/authentication-token.repository";
+} from "../../common/authz/policy";
+import {AuthenticationTokenRepository} from "../auth/authentication/authentication-token.repository";
 
 /**
  * Runs a callback inside a database transaction.

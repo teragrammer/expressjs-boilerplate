@@ -1,21 +1,21 @@
 import {beforeEach, describe, expect, it, vi} from "vitest";
 
 import {AccountService} from "./account.service";
-import {UserRepository} from "../user.repository";
-import {SecurityUtil} from "../../../common/utils/security.util";
-import {AuthenticationTokenRepository} from "../../auth/authentication/authentication-token.repository";
-import {RoleService} from "../../system/roles/role.service";
-import {DateUtil} from "../../../common/utils/date.util";
+import {UserRepository} from "./user.repository";
+import {SecurityUtil} from "../../common/utils/security.util";
+import {AuthenticationTokenRepository} from "../auth/authentication/authentication-token.repository";
+import {RoleService} from "../system/roles/role.service";
+import {DateUtil} from "../../common/utils/date.util";
 import {
     SecurityAccountDTO,
     UpdateUserDTO,
     User,
-} from "../user.interface";
-import {AuthenticationToken} from "../../auth/authentication/authentication.interface";
-import Messages from "../../../common/utils/messages";
-import {SessionService} from "../../auth/authentication/session.service";
-import {VerificationService} from "../../auth/verification/verification.service";
-import {PasswordRecoveryRepository} from "../../auth/password-recovery/password-recovery.repository";
+} from "./user.interface";
+import {AuthenticationToken} from "../auth/authentication/authentication.interface";
+import Messages from "../../common/utils/messages";
+import {SessionService} from "../auth/authentication/session.service";
+import {VerificationService} from "../auth/verification/verification.service";
+import {PasswordRecoveryRepository} from "../auth/password-recovery/password-recovery.repository";
 
 describe("AccountService", () => {
     let service: AccountService;

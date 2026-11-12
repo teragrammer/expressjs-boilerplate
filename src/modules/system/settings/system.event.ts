@@ -1,4 +1,4 @@
-// src/modules/system/events/system.event.ts
+// src/modules/system/settings/system.event.ts
 
 import {logger} from "../../../config/logger";
 import {RedisCache} from "../../../shared/redis/redis-cache";

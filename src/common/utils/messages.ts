@@ -1,4 +1,4 @@
-// src/utils/messages.ts
+// src/common/utils/messages.ts
 export const Messages = {
     VALIDATION_FAILED: {
         code: "VALIDATION_FAILED",

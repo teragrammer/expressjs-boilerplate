@@ -16,7 +16,7 @@ import {
 } from "./common/middleware/request-context.middleware";
 import {metricsMiddleware} from "./common/middleware/metrics.middleware";
 
-import {configureMiddleware} from "./config/http";
+import {configureMiddleware} from "./config/express";
 import {bootstrap} from "./bootstrap";
 
 const app = express();

@@ -1,14 +1,14 @@
-// src/modules/users/services/user-purge.service.ts
+// src/modules/users/user-purge.service.ts
 import {Request} from "express";
-import {UserRepository} from "../user.repository";
-import {AuthenticationTokenRepository} from "../../auth/authentication/authentication-token.repository";
-import {AuditService} from "../../audit/audit.service";
-import {AUDIT_ACTIONS} from "../../audit/audit.interface";
-import {AppError} from "../../../common/utils/errors";
-import Messages from "../../../common/utils/messages";
-import {Actor} from "../../../common/authz/policy";
-import {type TransactionRunner} from "../services/user.service";
-import {withTransaction} from "../../../config/database";
+import {UserRepository} from "./user.repository";
+import {AuthenticationTokenRepository} from "../auth/authentication/authentication-token.repository";
+import {AuditService} from "../audit/audit.service";
+import {AUDIT_ACTIONS} from "../audit/audit.interface";
+import {AppError} from "../../common/utils/errors";
+import Messages from "../../common/utils/messages";
+import {Actor} from "../../common/authz/policy";
+import {type TransactionRunner} from "./user.service";
+import {withTransaction} from "../../config/database";
 
 /**
  * Roles allowed to permanently remove a user.

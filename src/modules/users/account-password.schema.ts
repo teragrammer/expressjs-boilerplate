@@ -1,6 +1,6 @@
-// src/modules/users/validations/account-information.schema.ts
-import Joi from '../../../shared/validations/joi';
-import {validateCompositeUnique} from "../../../shared/validations/database/unique";
+// src/modules/users/account-password.schema.ts
+import Joi from '../../shared/validations/joi';
+import {validateCompositeUnique} from "../../shared/validations/database/unique";
 
 export const accountPasswordSchema = (userId: string | number) => Joi.object({
     current_password: Joi.string().required(),

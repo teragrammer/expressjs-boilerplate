@@ -1,4 +1,4 @@
-// src/config/http.ts
+// src/config/express.ts
 import express, {Request, Response,} from "express";
 import cors from "cors";
 import helmet from "helmet";

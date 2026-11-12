@@ -1,20 +1,13 @@
 // src/modules/auth/password-recovery/password-recovery.routes.ts
 import {Router} from "express";
 
-import {PasswordRecoveryController} from "./password-recovery.controller";
-
 import {validate} from "../../../common/middleware/validate.middleware";
 import {authRateLimiters} from "../../../common/middleware/rate-limiter.middleware";
 
-import {passwordRecoveryService} from "../../../config/container";
+import {passwordRecoveryController} from "../../../config/container";
 
 import {passwordRecoverySendSchema} from "./password-recovery-send.schema";
 import {passwordRecoveryValidateSchema} from "./password-recovery-validate.schema";
-
-const passwordRecoveryController =
-    new PasswordRecoveryController(
-        passwordRecoveryService,
-    );
 
 export default () => {
     const router = Router();

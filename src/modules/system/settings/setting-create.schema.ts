@@ -1,7 +1,7 @@
-// src/modules/system/validations/setting-create.schema.ts
+// src/modules/system/settings/setting-create.schema.ts
 import Joi from '../../../shared/validations/joi';
 import {validateCompositeUnique} from "../../../shared/validations/database/unique";
-import {DATA_TYPES} from "./setting.model";
+import {DATA_TYPES} from "./setting.interface";
 
 export const settingCreateSchema = Joi.object({
     name: Joi.string().min(1).max(50).required(),

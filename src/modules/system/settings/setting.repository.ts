@@ -8,6 +8,7 @@ import {
     Setting,
     UpdateSettingDTO,
 } from "./setting.interface";
+import {escapeLikePattern} from "../../../common/utils/sql-like";
 
 export const SETTING_TABLE = "settings";
 
@@ -25,14 +26,6 @@ const SETTING_COLUMNS = [
 ] as const;
 
 type SettingTableRow = Selectable<Database["settings"]>;
-
-/**
- * Escapes PostgreSQL LIKE wildcards so free-text search can never
- * change the meaning of the pattern.
- */
-function escapeLikePattern(value: string): string {
-    return value.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
-}
 
 export class SettingRepository {
     private readonly db: DatabaseExecutor;

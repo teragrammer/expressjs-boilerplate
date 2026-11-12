@@ -2,7 +2,7 @@
 import {NextFunction, Request, Response} from "express";
 import {AppError} from "../utils/errors";
 import Messages from "../utils/messages";
-import {RateLimiter} from "./rate-limiter";
+import {RateLimiter} from "./rate-limiter.service";
 import {logger} from "../../config/logger";
 import {createHash} from "node:crypto";
 import {rateLimitRejectionsTotal} from "../metrics/metrics";

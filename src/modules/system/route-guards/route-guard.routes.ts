@@ -1,13 +1,10 @@
-// src/modules/system/roles/role.routes.ts
+// src/modules/system/route-guards/route-guard.routes.ts
 import {Router} from "express";
 import {AuthenticationMiddleware} from "../../../common/middleware/authentication.middleware";
 import {AuthorizationMiddleware} from "../../../common/middleware/authorization.middleware";
 import {validate} from "../../../common/middleware/validate.middleware";
-import {RouteGuardController} from "./route-guard.controller";
 import {routeGuardCreateSchema} from "./route-guard-create.schema";
-import {routeGuardService} from "../../../config/container";
-
-const roleController = new RouteGuardController(routeGuardService);
+import {routeGuardController} from "../../../config/container";
 
 export default () => {
     const router = Router();
@@ -18,13 +15,13 @@ export default () => {
         validate(routeGuardCreateSchema, [
             "role_id", "route"
         ])
-    ], roleController.create);
+    ], routeGuardController.create);
 
-    router.get("/", [AuthenticationMiddleware(), AuthorizationMiddleware("route-guards:browse")], roleController.browse);
+    router.get("/", [AuthenticationMiddleware(), AuthorizationMiddleware("route-guards:browse")], routeGuardController.browse);
 
-    router.get("/:id", [AuthenticationMiddleware(), AuthorizationMiddleware("route-guards:view")], roleController.view);
+    router.get("/:id", [AuthenticationMiddleware(), AuthorizationMiddleware("route-guards:view")], routeGuardController.view);
 
-    router.delete("/:id", [AuthenticationMiddleware(), AuthorizationMiddleware("route-guards:delete")], roleController.delete);
+    router.delete("/:id", [AuthenticationMiddleware(), AuthorizationMiddleware("route-guards:delete")], routeGuardController.delete);
 
     return router;
-}
+};

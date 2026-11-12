@@ -1,21 +1,21 @@
-// src/modules/users/services/account.service.ts
-import {SecurityAccountDTO, UpdateUserDTO, User} from "../user.interface";
-import {UserRepository} from "../user.repository";
-import {AppError} from "../../../common/utils/errors";
-import Messages from "../../../common/utils/messages";
-import {SecurityUtil} from "../../../common/utils/security.util";
-import {AuthenticationTokenRepository} from "../../auth/authentication/authentication-token.repository";
-import {RoleService} from "../../system/roles/role.service";
-import {DateUtil} from "../../../common/utils/date.util";
+// src/modules/users/account.service.ts
+import {SecurityAccountDTO, UpdateUserDTO, User} from "./user.interface";
+import {UserRepository} from "./user.repository";
+import {AppError} from "../../common/utils/errors";
+import Messages from "../../common/utils/messages";
+import {SecurityUtil} from "../../common/utils/security.util";
+import {AuthenticationTokenRepository} from "../auth/authentication/authentication-token.repository";
+import {RoleService} from "../system/roles/role.service";
+import {DateUtil} from "../../common/utils/date.util";
 import {
     IssuedTokens,
     SessionService,
-} from "../../auth/authentication/session.service";
-import {VerificationService} from "../../auth/verification/verification.service";
-import {PasswordRecoveryRepository} from "../../auth/password-recovery/password-recovery.repository";
-import {__ENV} from "../../../config/environment";
+} from "../auth/authentication/session.service";
+import {VerificationService} from "../auth/verification/verification.service";
+import {PasswordRecoveryRepository} from "../auth/password-recovery/password-recovery.repository";
+import {__ENV} from "../../config/environment";
 import {type TransactionRunner} from "./user.service";
-import {withTransaction} from "../../../config/database";
+import {withTransaction} from "../../config/database";
 
 export class AccountService {
     constructor(

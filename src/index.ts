@@ -1,4 +1,4 @@
-// src/server.ts
+// src/index.ts
 import os from "node:os";
 import cluster from "node:cluster";
 

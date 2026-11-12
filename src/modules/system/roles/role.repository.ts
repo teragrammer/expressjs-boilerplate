@@ -8,6 +8,7 @@ import {
     Role,
     UpdateRoleDTO,
 } from "./role.interface";
+import {escapeLikePattern} from "../../../common/utils/sql-like";
 
 export const ROLE_TABLE = "roles";
 
@@ -23,14 +24,6 @@ const ROLE_COLUMNS = [
 ] as const;
 
 type RoleTableRow = Selectable<Database["roles"]>;
-
-/**
- * Escapes PostgreSQL LIKE wildcards so free-text search can never
- * change the meaning of the pattern.
- */
-function escapeLikePattern(value: string): string {
-    return value.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
-}
 
 export class RoleRepository {
     private readonly db: DatabaseExecutor;

@@ -1,4 +1,4 @@
-// src/common/middleware/rate-limiter.ts
+// src/common/middleware/rate-limiter.service.ts
 import {sql} from "kysely";
 import {db as defaultDb, type DatabaseExecutor} from "../../config/database";
 import {logger} from "../../config/logger";

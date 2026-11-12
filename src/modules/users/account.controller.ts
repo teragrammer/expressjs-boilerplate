@@ -1,12 +1,12 @@
-// src/modules/users/controllers/account.controller.ts
+// src/modules/users/account.controller.ts
 import {Request, Response} from "express";
-import catchAsync from "../../../common/utils/catch-async";
-import {SecurityAccountDTO, UpdateUserDTO} from "../user.interface";
-import {AccountService} from "../services/account.service";
-import {assertCredentials} from "../../../common/utils/request-credentials";
-import {setRefreshTokenCookie} from "../../../common/utils/refresh-token-cookie";
-import {__ENV} from "../../../config/environment";
-import {IssuedTokens} from "../../auth/authentication/session.service";
+import catchAsync from "../../common/utils/catch-async";
+import {SecurityAccountDTO, UpdateUserDTO} from "./user.interface";
+import {AccountService} from "./account.service";
+import {assertCredentials} from "../../common/utils/request-credentials";
+import {setRefreshTokenCookie} from "../../common/utils/refresh-token-cookie";
+import {__ENV} from "../../config/environment";
+import {IssuedTokens} from "../auth/authentication/session.service";
 
 const REFRESH_COOKIE_MAX_AGE_MS =
     Number(__ENV.JWT_REFRESH_TOKEN_DAYS || 7) * 24 * 60 * 60 * 1000;

@@ -3,6 +3,7 @@ import {sql, type Selectable, type Transaction} from "kysely";
 import {db as defaultDb, type DatabaseExecutor} from "../../config/database";
 import type {Database} from "../../config/schema";
 import {BrowseUsersQuery, BrowseUsersResult, CreateUserDTO, Status, UpdateUserDTO, User, UserRow,} from "./user.interface";
+import {escapeLikePattern} from "../../common/utils/sql-like";
 
 export const USER_TABLE = "users";
 
@@ -26,14 +27,6 @@ const USER_PUBLIC_COLUMNS = [
     "updated_at",
     "authorization_version",
 ] as const;
-
-/**
- * Escapes PostgreSQL LIKE wildcards so free-text search can never
- * change the meaning of the pattern.
- */
-function escapeLikePattern(value: string): string {
-    return value.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
-}
 
 type UserTableRow = Selectable<Database["users"]>;
 

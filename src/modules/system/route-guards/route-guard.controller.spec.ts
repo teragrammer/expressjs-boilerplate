@@ -1,4 +1,4 @@
-// __test__/modules/system/controllers/route-guard.controller.spec.ts
+// src/modules/system/route-guards/route-guard.controller.spec.ts
 import {beforeEach, describe, expect, it, vi,} from "vitest";
 import {NextFunction, Request, Response,} from "express";
 

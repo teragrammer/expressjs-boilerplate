@@ -4,33 +4,9 @@ import {AuthenticationMiddleware} from "../../common/middleware/authentication.m
 import {AuthorizationMiddleware} from "../../common/middleware/authorization.middleware";
 import {validate} from "../../common/middleware/validate.middleware";
 import {privilegedFieldsMiddleware} from "../../common/middleware/privileged-fields.middleware";
-import {userCreateSchema} from "./validations/user-create.schema";
-import {userUpdateSchema} from "./validations/user-update.schema";
-import {UserController} from "./controllers/user.controller";
-import {UserService} from "./services/user.service";
-import {UserPurgeService} from "./services/user-purge.service";
-import {UserRepository} from "./user.repository";
-import {AuthenticationTokenRepository} from "../auth/authentication/authentication-token.repository";
-import {SecurityUtil} from "../../common/utils/security.util";
-import {__ENV} from "../../config/environment";
-import {auditService} from "../../config/container";
-
-const userController = new UserController(
-    new UserService(
-        new UserRepository(),
-        new SecurityUtil({
-            bcryptSecret: __ENV.BCRYPT_SECRET,
-            bcryptSaltRounds: Number(__ENV.BCRYPT_SALT_ROUND || 10),
-        }),
-        new AuthenticationTokenRepository(),
-    ),
-    new UserPurgeService(
-        new UserRepository(),
-        new AuthenticationTokenRepository(),
-        auditService,
-    ),
-    auditService,
-);
+import {userCreateSchema} from "./user-create.schema";
+import {userUpdateSchema} from "./user-update.schema";
+import {userController} from "../../config/container";
 
 export default () => {
     const router = Router();
@@ -80,4 +56,4 @@ export default () => {
     ], userController.purge);
 
     return router;
-}
+};

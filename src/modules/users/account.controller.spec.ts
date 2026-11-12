@@ -2,15 +2,15 @@ import {beforeEach, describe, expect, it, vi} from "vitest";
 import {NextFunction, Request, Response} from "express";
 
 import {AccountController} from "./account.controller";
-import {AccountService} from "../services/account.service";
-import {User} from "../user.interface";
+import {AccountService} from "./account.service";
+import {User} from "./user.interface";
 
 const {mockInformation, mockPassword} = vi.hoisted(() => ({
     mockInformation: vi.fn(),
     mockPassword: vi.fn(),
 }));
 
-vi.mock("../../../../src/common/utils/catch-async", () => ({
+vi.mock("../../../src/common/utils/catch-async", () => ({
     default: (fn: any) => (req: any, res: any, next: any) =>
         Promise.resolve(fn(req, res, next)).catch(next),
 }));

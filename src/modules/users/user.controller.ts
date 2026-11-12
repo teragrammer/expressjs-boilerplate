@@ -1,15 +1,14 @@
-// src/modules/users/controllers/user.controller.ts
-// src/modules/users/controllers/user.controller.ts
+// src/modules/users/user.controller.ts
 import {Request, Response} from "express";
-import catchAsync from "../../../common/utils/catch-async";
-import {UserService} from "../services/user.service";
-import {UserPurgeService} from "../services/user-purge.service";
-import {BrowseUsersResult, CreateUserDTO, UpdateUserDTO, User} from "../user.interface";
-import {AppError} from "../../../common/utils/errors";
-import Messages from "../../../common/utils/messages";
-import {resolveActor} from "../../../common/utils/actor";
-import {AuditService} from "../../audit/audit.service";
-import {AUDIT_ACTIONS} from "../../audit/audit.interface";
+import catchAsync from "../../common/utils/catch-async";
+import {UserService} from "./user.service";
+import {UserPurgeService} from "./user-purge.service";
+import {BrowseUsersResult, CreateUserDTO, UpdateUserDTO, User} from "./user.interface";
+import {AppError} from "../../common/utils/errors";
+import Messages from "../../common/utils/messages";
+import {resolveActor} from "../../common/utils/actor";
+import {AuditService} from "../audit/audit.service";
+import {AUDIT_ACTIONS} from "../audit/audit.interface";
 
 export class UserController {
     constructor(

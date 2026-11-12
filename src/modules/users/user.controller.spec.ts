@@ -1,12 +1,12 @@
-// __test__/modules/users/controllers/user.controller.spec.ts
+// src/modules/users/user.controller.spec.ts
 import {beforeEach, describe, expect, it, vi} from "vitest";
 import {NextFunction, Request, Response} from "express";
 
 import {UserController} from "./user.controller";
-import {UserService} from "../services/user.service";
-import {UserPurgeService} from "../services/user-purge.service";
-import {AuditService} from "../../audit/audit.service";
-import {BrowseUsersResult, CreateUserDTO, UpdateUserDTO, User,} from "../user.interface";
+import {UserService} from "./user.service";
+import {UserPurgeService} from "./user-purge.service";
+import {AuditService} from "../audit/audit.service";
+import {BrowseUsersResult, CreateUserDTO, UpdateUserDTO, User,} from "./user.interface";
 
 const {
     mockCreateUser,
@@ -28,7 +28,7 @@ const {
     mockAuditFailure: vi.fn(),
 }));
 
-vi.mock("../../../../src/common/utils/catch-async", () => ({
+vi.mock("../../../src/common/utils/catch-async", () => ({
     default: (fn: any) => (req: any, res: any, next: any) =>
         Promise.resolve(fn(req, res, next)).catch(next),
 }));

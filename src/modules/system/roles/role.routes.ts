@@ -5,15 +5,7 @@ import {AuthorizationMiddleware} from "../../../common/middleware/authorization.
 import {validate} from "../../../common/middleware/validate.middleware";
 import {roleCreateSchema} from "./role-create.schema";
 import {roleUpdateSchema} from "./role-update.schema";
-import {RoleController} from "./role.controller";
-import {RoleService} from "./role.service";
-import {RoleRepository} from "./role.repository";
-import {auditService} from "../../../config/container";
-
-const roleController = new RoleController(
-    new RoleService(new RoleRepository()),
-    auditService,
-);
+import {roleController} from "../../../config/container";
 
 export default () => {
     const router = Router();
@@ -41,4 +33,4 @@ export default () => {
     router.delete("/:id", [AuthenticationMiddleware(), AuthorizationMiddleware("roles:delete")], roleController.delete);
 
     return router;
-}
+};

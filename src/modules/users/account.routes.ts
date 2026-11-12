@@ -4,13 +4,10 @@ import {AuthenticationMiddleware} from "../../common/middleware/authentication.m
 import {idempotency} from "../../common/middleware/idempotency.middleware";
 import {TwoFactorAuthenticationMiddleware} from "../../common/middleware/two-factor-authentication.middleware";
 import {validate} from "../../common/middleware/validate.middleware";
-import {accountInformationSchema} from "./validations/account-information.schema";
-import {AccountController} from "./controllers/account.controller";
-import {accountPasswordSchema} from "./validations/account-password.schema";
-import {accountService} from "../../config/container";
+import {accountInformationSchema} from "./account-information.schema";
+import {accountPasswordSchema} from "./account-password.schema";
+import {accountController} from "../../config/container";
 import verificationRoutes from "../auth/verification/verification.routes";
-
-const accountController = new AccountController(accountService);
 
 export default () => {
     const router = Router();
@@ -39,4 +36,4 @@ export default () => {
     ], accountController.password);
 
     return router;
-}
+};

@@ -1,25 +1,26 @@
-// src/modules/users/validations/user-create.schema.ts
-import Joi from '../../../shared/validations/joi';
-import {validateUnique, validateExists} from "../../../shared/validations";
-import {STATUSES} from "../user.interface";
+// src/modules/users/user-update.schema.ts
+import Joi from '../../shared/validations/joi';
+import {validateUnique, validateExists} from "../../shared/validations";
+import {STATUSES} from "./user.interface";
 
-export const userCreateSchema = Joi.object({
+export const userUpdateSchema = (userId: string | number) => Joi.object({
     first_name: Joi.string().min(1).max(100).required(),
     middle_name: Joi.string().min(1).max(100).allow(null, ""),
     last_name: Joi.string().min(1).max(100).required(),
 
     address: Joi.string().max(100).allow(null, ""),
     comments: Joi.string().max(100).allow(null, ""),
-    status: Joi.string().valid(...STATUSES).allow(null, ""),
+    // status is NOT NULL in DB, so don't allow null
+    status: Joi.string().valid(...STATUSES).required(),
 
-    role_id: Joi.number().integer().required()
+    role_id: Joi.number().integer()
         .external(validateExists("roles", {column: "id"})),
     phone: Joi.string().min(10).max(16).allow(null, "")
-        .external(validateUnique("users", "phone")),
+        .external(validateUnique("users", "phone", {ignoreId: userId})),
     email: Joi.string().email().max(180).allow(null, "")
-        .external(validateUnique("users", "email")),
+        .external(validateUnique("users", "email", {ignoreId: userId})),
     username: Joi.string().min(2).max(16).pattern(/^[a-zA-Z0-9_]+$/).allow(null, "")
-        .external(validateUnique("users", "username"))
+        .external(validateUnique("users", "username", {ignoreId: userId}))
         .required(),
     password: Joi.string().min(8).max(32)
         .pattern(/[A-Z]/)           // At least one uppercase letter
@@ -30,7 +31,6 @@ export const userCreateSchema = Joi.object({
             "string.min": "Password should be at least 8 characters long.",
             "string.max": "Password should be no longer than 32 characters.",
             "string.pattern.base": "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character.",
-            "any.required": "Password is required.",
         })
-        .required(),
+        .allow(null, ""),
 });

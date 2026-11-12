@@ -1,4 +1,4 @@
-// __test__/shared/validations/database/unique.spec.ts
+// src/shared/validations/database/unique.spec.ts
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 import Joi from 'joi';
 import {validateUnique, validateCompositeUnique} from "./unique";

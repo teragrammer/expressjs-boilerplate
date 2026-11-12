@@ -1,4 +1,4 @@
-// __test__/security.util.spec.ts
+// src/common/utils/security.spec.ts
 import {beforeEach, describe, expect, it} from "vitest";
 import {SecurityUtil} from "./security.util";
 

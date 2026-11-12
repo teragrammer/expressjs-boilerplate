@@ -1,18 +1,11 @@
+// src/modules/system/settings/setting.routes.ts
 import {Router} from "express";
 import {AuthenticationMiddleware} from "../../../common/middleware/authentication.middleware";
 import {AuthorizationMiddleware} from "../../../common/middleware/authorization.middleware";
 import {validate} from "../../../common/middleware/validate.middleware";
 import {settingCreateSchema} from "./setting-create.schema";
 import {settingUpdateSchema} from "./setting-update.schema";
-import {SettingController} from "./setting.controller";
-import {SettingService} from "./setting.service";
-import {SettingRepository} from "./setting.repository";
-import {auditService, redisCache} from "../../../config/container";
-
-const settingController = new SettingController(
-    new SettingService(new SettingRepository(), redisCache),
-    auditService,
-);
+import {settingController} from "../../../config/container";
 
 export default () => {
     const router = Router();
@@ -49,4 +42,4 @@ export default () => {
     router.delete("/:id", [AuthenticationMiddleware(), AuthorizationMiddleware("settings:delete")], settingController.delete);
 
     return router;
-}
+};

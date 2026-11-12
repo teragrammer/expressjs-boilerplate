@@ -1,7 +1,6 @@
 // src/modules/auth/two-factor-authentication/two-factor-authentication.routes.ts
 import {Router} from "express";
 
-import {TwoFactorAuthenticationController} from "./two-factor-authentication.controller";
 import {
     disableTfaSchema,
     recoveryCodeSchema,
@@ -12,16 +11,7 @@ import {AuthenticationMiddleware} from "../../../common/middleware/authenticatio
 import {validate} from "../../../common/middleware/validate.middleware";
 import {authRateLimiters} from "../../../common/middleware/rate-limiter.middleware";
 
-import {
-    auditService,
-    twoFactorAuthenticationService,
-} from "../../../config/container";
-
-const twoFactorAuthenticationController =
-    new TwoFactorAuthenticationController(
-        twoFactorAuthenticationService,
-        auditService,
-    );
+import {twoFactorAuthenticationController} from "../../../config/container";
 
 export default () => {
     const router = Router();

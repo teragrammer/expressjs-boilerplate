@@ -1,4 +1,4 @@
-// src/modules/system/interfaces/setting-key-value.interface.ts
+// src/modules/system/settings/setting-key-value.interface.ts
 export interface SettingKeyValue {
     mx_log_try: number;         // Max Login Tries
     lck_prd: number;            // Failed Login Tries Lockout Period
