@@ -319,7 +319,7 @@ All paths are prefixed with `/api/v1`.
 | CI | GitHub Actions: install, migrate, seed, test |
 | Container | Single-stage Ubuntu development image |
 | Compose | One `web` service; no PostgreSQL/Redis services; no `env_file` |
-| Docs | README, `docs/testing/integration.md`, `docs/testing/load-performance.md`, `docs/ai-setup-guide.md` |
+| Docs | README, `docs/testing/integration.md`, `docs/testing/load-performance.md` |
 
 ---
 
