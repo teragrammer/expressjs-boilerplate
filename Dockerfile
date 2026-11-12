@@ -22,7 +22,6 @@ RUN npm ci
 # Compile the application.
 COPY tsconfig.json ./
 COPY src ./src
-COPY scripts ./scripts
 COPY database ./database
 RUN npm run build
 
@@ -33,8 +32,6 @@ RUN npm prune --omit=dev
 FROM node:24-bookworm-slim AS runtime
 
 ENV NODE_ENV=production \
-    PORT=4000 \
-    PORT_EXPOSE=4000 \
     NPM_CONFIG_UPDATE_NOTIFIER=false
 
 WORKDIR /app
@@ -54,7 +51,10 @@ COPY --from=builder --chown=node:node /app/database ./database
 # Run as the unprivileged `node` user shipped with the base image.
 USER node
 
-EXPOSE 4000
+# Document the default listening port; overridable at build time via
+# the PORT build argument (sourced from .env by Docker Compose).
+ARG PORT=4000
+EXPOSE ${PORT}
 
 STOPSIGNAL SIGTERM
 
