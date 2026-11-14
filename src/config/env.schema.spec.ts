@@ -132,6 +132,7 @@ describe("createEnvSchema", () => {
             BCRYPT_SECRET: "test-bcrypt-pepper-min-32-chars",
             CRYPT0_SECRET: "0123456789abcdef0123456789abcdef",
             CLUSTER_WORKERS: DEFAULT_CLUSTER_WORKERS,
+            METRICS_ENABLED: false,
         });
     });
 

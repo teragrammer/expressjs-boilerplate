@@ -253,7 +253,7 @@ export function createEnvSchema(isTest: boolean) {
         LOG_LEVEL: Joi.string()
             .valid("fatal", "error", "warn", "info", "debug", "trace", "silent")
             .default("info"),
-        METRICS_ENABLED: Joi.boolean().default(true),
+        METRICS_ENABLED: Joi.boolean().default(false),
         METRICS_PATH: Joi.string().default("/metrics"),
 
         /* Audit trail */

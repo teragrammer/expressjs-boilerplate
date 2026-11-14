@@ -26,6 +26,40 @@ function resolveSpecPath(): string {
 
 const SPEC_PATH = resolveSpecPath();
 
+/*
+ * Swagger UI is loaded from a CDN, but the version is pinned and every
+ * asset carries a Subresource Integrity hash. A compromised CDN (or a
+ * malicious release published under the floating `@5` range) therefore
+ * cannot execute arbitrary JavaScript on the API origin.
+ *
+ * The hashes are SHA-384 digests of the `swagger-ui-dist@5.35.0` files.
+ */
+const SWAGGER_UI_VERSION = "5.35.0";
+const SWAGGER_UI_BASE =
+    `https://unpkg.com/swagger-ui-dist@${SWAGGER_UI_VERSION}`;
+
+const SWAGGER_UI_CSS_SRI =
+    "sha384-WlYgdmXYOOBWL5apwjDEZwN+U3HmXSSu5R6V5aGxEcf7z+KuRNwBhoxKVN1i3D5I";
+const SWAGGER_UI_BUNDLE_SRI =
+    "sha384-gjRm0bEPMeTmMh5jT2cHccIwCUZSTd8YC+j0d0sXw0MdGEfScduGpSyF3ZSSLkX9";
+const SWAGGER_UI_PRESET_SRI =
+    "sha384-My2aDM4r2Mbm3ybHcubKm9O9U8FEjvF/O5nGvE9YK5dzqOTbWEKa79RPJ1krdMaF";
+
+/*
+ * The bootstrap lives in its own same-origin script so the page does
+ * not need `script-src 'unsafe-inline'`.
+ */
+const SWAGGER_UI_INIT = `window.onload = function () {
+  window.ui = SwaggerUIBundle({
+    url: "/openapi.yaml",
+    dom_id: "#swagger-ui",
+    deepLinking: true,
+    presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
+    layout: "StandaloneLayout",
+  });
+};
+`;
+
 export default () => {
     const router = express.Router();
 
@@ -61,14 +95,22 @@ export default () => {
         }
     });
 
+    router.get("/swagger-ui-init.js", (_req: Request, res: Response) => {
+        res.type("application/javascript").send(SWAGGER_UI_INIT);
+    });
+
     router.get(["/api-docs", "/swagger"], (_req: Request, res: Response) => {
-        // The page loads Swagger UI from a CDN and uses an inline
-        // bootstrap script, so the global Helmet CSP (default-src 'none')
-        // would otherwise blank the page.
+        /*
+         * The page loads pinned, integrity-checked Swagger UI assets
+         * from the CDN and its bootstrap from the same origin, so the
+         * global Helmet CSP only needs to allow the CDN origins. Inline
+         * styles remain allowed because Swagger UI applies them at
+         * runtime.
+         */
         res.setHeader(
             "Content-Security-Policy",
             "default-src 'self' https://unpkg.com; " +
-                "script-src 'self' 'unsafe-inline' https://unpkg.com; " +
+                "script-src 'self' https://unpkg.com; " +
                 "style-src 'self' 'unsafe-inline' https://unpkg.com; " +
                 "img-src 'self' data: https://unpkg.com; " +
                 "font-src 'self' https://unpkg.com; " +
@@ -80,23 +122,26 @@ export default () => {
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Express API Boilerplate - Swagger UI</title>
-  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
+  <link
+    rel="stylesheet"
+    href="${SWAGGER_UI_BASE}/swagger-ui.css"
+    integrity="${SWAGGER_UI_CSS_SRI}"
+    crossorigin="anonymous"
+  />
 </head>
 <body>
   <div id="swagger-ui"></div>
-  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
-  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-standalone-preset.js"></script>
-  <script>
-    window.onload = function () {
-      window.ui = SwaggerUIBundle({
-        url: "/openapi.yaml",
-        dom_id: "#swagger-ui",
-        deepLinking: true,
-        presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
-        layout: "StandaloneLayout",
-      });
-    };
-  </script>
+  <script
+    src="${SWAGGER_UI_BASE}/swagger-ui-bundle.js"
+    integrity="${SWAGGER_UI_BUNDLE_SRI}"
+    crossorigin="anonymous"
+  ></script>
+  <script
+    src="${SWAGGER_UI_BASE}/swagger-ui-standalone-preset.js"
+    integrity="${SWAGGER_UI_PRESET_SRI}"
+    crossorigin="anonymous"
+  ></script>
+  <script src="/swagger-ui-init.js"></script>
 </body>
 </html>`);
     });
