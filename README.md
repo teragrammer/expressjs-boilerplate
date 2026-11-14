@@ -340,14 +340,22 @@ Contributions are welcome! Please follow these steps:
 
 ### Hire Me
 
-```
-If you like this project and need help with development, customization, or integration, feel free to reach out!
+I build and maintain production-ready Node.js APIs with Express, TypeScript, and PostgreSQL. This boilerplate reflects how I work: typed end to end, security-conscious, tested, and documented.
 
-I’m available for freelance work, consulting, and collaboration.
+If you need help with:
 
-Thank you for checking out ExpressJS Boilerplate API for PostgreSQL!
-Feel free to contribute or open issues.
-```
+- **API development** — new endpoints, authentication, authorization, background jobs, or a service built from scratch.
+- **Customization** — adapting this boilerplate to your domain, database, or deployment environment.
+- **Integration** — connecting payments, email, queues, observability, or third-party APIs.
+- **Security and reliability** — reviewing authentication and session flows, hardening endpoints, fixing performance bottlenecks, or improving test coverage.
+- **Consulting** — architecture reviews, code reviews, or hands-on help for your team.
+
+I’m available for freelance projects, consulting engagements, and collaboration. Tell me what you’re building and what you need, and I’ll reply with a clear scope and next steps.
+
+- GitHub: [@teragrammer](https://github.com/teragrammer)
+- Email: [teragrammer@proton.me](mailto:teragrammer@proton.me)
+
+Thanks for checking out the project. Contributions and issues are always welcome.
 
 ### License
 
