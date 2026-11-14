@@ -60,6 +60,7 @@ type RedisEnvironment = {
     REDIS_TLS_CA?: string;
     REDIS_TLS_CERT?: string;
     REDIS_TLS_KEY?: string;
+    REDIS_TLS_SERVERNAME?: string;
     NODE_ENV?: string;
 };
 
@@ -75,6 +76,7 @@ function mockEnvironment(
             REDIS_TLS_CA: "",
             REDIS_TLS_CERT: "",
             REDIS_TLS_KEY: "",
+            REDIS_TLS_SERVERNAME: "",
             NODE_ENV: "test",
             ...overrides,
         },
@@ -313,6 +315,31 @@ describe("Redis configuration", () => {
                 cert: undefined,
                 key: undefined,
                 rejectUnauthorized: true,
+            });
+
+            expect(mockReadFileSync).toHaveBeenCalledTimes(1);
+        });
+
+        it("verifies the certificate against REDIS_TLS_SERVERNAME when set", async () => {
+            const {buildRedisConfig} =
+                await importRedisModule({
+                    REDIS_TLS: true,
+                    REDIS_TLS_CA: "/certs/ca.pem",
+                    REDIS_TLS_CERT: "",
+                    REDIS_TLS_KEY: "",
+                    REDIS_TLS_SERVERNAME: "redis.internal",
+                });
+
+            mockReadFileSync.mockClear();
+
+            const config = buildRedisConfig();
+
+            expect(config?.tls).toEqual({
+                ca: "certificate:/certs/ca.pem",
+                cert: undefined,
+                key: undefined,
+                rejectUnauthorized: true,
+                servername: "redis.internal",
             });
 
             expect(mockReadFileSync).toHaveBeenCalledTimes(1);

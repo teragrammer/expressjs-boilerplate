@@ -205,6 +205,12 @@ export function createEnvSchema(isTest: boolean) {
         REDIS_TLS_CA: Joi.string().allow(""),
         REDIS_TLS_CERT: Joi.string().allow(""),
         REDIS_TLS_KEY: Joi.string().allow(""),
+        /*
+         * Name to verify against the Redis certificate when REDIS_HOST
+         * is an address the certificate does not cover (for example,
+         * connecting by IP to a host-only certificate).
+         */
+        REDIS_TLS_SERVERNAME: Joi.string().allow(""),
 
         /*
          * Email is optional in development but required in production:

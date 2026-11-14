@@ -59,6 +59,15 @@ export function buildRedisConfig(): RedisOptions | null {
                     : undefined,
             };
 
+            /*
+             * Node verifies the certificate against the host it dials.
+             * When REDIS_HOST is an IP that the certificate does not
+             * list, verify against this name instead (SNI is still sent).
+             */
+            if (__ENV.REDIS_TLS_SERVERNAME) {
+                tls.servername = __ENV.REDIS_TLS_SERVERNAME;
+            }
+
             config.tls = tls;
         } catch (error: any) {
             logger.error(`CRITICAL: Failed to load TLS certificates for Redis: ${error.message}`);
