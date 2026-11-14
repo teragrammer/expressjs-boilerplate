@@ -25,16 +25,22 @@ export default () => {
         "/register",
         [
             authRateLimiters.register,
+            /*
+             * Validate before reserving the key: a failed validation
+             * must not consume an idempotency key, and the hash must be
+             * computed from the validated payload rather than the
+             * empty sanitizer placeholder.
+             */
+            validate(registerSchema, [
+                "first_name",
+                "middle_name",
+                "last_name",
+                "username",
+                "password",
+                "email",
+            ]),
             idempotency({scope: "auth:register"}),
         ],
-        validate(registerSchema, [
-            "first_name",
-            "middle_name",
-            "last_name",
-            "username",
-            "password",
-            "email",
-        ]),
         registerController.create,
     );
 
@@ -54,10 +60,14 @@ export default () => {
         authenticationRefreshController.refresh,
     );
 
+    /*
+     * Logout is safe for a pending-TFA session: it only deletes that
+     * session and lets the caller abandon an incomplete login.
+     */
     router.post(
         "/logout",
         authRateLimiters.logout,
-        AuthenticationMiddleware(),
+        AuthenticationMiddleware(true, {allowPendingTfa: true}),
         authenticationController.logout,
     );
 

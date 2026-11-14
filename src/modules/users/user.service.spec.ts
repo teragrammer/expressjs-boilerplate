@@ -34,6 +34,10 @@ describe("UserService", () => {
         deleteAllByUserId: ReturnType<typeof vi.fn>;
     };
 
+    let refreshTokenRepository: {
+        revokeAllByUserId: ReturnType<typeof vi.fn>;
+    };
+
     const mockUser: User = {
         id: 42,
         first_name: "John",
@@ -107,6 +111,10 @@ describe("UserService", () => {
             deleteAllByUserId: vi.fn().mockResolvedValue(0),
         };
 
+        refreshTokenRepository = {
+            revokeAllByUserId: vi.fn().mockResolvedValue(0),
+        };
+
         /*
          * The transaction runner is faked so the unit test does not
          * need a database; the callback is invoked with a stub
@@ -120,6 +128,7 @@ describe("UserService", () => {
             securityUtil as unknown as SecurityUtil,
             authenticationTokenRepository as unknown as AuthenticationTokenRepository,
             runInTransaction,
+            refreshTokenRepository as never,
         );
 
         // Default mock for findAuthById to return the mockUser
@@ -405,8 +414,17 @@ describe("UserService", () => {
                 {
                     ...data,
                     password: "hashed-password",
+                    authorization_version: 1,
                 },
+                undefined,
+                {},
             );
+            expect(
+                authenticationTokenRepository.deleteAllByUserId,
+            ).toHaveBeenCalledWith(42, undefined, {});
+            expect(
+                refreshTokenRepository.revokeAllByUserId,
+            ).toHaveBeenCalledWith(42, {});
         });
 
         it("should not hash the password when password is null", async () => {

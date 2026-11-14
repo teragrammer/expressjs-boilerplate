@@ -1,5 +1,5 @@
 // src/modules/system/roles/role.repository.ts
-import type {Selectable} from "kysely";
+import {sql, type Kysely, type Selectable} from "kysely";
 import {db as defaultDb, type DatabaseExecutor} from "../../../config/database";
 import type {Database} from "../../../config/schema";
 import {
@@ -90,34 +90,126 @@ export class RoleRepository {
     async update(
         id: number,
         data: UpdateRoleDTO,
+        executor?: DatabaseExecutor,
     ): Promise<Role | null> {
-        const updatedRow = await this.db
-            .updateTable(ROLE_TABLE)
-            .set({
-                ...(data.name !== undefined && {
-                    name: data.name,
-                }),
-                ...(data.slug !== undefined && {
-                    slug: data.slug,
-                }),
-                ...(data.description !== undefined && {
-                    description: data.description || null,
-                }),
-                ...(data.is_public !== undefined && {
-                    is_public: data.is_public,
-                }),
-                ...(data.is_bypass_authorization !== undefined && {
-                    is_bypass_authorization: data.is_bypass_authorization,
-                }),
-                updated_at: new Date(),
-            })
-            .where("id", "=", id)
-            .returningAll()
-            .executeTakeFirst();
+        const updateRole = async (
+            db: DatabaseExecutor,
+        ): Promise<Role | null> => {
+            const existing = await db
+                .selectFrom(ROLE_TABLE)
+                .selectAll()
+                .where("id", "=", id)
+                .executeTakeFirst();
 
-        return updatedRow
-            ? this.mapToRole(updatedRow)
-            : null;
+            if (!existing) {
+                return null;
+            }
+
+            const updatedRow = await db
+                .updateTable(ROLE_TABLE)
+                .set({
+                    ...(data.name !== undefined && {
+                        name: data.name,
+                    }),
+                    ...(data.slug !== undefined && {
+                        slug: data.slug,
+                    }),
+                    ...(data.description !== undefined && {
+                        description: data.description || null,
+                    }),
+                    ...(data.is_public !== undefined && {
+                        is_public: data.is_public,
+                    }),
+                    ...(data.is_bypass_authorization !== undefined && {
+                        is_bypass_authorization: data.is_bypass_authorization,
+                    }),
+                    updated_at: new Date(),
+                })
+                .where("id", "=", id)
+                .returningAll()
+                .executeTakeFirst();
+
+            if (!updatedRow) {
+                return null;
+            }
+
+            /*
+             * The bypass flag and the role slug are embedded in issued
+             * access tokens. A change to either must invalidate the
+             * tokens of every user assigned to the role, not only
+             * future logins.
+             */
+            const securityChanged =
+                (data.is_bypass_authorization !== undefined &&
+                    Boolean(data.is_bypass_authorization) !==
+                        Boolean(existing.is_bypass_authorization)) ||
+                (data.slug !== undefined && data.slug !== existing.slug);
+
+            if (securityChanged) {
+                const users = await db
+                    .selectFrom("users")
+                    .select("id")
+                    .where("role_id", "=", id)
+                    .execute();
+
+                const userIds = users.map((user) => user.id);
+
+                if (userIds.length > 0) {
+                    await db
+                        .updateTable("users")
+                        .set({
+                            authorization_version:
+                                sql<number>`authorization_version + 1`,
+                            updated_at: new Date(),
+                        })
+                        .where("id", "in", userIds)
+                        .execute();
+
+                    const tokens = await db
+                        .selectFrom("authentication_tokens")
+                        .select("id")
+                        .where("user_id", "in", userIds)
+                        .execute();
+
+                    if (tokens.length > 0) {
+                        await db
+                            .deleteFrom("two_factor_authentications")
+                            .where(
+                                "token_id",
+                                "in",
+                                tokens.map((token) => token.id),
+                            )
+                            .execute();
+                    }
+
+                    await db
+                        .deleteFrom("authentication_tokens")
+                        .where("user_id", "in", userIds)
+                        .execute();
+
+                    await db
+                        .updateTable("refresh_tokens")
+                        .set({
+                            revoked_at:
+                                sql<Date>`COALESCE(revoked_at, now())`,
+                            updated_at: new Date(),
+                        })
+                        .where("user_id", "in", userIds)
+                        .where("revoked_at", "is", null)
+                        .execute();
+                }
+            }
+
+            return this.mapToRole(updatedRow);
+        };
+
+        if (executor) {
+            return updateRole(executor);
+        }
+
+        return (this.db as Kysely<Database>)
+            .transaction()
+            .execute(updateRole);
     }
 
     async browse(

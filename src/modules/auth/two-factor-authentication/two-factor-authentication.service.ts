@@ -6,6 +6,7 @@ import {DateUtil} from "../../../common/utils/date.util";
 import {AppError} from "../../../common/utils/errors";
 import Messages from "../../../common/utils/messages";
 import {AuthenticationTokenRepository} from "../authentication/authentication-token.repository";
+import {RefreshTokenRepository} from "../authentication/refresh-token.repository";
 import {SessionService, IssuedTokens} from "../authentication/session.service";
 import {SettingService} from "../../system/settings/setting.service";
 import {RoleService} from "../../system/roles/role.service";
@@ -46,6 +47,7 @@ export class TwoFactorAuthenticationService {
         private readonly userRepository: UserRepository,
         private readonly sessionService: SessionService,
         private readonly recoveryCodeRepository: TfaRecoveryCodeRepository,
+        private readonly refreshTokenRepository: RefreshTokenRepository,
     ) {
     }
 
@@ -205,6 +207,25 @@ export class TwoFactorAuthenticationService {
                 hashedRecoveryCodes,
                 trx,
             );
+
+            /*
+             * Enabling TFA is a security-state change: every session
+             * other than the one performing the enrollment is revoked,
+             * together with its refresh tokens. A session that was
+             * stolen before enrollment must not survive it.
+             */
+            await this.authenticationTokenRepository.deleteAllByUserId(
+                input.userId,
+                input.tokenId,
+                trx,
+            );
+
+            await this.refreshTokenRepository
+                .revokeByUserIdExceptSession(
+                    input.userId,
+                    input.tokenId,
+                    trx,
+                );
         });
 
         await this.authenticationTokenRepository

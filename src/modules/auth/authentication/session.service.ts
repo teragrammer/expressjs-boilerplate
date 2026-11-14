@@ -9,7 +9,18 @@ import {RefreshTokenRepository} from "./refresh-token.repository";
 import {TokenService} from "./authentication-token.service";
 import {RoleService} from "../../system/roles/role.service";
 import {UserRepository} from "../../users/user.repository";
-import type {DatabaseExecutor} from "../../../config/database";
+import {
+    withTransaction,
+    type DatabaseExecutor,
+} from "../../../config/database";
+import type {Transaction} from "kysely";
+import type {Database} from "../../../config/schema";
+
+/**
+ * Internal signal used when another request already rotated the token.
+ */
+class RefreshTokenAlreadyRotatedError extends Error {
+}
 
 /**
  * A freshly issued credential pair.
@@ -47,6 +58,9 @@ export class SessionService {
         private readonly roleService: RoleService,
         private readonly userRepository: UserRepository,
         private readonly dateUtil: DateUtil,
+        private readonly runInTransaction: <T>(
+            callback: (trx: Transaction<Database>) => Promise<T>,
+        ) => Promise<T> = withTransaction,
     ) {
     }
 
@@ -276,18 +290,6 @@ export class SessionService {
 
         const nextRefreshToken = randomBytes(32).toString("base64url");
 
-        const created = await this.refreshTokenRepository.create({
-            session_id: stored.session_id,
-            user_id: stored.user_id,
-            token_hash: this.hashRefreshToken(nextRefreshToken),
-            family_id: stored.family_id,
-            expires_at: expiresAt,
-            ip: metadata?.ip ?? stored.ip,
-            user_agent: metadata?.userAgent ?? stored.user_agent,
-        });
-
-        await this.refreshTokenRepository.revoke(stored.id, created.id);
-
         const accessToken = this.tokenService.generateToken({
             uid: user.id,
             tid: stored.session_id,
@@ -301,6 +303,58 @@ export class SessionService {
             bpa: role.is_bypass_authorization ? 1 : 0,
             av: user.authorization_version || 0,
         });
+
+        try {
+            /*
+             * Claiming and creating the successor are one unit of work.
+             * The conditional UPDATE is the atomic gate: if two
+             * requests present the same token, only one transitions it
+             * from active to revoked and therefore only one creates a
+             * successor.
+             */
+            await this.runInTransaction(async (trx) => {
+                const claimed = await this.refreshTokenRepository
+                    .claimForRotation(tokenHash, trx);
+
+                if (!claimed) {
+                    throw new RefreshTokenAlreadyRotatedError();
+                }
+
+                const created = await this.refreshTokenRepository.create({
+                    session_id: stored.session_id,
+                    user_id: stored.user_id,
+                    token_hash: this.hashRefreshToken(nextRefreshToken),
+                    family_id: stored.family_id,
+                    expires_at: expiresAt,
+                    ip: metadata?.ip ?? stored.ip,
+                    user_agent: metadata?.userAgent ?? stored.user_agent,
+                }, trx);
+
+                await this.refreshTokenRepository.markReplacedBy(
+                    claimed.id,
+                    created.id,
+                    trx,
+                );
+            });
+        } catch (error) {
+            if (error instanceof RefreshTokenAlreadyRotatedError) {
+                /*
+                 * A concurrent rotation already consumed this token.
+                 * Treat it as reuse and revoke the whole family so a
+                 * stolen token cannot be forked into two live branches.
+                 */
+                await this.refreshTokenRepository.revokeFamily(
+                    stored.family_id,
+                );
+
+                throw new AppError(
+                    Messages.INVALID_TOKEN,
+                    "The refresh token has already been used. All sessions in this family were revoked.",
+                );
+            }
+
+            throw error;
+        }
 
         return {
             accessToken,

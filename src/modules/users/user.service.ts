@@ -15,6 +15,7 @@ import {
     assertCanChangePrivilegedFields,
 } from "../../common/authz/policy";
 import {AuthenticationTokenRepository} from "../auth/authentication/authentication-token.repository";
+import {RefreshTokenRepository} from "../auth/authentication/refresh-token.repository";
 
 /**
  * Runs a callback inside a database transaction.
@@ -35,6 +36,7 @@ export class UserService {
         private readonly securityUtil: SecurityUtil,
         private readonly authenticationTokenRepository: AuthenticationTokenRepository,
         private readonly runInTransaction: TransactionRunner = withTransaction,
+        private readonly refreshTokenRepository?: RefreshTokenRepository,
     ) {
     }
 
@@ -122,17 +124,24 @@ export class UserService {
         // Check if role_id or status is being changed to increment authorization_version
         const roleChanged = data.role_id !== undefined && data.role_id !== currentUser.role_id;
         const statusChanged = data.status !== undefined && data.status !== currentUser.status;
+        /*
+         * Any password change (including an administrative reset) is a
+         * security-state change. The old refresh token must not be
+         * able to rotate into a fresh session after the reset.
+         */
+        const passwordChanged =
+            data.password !== null && typeof data.password !== "undefined";
         
-        if (roleChanged || statusChanged) {
+        if (roleChanged || statusChanged || passwordChanged) {
             data.authorization_version = (currentUser.authorization_version || 0) + 1;
         }
 
         // Hash password if provided
-        if (data.password !== null && typeof data.password !== "undefined") {
-            data.password = await this.securityUtil.hash(data.password);
+        if (passwordChanged) {
+            data.password = await this.securityUtil.hash(data.password!);
         }
 
-        if (!roleChanged && !statusChanged) {
+        if (!roleChanged && !statusChanged && !passwordChanged) {
             const user: User | null = await this.userRepository.update(id, data);
 
             if (!user) {throw new AppError(Messages.DATA_NOT_FOUND);}
@@ -141,13 +150,14 @@ export class UserService {
         }
 
         /*
-         * A role or status change must take effect immediately: the
-         * sessions of the affected user are revoked so the old
-         * permissions cannot be used until the next login.
+         * A role, status or password change must take effect
+         * immediately: every session and refresh token of the affected
+         * user is revoked so the old credentials cannot be used until
+         * the next login.
          *
          * The update and the revocation happen in one transaction, so
-         * a failure cannot leave a user with new permissions and a live
-         * session.
+         * a failure cannot leave a user with new permissions (or a new
+         * password) and a live session.
          */
         return this.runInTransaction(async (trx) => {
             const updated = await this.userRepository.update(
@@ -166,6 +176,13 @@ export class UserService {
                 undefined,
                 trx,
             );
+
+            if (this.refreshTokenRepository) {
+                await this.refreshTokenRepository.revokeAllByUserId(
+                    id,
+                    trx,
+                );
+            }
 
             return updated;
         });

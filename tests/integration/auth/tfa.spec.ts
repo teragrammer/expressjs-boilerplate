@@ -69,6 +69,7 @@ describe("TFA lifecycle", () => {
         userRepository,
         sessionService,
         recoveryCodeRepository,
+        refreshTokenRepository,
     );
 
     const createUser = async () => {

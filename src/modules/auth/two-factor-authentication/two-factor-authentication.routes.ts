@@ -22,7 +22,7 @@ export default () => {
     router.post(
         "/tfa/send",
         authRateLimiters.tfaSend,
-        AuthenticationMiddleware(),
+        AuthenticationMiddleware(true, {allowPendingTfa: true}),
         twoFactorAuthenticationController.send,
     );
 
@@ -30,7 +30,7 @@ export default () => {
         "/tfa/validate",
         [
             authRateLimiters.tfaValidate,
-            AuthenticationMiddleware(),
+            AuthenticationMiddleware(true, {allowPendingTfa: true}),
             validate(verifyOtpSchema, ["code"]),
         ],
         twoFactorAuthenticationController.validate,
@@ -65,13 +65,17 @@ export default () => {
         "/tfa/recovery",
         [
             authRateLimiters.tfaValidate,
-            AuthenticationMiddleware(),
+            AuthenticationMiddleware(true, {allowPendingTfa: true}),
             validate(recoveryCodeSchema, ["code"]),
         ],
         twoFactorAuthenticationController.recovery,
     );
 
-    // TFA Disable - requires authentication and password verification
+    /*
+     * TFA Disable - requires a fully authenticated session (the
+     * default middleware gate) and password verification. A pending-TFA
+     * token must not be able to change the second-factor state.
+     */
     router.post(
         "/tfa/disable",
         [

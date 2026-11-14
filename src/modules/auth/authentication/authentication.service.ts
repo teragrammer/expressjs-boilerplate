@@ -18,6 +18,7 @@ import {User} from "../../users/user.interface";
 import {AuthenticationTokenRepository} from "./authentication-token.repository";
 import {SettingService} from "../../system/settings/setting.service";
 import {TwoFactorAuthenticationService} from "../two-factor-authentication/two-factor-authentication.service";
+import {TfaPolicy} from "../two-factor-authentication/two-factor-authentication.interface";
 import {SessionService, IssuedTokens} from "./session.service";
 import {withTransaction} from "../../../config/database";
 import {authAttemptsTotal} from "../../../common/metrics/metrics";
@@ -70,6 +71,15 @@ export class AuthenticationService {
 
         const hashedPassword = await this.securityUtil.hash(data.password);
 
+        /*
+         * Registration must honour the same TFA policy as login. A new
+         * account has no enrolled secret yet, so only a global policy
+         * requires the challenge; under a per-user policy the new user
+         * starts without TFA (and can enroll later).
+         */
+        const tfaRequired =
+            (await this.tfaService.getTfaPolicy()) === TfaPolicy.GLOBAL;
+
         const newUser = await withTransaction(async (trx) => {
             const created = await this.userService.registerUser(
                 {
@@ -91,7 +101,7 @@ export class AuthenticationService {
                     ip: metadata?.ip ?? null,
                     browser: metadata?.browser ?? null,
                     os: metadata?.os ?? null,
-                    tfa_verified: true,
+                    tfa_verified: !tfaRequired,
                 },
                 trx,
             );
@@ -107,9 +117,14 @@ export class AuthenticationService {
             newUser.session.id,
             newUser.created,
             role,
-            true,
+            !tfaRequired,
             {
-                includeRefreshToken: true,
+                /*
+                 * A pending-TFA session receives only the short-lived
+                 * access token: issuing a refresh token before the
+                 * challenge would let `/auth/refresh` bypass it.
+                 */
+                includeRefreshToken: !tfaRequired,
                 metadata: {
                     ip: metadata?.ip ?? null,
                     userAgent: metadata?.userAgent ?? null,
@@ -124,7 +139,7 @@ export class AuthenticationService {
             refreshToken: issued.refreshToken,
             sessionId: newUser.session.id,
             expiresAt: issued.expiresAt,
-            tfaRequired: false,
+            tfaRequired,
             userId: newUser.created.id,
         };
     }

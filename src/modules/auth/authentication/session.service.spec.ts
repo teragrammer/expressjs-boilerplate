@@ -21,6 +21,8 @@ describe("SessionService", () => {
     let refreshTokenRepository: {
         create: ReturnType<typeof vi.fn>;
         findByHash: ReturnType<typeof vi.fn>;
+        claimForRotation: ReturnType<typeof vi.fn>;
+        markReplacedBy: ReturnType<typeof vi.fn>;
         revoke: ReturnType<typeof vi.fn>;
         revokeFamily: ReturnType<typeof vi.fn>;
         revokeBySessionId: ReturnType<typeof vi.fn>;
@@ -60,6 +62,8 @@ describe("SessionService", () => {
         refreshTokenRepository = {
             create: vi.fn().mockResolvedValue({id: "r1"}),
             findByHash: vi.fn(),
+            claimForRotation: vi.fn().mockResolvedValue({id: "old"}),
+            markReplacedBy: vi.fn().mockResolvedValue(undefined),
             revoke: vi.fn(),
             revokeFamily: vi.fn().mockResolvedValue(1),
             revokeBySessionId: vi.fn().mockResolvedValue(1),
@@ -85,6 +89,7 @@ describe("SessionService", () => {
             roleService as unknown as RoleService,
             userRepository as unknown as UserRepository,
             {expiredAt: vi.fn().mockReturnValue(expiry)} as unknown as DateUtil,
+            (async (callback: any) => callback({})) as never,
         );
     });
 
@@ -187,9 +192,38 @@ describe("SessionService", () => {
 
             expect(result.accessToken).toBe("signed.token");
             expect(result.sessionId).toBe(42);
-            expect(refreshTokenRepository.revoke).toHaveBeenCalledWith(
-                "old",
+            expect(refreshTokenRepository.claimForRotation).toHaveBeenCalledWith(
                 expect.any(String),
+                {},
+            );
+            expect(refreshTokenRepository.markReplacedBy).toHaveBeenCalledWith(
+                "old",
+                "r1",
+                {},
+            );
+        });
+
+        it("revokes the family when a concurrent rotation already claimed the token", async () => {
+            refreshTokenRepository.findByHash.mockResolvedValue({
+                id: "old",
+                session_id: 42,
+                user_id: 7,
+                family_id: "family-1",
+                expires_at: new Date(Date.now() + 60_000),
+                revoked_at: null,
+                replaced_by: null,
+            });
+            refreshTokenRepository.claimForRotation.mockResolvedValue(null);
+
+            await expect(
+                service.rotate("presented-token"),
+            ).rejects.toMatchObject({
+                errorCode: Messages.INVALID_TOKEN.code,
+            });
+
+            expect(refreshTokenRepository.create).not.toHaveBeenCalled();
+            expect(refreshTokenRepository.revokeFamily).toHaveBeenCalledWith(
+                "family-1",
             );
         });
 

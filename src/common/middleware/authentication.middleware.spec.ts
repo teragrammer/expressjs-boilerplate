@@ -83,11 +83,15 @@ describe("AuthenticationMiddleware Unit Tests", () => {
         });
 
         it("should bind lazy promises to req.credentials on a valid token structure", async () => {
-            const mockPayload = {uid: 42, tid: 99};
+            const mockPayload = {uid: 42, tid: 99, tfa: true};
             mockReq.headers!.authorization = "Bearer valid-token";
             mockVerifyToken.mockReturnValue(mockPayload);
             mockFindUser.mockResolvedValue({id: 42, name: "John Doe"});
-            mockFindAuthToken.mockResolvedValue({id: 99, active: true});
+            mockFindAuthToken.mockResolvedValue({
+                id: 99,
+                active: true,
+                tfa_verified: true,
+            });
 
             const middleware = AuthenticationMiddleware(true);
             await middleware(mockReq as Request, mockRes as Response, nextMock);
@@ -102,6 +106,73 @@ describe("AuthenticationMiddleware Unit Tests", () => {
             expect(mockFindAuthToken).toHaveBeenCalledWith(mockPayload);
             expect(userResult.name).toBe("John Doe");
             expect(authResult.active).toBe(true);
+        });
+
+        it("should reject a pending-TFA session by default", async () => {
+            mockReq.headers!.authorization = "Bearer pending-token";
+            mockVerifyToken.mockReturnValue({
+                uid: 42,
+                tid: 99,
+                tfa: false,
+            });
+            mockFindAuthToken.mockResolvedValue({
+                id: 99,
+                active: true,
+                tfa_verified: false,
+            });
+
+            const middleware = AuthenticationMiddleware(true);
+            await middleware(mockReq as Request, mockRes as Response, nextMock);
+
+            expect(nextMock).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    errorCode: "AUTH_OTP_INCOMPLETE",
+                }),
+            );
+        });
+
+        it("should reject a session whose token claims TFA completion but whose durable state does not", async () => {
+            mockReq.headers!.authorization = "Bearer stale-token";
+            mockVerifyToken.mockReturnValue({
+                uid: 42,
+                tid: 99,
+                tfa: true,
+            });
+            mockFindAuthToken.mockResolvedValue({
+                id: 99,
+                active: true,
+                tfa_verified: false,
+            });
+
+            const middleware = AuthenticationMiddleware(true);
+            await middleware(mockReq as Request, mockRes as Response, nextMock);
+
+            expect(nextMock).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    errorCode: "AUTH_OTP_INCOMPLETE",
+                }),
+            );
+        });
+
+        it("should allow a pending-TFA session when the route opts in", async () => {
+            mockReq.headers!.authorization = "Bearer pending-token";
+            mockVerifyToken.mockReturnValue({
+                uid: 42,
+                tid: 99,
+                tfa: false,
+            });
+            mockFindAuthToken.mockResolvedValue({
+                id: 99,
+                active: true,
+                tfa_verified: false,
+            });
+
+            const middleware = AuthenticationMiddleware(true, {
+                allowPendingTfa: true,
+            });
+            await middleware(mockReq as Request, mockRes as Response, nextMock);
+
+            expect(nextMock).toHaveBeenCalledWith();
         });
     });
 

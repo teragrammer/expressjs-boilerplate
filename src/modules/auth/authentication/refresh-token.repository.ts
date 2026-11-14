@@ -60,14 +60,60 @@ export class RefreshTokenRepository {
      */
     async findByHash(
         tokenHash: string,
+        executor: DatabaseExecutor = this.db,
     ): Promise<RefreshTokenRow | null> {
-        const row = await this.db
+        const row = await executor
             .selectFrom(REFRESH_TOKEN_TABLE)
             .selectAll()
             .where("token_hash", "=", tokenHash)
             .executeTakeFirst();
 
         return row ?? null;
+    }
+
+    /**
+     * Atomically claims a refresh token for rotation.
+     *
+     * Only one caller can transition the row from "active" to
+     * "revoked": PostgreSQL re-evaluates the `revoked_at IS NULL`
+     * predicate after it acquires the row lock, so a concurrent caller
+     * updates zero rows. The caller that wins is the only one allowed
+     * to create a successor.
+     */
+    async claimForRotation(
+        tokenHash: string,
+        executor: DatabaseExecutor = this.db,
+    ): Promise<RefreshTokenRow | null> {
+        const row = await executor
+            .updateTable(REFRESH_TOKEN_TABLE)
+            .set({
+                revoked_at: new Date(),
+                updated_at: new Date(),
+            })
+            .where("token_hash", "=", tokenHash)
+            .where("revoked_at", "is", null)
+            .returningAll()
+            .executeTakeFirst();
+
+        return row ?? null;
+    }
+
+    /**
+     * Records the successor of a token that was already claimed.
+     */
+    async markReplacedBy(
+        id: string,
+        replacedBy: string,
+        executor: DatabaseExecutor = this.db,
+    ): Promise<void> {
+        await executor
+            .updateTable(REFRESH_TOKEN_TABLE)
+            .set({
+                replaced_by: replacedBy,
+                updated_at: new Date(),
+            })
+            .where("id", "=", id)
+            .execute();
     }
 
     /**
@@ -111,8 +157,11 @@ export class RefreshTokenRepository {
     /**
      * Revokes every refresh token for a session.
      */
-    async revokeBySessionId(sessionId: number): Promise<number> {
-        const result = await this.db
+    async revokeBySessionId(
+        sessionId: number,
+        executor: DatabaseExecutor = this.db,
+    ): Promise<number> {
+        const result = await executor
             .updateTable(REFRESH_TOKEN_TABLE)
             .set({
                 revoked_at: sql<Date>`COALESCE(revoked_at, now())`,
@@ -128,14 +177,40 @@ export class RefreshTokenRepository {
     /**
      * Revokes every refresh token for a user.
      */
-    async revokeAllByUserId(userId: number): Promise<number> {
-        const result = await this.db
+    async revokeAllByUserId(
+        userId: number,
+        executor: DatabaseExecutor = this.db,
+    ): Promise<number> {
+        const result = await executor
             .updateTable(REFRESH_TOKEN_TABLE)
             .set({
                 revoked_at: sql<Date>`COALESCE(revoked_at, now())`,
                 updated_at: new Date(),
             })
             .where("user_id", "=", userId)
+            .where("revoked_at", "is", null)
+            .executeTakeFirst();
+
+        return Number(result.numUpdatedRows);
+    }
+
+    /**
+     * Revokes every refresh token for a user except the family of the
+     * session that must be retained.
+     */
+    async revokeByUserIdExceptSession(
+        userId: number,
+        sessionId: number,
+        executor: DatabaseExecutor = this.db,
+    ): Promise<number> {
+        const result = await executor
+            .updateTable(REFRESH_TOKEN_TABLE)
+            .set({
+                revoked_at: sql<Date>`COALESCE(revoked_at, now())`,
+                updated_at: new Date(),
+            })
+            .where("user_id", "=", userId)
+            .where("session_id", "!=", sessionId)
             .where("revoked_at", "is", null)
             .executeTakeFirst();
 

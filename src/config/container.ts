@@ -107,6 +107,8 @@ export const userService = new UserService(
     userRepository,
     securityUtil,
     authenticationTokenRepository,
+    undefined,
+    refreshTokenRepository,
 );
 export const tokenService = new TokenService();
 
@@ -161,6 +163,7 @@ export const twoFactorAuthenticationService = new TwoFactorAuthenticationService
     userRepository,
     sessionService,
     new TfaRecoveryCodeRepository(db),
+    refreshTokenRepository,
 );
 
 export const authService = new AuthenticationService(
@@ -286,6 +289,7 @@ outboxWorker.register(
             subject?: string;
             text?: string;
             html?: string;
+            encrypted?: boolean;
         };
 
         if (!payload.to) {
@@ -294,11 +298,21 @@ outboxWorker.register(
             );
         }
 
+        /*
+         * One-time codes are encrypted at rest. Decrypt only at the
+         * delivery boundary so the plaintext never lives in the table
+         * or in a database backup.
+         */
+        const text =
+            payload.encrypted === true && typeof payload.text === "string"
+                ? securityUtil.decrypt(payload.text)
+                : payload.text;
+
         await mailService.send({
             to: payload.to,
             from: payload.from ?? __ENV.MAIL_FROM_ADDRESS,
             subject: payload.subject ?? "",
-            text: payload.text,
+            text,
             html: payload.html,
         });
     },

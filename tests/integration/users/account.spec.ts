@@ -41,6 +41,7 @@ const createAuthenticatedUser = async () => {
         .values({
             user_id: user.id,
             expired_at: new Date(Date.now() + 60 * 60 * 1000),
+            tfa_verified: true,
         })
         .returningAll()
         .executeTakeFirstOrThrow();
