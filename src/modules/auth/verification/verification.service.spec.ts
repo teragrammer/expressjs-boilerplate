@@ -13,7 +13,10 @@ import Messages from "../../../common/utils/messages";
 describe("VerificationService", () => {
     let service: VerificationService;
 
-    let securityUtil: {hash: ReturnType<typeof vi.fn>};
+    let securityUtil: {
+        hash: ReturnType<typeof vi.fn>;
+        encrypt: ReturnType<typeof vi.fn>;
+    };
     let verificationRepository: {
         create: ReturnType<typeof vi.fn>;
         findByHash: ReturnType<typeof vi.fn>;
@@ -22,7 +25,10 @@ describe("VerificationService", () => {
         consume: ReturnType<typeof vi.fn>;
         isTargetVerified: ReturnType<typeof vi.fn>;
     };
-    let userRepository: {update: ReturnType<typeof vi.fn>};
+    let userRepository: {
+        update: ReturnType<typeof vi.fn>;
+        findAuthById: ReturnType<typeof vi.fn>;
+    };
     let settingService: {getCache: ReturnType<typeof vi.fn>};
     let outboxRepository: {enqueue: ReturnType<typeof vi.fn>};
     let mailService: {send: ReturnType<typeof vi.fn>};
@@ -40,6 +46,9 @@ describe("VerificationService", () => {
 
         securityUtil = {
             hash: vi.fn().mockResolvedValue("hashed"),
+            encrypt: vi
+                .fn()
+                .mockImplementation((value: string) => `encrypted(${value})`),
         };
 
         verificationRepository = {
@@ -47,11 +56,18 @@ describe("VerificationService", () => {
             findByHash: vi.fn(),
             invalidateForUserChannel: vi.fn().mockResolvedValue(1),
             incrementAttempts: vi.fn(),
-            consume: vi.fn(),
+            consume: vi.fn().mockResolvedValue(true),
             isTargetVerified: vi.fn().mockResolvedValue(true),
         };
 
-        userRepository = {update: vi.fn()};
+        userRepository = {
+            update: vi.fn(),
+            findAuthById: vi.fn().mockResolvedValue({
+                id: 1,
+                email: "user@example.com",
+                phone: "+1234567890",
+            }),
+        };
         settingService = {
             getCache: vi.fn().mockResolvedValue({
                 pri: {
@@ -112,7 +128,13 @@ describe("VerificationService", () => {
             expect(stored.channel).toBe("email");
 
             expect(outboxRepository.enqueue).toHaveBeenCalledWith(
-                expect.objectContaining({type: OUTBOX_TYPES.SEND_EMAIL}),
+                expect.objectContaining({
+                    type: OUTBOX_TYPES.SEND_EMAIL,
+                    payload: expect.objectContaining({
+                        text: expect.stringMatching(/^encrypted\(/),
+                        encrypted: true,
+                    }),
+                }),
             );
         });
 

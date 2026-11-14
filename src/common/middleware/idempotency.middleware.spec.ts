@@ -18,6 +18,7 @@ const selectRows: any[] = [];
 const insertCalls: any[] = [];
 const insertResult: any[] = [];
 const updateCalls: any[] = [];
+const updateWheres: any[][] = [];
 
 vi.mock("../../config/database", () => ({
     db: {
@@ -52,7 +53,10 @@ vi.mock("../../config/database", () => ({
                     updateCalls.push(values);
                     return builder;
                 }),
-                where: vi.fn(() => builder),
+                where: vi.fn((...args: unknown[]) => {
+                    updateWheres.push(args);
+                    return builder;
+                }),
                 execute: vi.fn(async () => undefined),
             };
 
@@ -72,6 +76,7 @@ describe("idempotency middleware", () => {
         insertCalls.length = 0;
         insertResult.length = 0;
         updateCalls.length = 0;
+        updateWheres.length = 0;
 
         req = {
             method: "POST",
@@ -250,6 +255,44 @@ describe("idempotency middleware", () => {
             expect(next).toHaveBeenCalledWith(
                 expect.objectContaining({statusCode: 409}),
             );
+        });
+
+        it("hashes the validated payload rather than the raw body", async () => {
+            (req.headers as Record<string, string>)["idempotency-key"] =
+                "key-validated";
+            req.body = {name: "raw-but-unvalidated"};
+            req.sanitize!.data = {name: "value"};
+
+            selectRows.push({
+                id: "6",
+                key: "key-validated",
+                route: "test",
+                request_hash: hashRequest({name: "value"}),
+                status: "completed",
+                locked_at: new Date(),
+                response_status: 200,
+                response_body: {id: 7},
+            });
+
+            const middleware = idempotency({scope: "test"});
+
+            await middleware(req as Request, res as Response, next);
+
+            expect(res.json).toHaveBeenCalledWith({id: 7});
+            expect(next).not.toHaveBeenCalled();
+        });
+
+        it("completes only the reservation it created", async () => {
+            (req.headers as Record<string, string>)["idempotency-key"] =
+                "key-complete";
+
+            const middleware = idempotency({scope: "test"});
+
+            await middleware(req as Request, res as Response, next);
+
+            (res.json as any)({ok: true});
+
+            expect(updateWheres).toContainEqual(["id", "=", "new"]);
         });
 
         it("takes over an expired reservation", async () => {

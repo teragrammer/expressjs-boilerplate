@@ -106,6 +106,24 @@ describe("Password recovery", () => {
             },
         });
 
+        /*
+         * The live code must not be stored in plaintext in the outbox:
+         * only the worker decrypts it at the delivery boundary.
+         */
+        const queued = await db
+            .selectFrom("outbox_events")
+            .selectAll()
+            .where("type", "=", "email.send")
+            .executeTakeFirstOrThrow();
+
+        const queuedPayload = queued.payload as {
+            text?: string;
+            encrypted?: boolean;
+        };
+
+        expect(queuedPayload.encrypted).toBe(true);
+        expect(queuedPayload.text).not.toMatch(/Recovery Code: \d+/);
+
         // The email is delivered by the outbox worker, not inline.
         await drainOutbox();
 
@@ -331,10 +349,10 @@ describe("Password recovery", () => {
             },
         });
 
-        await drainOutbox();
-
-        expect(sendMailSpy).not.toHaveBeenCalled();
-
+        /*
+         * A dummy cooldown row is persisted for unknown targets so the
+         * second request behaves exactly like a real delivery.
+         */
         const recovery = await db
             .selectFrom("password_recoveries")
             .selectAll()
@@ -342,7 +360,21 @@ describe("Password recovery", () => {
             .where("send_to", "=", email)
             .executeTakeFirst();
 
-        expect(recovery).toBeUndefined();
+        expect(recovery).toBeDefined();
+        expect(recovery!.user_id).toBeNull();
+
+        const second = await request(app)
+            .post("/api/v1/auth/password-recovery/send")
+            .send({
+                type: "email",
+                send_to: email,
+            });
+
+        expect(second.status).toBe(429);
+
+        await drainOutbox();
+
+        expect(sendMailSpy).not.toHaveBeenCalled();
     });
 
     it("should reject password reset when no recovery record exists", async () => {

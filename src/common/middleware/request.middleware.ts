@@ -4,6 +4,19 @@ import {NextFunction, Request, Response} from "express";
 import * as xss from "xss";
 import {SanitizerHelper} from "../../@types/express";
 
+/**
+ * Fields that are opaque secrets.
+ *
+ * They must reach validation and bcrypt exactly as supplied: trimming
+ * or HTML-stripping a password changes the secret the user chose (and
+ * can silently reduce its entropy).
+ */
+const OPAQUE_FIELDS = new Set([
+    "password",
+    "current_password",
+    "new_password",
+]);
+
 const sanitizeString = (value: unknown): any => {
     if (typeof value !== "string") {return value;}
 
@@ -13,6 +26,14 @@ const sanitizeString = (value: unknown): any => {
     }).trim();
 
     return cleaned === "" ? null : cleaned;
+};
+
+const sanitizeField = (key: string, value: unknown): any => {
+    if (OPAQUE_FIELDS.has(key)) {
+        return value;
+    }
+
+    return sanitizeString(value);
 };
 
 const convertToNumber = (
@@ -42,7 +63,7 @@ const createSanitizer = (
         defaults?: T
     ): T => {
         return key in source
-            ? sanitizeString(source[key])
+            ? sanitizeField(key, source[key])
             : (defaults as T);
     },
 
@@ -56,7 +77,7 @@ const createSanitizer = (
 
         return keys.reduce((result, key) => {
             if (key in source) {
-                result[key] = sanitizeString(source[key]);
+                result[key] = sanitizeField(key, source[key]);
             } else if (defaults && key in defaults) {
                 result[key] = defaults[key];
             }

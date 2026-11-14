@@ -173,6 +173,8 @@ export interface VerificationTokensTable {
     token_hash: string;
     expires_at: RequiredTimestamp;
     consumed_at: NullableTimestamp;
+    verified_at: NullableTimestamp;
+    invalidated_at: NullableTimestamp;
     attempts: Generated<number>;
     created_at: GeneratedTimestamp;
     updated_at: GeneratedTimestamp;

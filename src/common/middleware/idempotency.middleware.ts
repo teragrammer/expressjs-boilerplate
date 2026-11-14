@@ -113,8 +113,28 @@ export function idempotency(options: IdempotencyOptions) {
 
         const userId = resolveUserId(req);
         const route = options.scope;
-        const requestHash = hashRequest(req.sanitize?.data ?? req.body);
+        /*
+         * Prefer the validated payload. The sanitizer initialises
+         * `req.sanitize.data` to an empty object, so an emptiness check
+         * (not a truthiness check) is required to fall back to the raw
+         * body on routes that do not run the validator first.
+         */
+        const validated = req.sanitize?.data;
+        const hashSource =
+            validated &&
+            typeof validated === "object" &&
+            Object.keys(validated as Record<string, unknown>).length > 0
+                ? validated
+                : req.body;
+        const requestHash = hashRequest(hashSource);
         const now = new Date();
+        /*
+         * The reservation id captured at insert time scopes the
+         * completion update to exactly one row. Updating by
+         * (key, route) would let a second user overwrite the first
+         * user's stored response.
+         */
+        let reservationId: string | null = null;
 
         try {
             /*
@@ -137,6 +157,8 @@ export function idempotency(options: IdempotencyOptions) {
                 .executeTakeFirst();
 
             if (existing) {
+                reservationId = existing.id;
+
                 if (existing.request_hash !== requestHash) {
                     next(
                         new AppError(
@@ -219,6 +241,8 @@ export function idempotency(options: IdempotencyOptions) {
                     );
                     return;
                 }
+
+                reservationId = inserted.id;
             }
         } catch (error) {
             /*
@@ -245,6 +269,10 @@ export function idempotency(options: IdempotencyOptions) {
         const originalJson = res.json.bind(res);
 
         res.json = ((body: unknown) => {
+            if (reservationId === null) {
+                return originalJson(body);
+            }
+
             void db
                 .updateTable("idempotency_keys")
                 .set({
@@ -257,8 +285,7 @@ export function idempotency(options: IdempotencyOptions) {
                     locked_at: null,
                     updated_at: new Date(),
                 })
-                .where("key", "=", key)
-                .where("route", "=", route)
+                .where("id", "=", reservationId)
                 .execute()
                 .catch((error: Error) => {
                     logger.error(

@@ -18,6 +18,7 @@ import * as addAuditLogs from "../../database/migrations/20261112000003_create_a
 import * as addOutboxEvents from "../../database/migrations/20261112000004_create_outbox_events_table";
 import * as addIdempotencyKeys from "../../database/migrations/20261112000005_create_idempotency_keys_table";
 import * as addTfaStateAndRecoveryCodes from "../../database/migrations/20261112000010_create_tfa_recovery_codes_table";
+import * as addVerificationStateColumns from "../../database/migrations/20261114000001_add_verification_state_columns";
 
 /**
  * Ordered migration registry.
@@ -47,6 +48,7 @@ const MIGRATIONS: Array<[string, Migration]> = [
     ["20261112000004_create_outbox_events_table", addOutboxEvents],
     ["20261112000005_create_idempotency_keys_table", addIdempotencyKeys],
     ["20261112000010_create_tfa_recovery_codes_table", addTfaStateAndRecoveryCodes],
+    ["20261114000001_add_verification_state_columns", addVerificationStateColumns],
 ];
 
 class StaticMigrationProvider implements MigrationProvider {

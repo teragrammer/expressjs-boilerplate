@@ -21,18 +21,18 @@ export default () => {
     router.put("/information", [
         AuthenticationMiddleware(),
         TwoFactorAuthenticationMiddleware(),
-        idempotency({scope: "account:information"}),
         validate(accountInformationSchema, ["first_name", "middle_name", "last_name", "address"]),
+        idempotency({scope: "account:information"}),
     ], accountController.information);
 
     router.put("/password", [
         AuthenticationMiddleware(),
         TwoFactorAuthenticationMiddleware(),
-        idempotency({scope: "account:password"}),
         validate(
             (req) => accountPasswordSchema(req.credentials!.jwt.uid),
             ["current_password", "new_password", "username", "email", "phone"]
         ),
+        idempotency({scope: "account:password"}),
     ], accountController.password);
 
     return router;

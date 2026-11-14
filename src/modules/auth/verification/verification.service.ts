@@ -108,7 +108,15 @@ export class VerificationService {
                     to: target,
                     from: settings.pri.ver_eml_snd,
                     subject: settings.pri.ver_eml_sbj,
-                    text: `Your verification code is: ${plainToken}`,
+                    /*
+                     * The payload holds a live verification secret.
+                     * Encrypt it at rest; the worker decrypts it only
+                     * immediately before handing it to the provider.
+                     */
+                    text: this.securityUtil.encrypt(
+                        `Your verification code is: ${plainToken}`,
+                    ),
+                    encrypted: true,
                 },
             });
         }
@@ -137,14 +145,23 @@ export class VerificationService {
             );
         }
 
-        if (stored.consumed_at) {
+        if (stored.consumed_at || stored.verified_at) {
             throw new AppError(
                 Messages.INVALID_TOKEN,
                 "The verification link has already been used.",
             );
         }
 
+        if (stored.invalidated_at) {
+            throw new AppError(
+                Messages.INVALID_TOKEN,
+                "The verification link is no longer valid. Please request a new one.",
+            );
+        }
+
         if (new Date(stored.expires_at).getTime() <= Date.now()) {
+            await this.verificationRepository.incrementAttempts(stored.id);
+
             throw new AppError(
                 Messages.EXPIRED_TOKEN,
                 "The verification link has expired. Please request a new one.",
@@ -160,7 +177,41 @@ export class VerificationService {
             );
         }
 
-        await this.verificationRepository.consume(stored.id);
+        /*
+         * A token only proves control of the target it was issued for.
+         * It must not be possible to confirm an arbitrary address and
+         * then mark the profile's real contact as verified.
+         */
+        const currentUser = await this.userRepository.findAuthById(userId);
+
+        if (!currentUser) {
+            throw new AppError(Messages.USER_NOT_FOUND);
+        }
+
+        const currentTarget =
+            stored.channel === "email"
+                ? currentUser.email
+                : currentUser.phone;
+
+        if (!currentTarget || stored.target !== currentTarget) {
+            await this.verificationRepository.incrementAttempts(stored.id);
+
+            throw new AppError(
+                Messages.INVALID_TOKEN,
+                "The verification target does not match the current profile.",
+            );
+        }
+
+        const consumed = await this.verificationRepository.consume(
+            stored.id,
+        );
+
+        if (!consumed) {
+            throw new AppError(
+                Messages.INVALID_TOKEN,
+                "The verification link has already been used.",
+            );
+        }
 
         if (stored.channel === "email") {
             await this.userRepository.update(userId, {

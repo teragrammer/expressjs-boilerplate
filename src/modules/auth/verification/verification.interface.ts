@@ -9,6 +9,8 @@ export interface VerificationToken {
     token_hash: string;
     expires_at: Date | string;
     consumed_at: Date | string | null;
+    verified_at: Date | string | null;
+    invalidated_at: Date | string | null;
     attempts: number;
     created_at: Date | string;
     updated_at: Date | string;

@@ -59,19 +59,24 @@ export class VerificationRepository {
         const result = await executor
             .updateTable(VERIFICATION_TOKEN_TABLE)
             .set({
-                consumed_at: new Date(),
+                invalidated_at: new Date(),
                 updated_at: new Date(),
             })
             .where("user_id", "=", userId)
             .where("channel", "=", channel)
             .where("consumed_at", "is", null)
+            .where("verified_at", "is", null)
+            .where("invalidated_at", "is", null)
             .executeTakeFirst();
 
         return Number(result.numUpdatedRows);
     }
 
-    async incrementAttempts(id: string): Promise<void> {
-        await this.db
+    async incrementAttempts(
+        id: string,
+        executor: DatabaseExecutor = this.db,
+    ): Promise<void> {
+        await executor
             .updateTable(VERIFICATION_TOKEN_TABLE)
             .set({
                 attempts: sql<number>`attempts + 1`,
@@ -81,15 +86,30 @@ export class VerificationRepository {
             .execute();
     }
 
-    async consume(id: string): Promise<void> {
-        await this.db
+    /**
+     * Marks a token as successfully verified.
+     *
+     * The conditional predicate prevents two concurrent confirmations
+     * from both claiming the same token.
+     */
+    async consume(
+        id: string,
+        executor: DatabaseExecutor = this.db,
+    ): Promise<boolean> {
+        const result = await executor
             .updateTable(VERIFICATION_TOKEN_TABLE)
             .set({
                 consumed_at: new Date(),
+                verified_at: new Date(),
                 updated_at: new Date(),
             })
             .where("id", "=", id)
-            .execute();
+            .where("consumed_at", "is", null)
+            .where("verified_at", "is", null)
+            .where("invalidated_at", "is", null)
+            .executeTakeFirst();
+
+        return Number(result.numUpdatedRows) > 0;
     }
 
     /**
@@ -106,7 +126,8 @@ export class VerificationRepository {
             .where("user_id", "=", userId)
             .where("channel", "=", channel)
             .where("target", "=", target)
-            .where("consumed_at", "is not", null)
+            .where("verified_at", "is not", null)
+            .where("invalidated_at", "is", null)
             .where("expires_at", ">", sql<Date>`now()`)
             .executeTakeFirst();
 

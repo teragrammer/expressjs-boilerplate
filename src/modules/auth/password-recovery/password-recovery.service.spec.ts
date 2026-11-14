@@ -31,6 +31,9 @@ describe("PasswordRecoveryService Unit Tests", () => {
             randomNumber: vi.fn().mockReturnValue("123456"),
             hash: vi.fn().mockResolvedValue("hashed_code"),
             compare: vi.fn(),
+            encrypt: vi
+                .fn()
+                .mockImplementation((value: string) => `encrypted(${value})`),
         } as unknown as SecurityUtil;
 
         mockRecoveryRepo = {
@@ -125,8 +128,22 @@ describe("PasswordRecoveryService Unit Tests", () => {
                 "unknown@example.com",
             );
 
-            expect(mockRecoveryRepo.findBySendTo).not.toHaveBeenCalled();
-            expect(mockRecoveryRepo.withTransaction).not.toHaveBeenCalled();
+            /*
+             * The cooldown row is persisted for unknown targets too, so
+             * a second request observes the same 429 as a real one.
+             */
+            expect(mockRecoveryRepo.findBySendTo).toHaveBeenCalledWith(
+                "unknown@example.com",
+                RECOVERY_EMAIL,
+            );
+            expect(mockRecoveryRepo.withTransaction).toHaveBeenCalledOnce();
+            expect(mockRecoveryRepo.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    send_to: "unknown@example.com",
+                    user_id: null,
+                }),
+                mockTransaction,
+            );
             expect(mockMailService.send).not.toHaveBeenCalled();
             expect(mockOutboxRepository.enqueue).not.toHaveBeenCalled();
 
@@ -140,10 +157,6 @@ describe("PasswordRecoveryService Unit Tests", () => {
         });
 
         it("should throw AppError 429 if request is made within resend cooldown", async () => {
-            vi.mocked(mockUserRepo.findByPhone).mockResolvedValue({
-                id: 1,
-            } as any);
-
             vi.mocked(mockRecoveryRepo.findBySendTo).mockResolvedValue({
                 id: 10,
                 next_resend_at: new Date(Date.now() + 60000),
@@ -151,16 +164,36 @@ describe("PasswordRecoveryService Unit Tests", () => {
 
             await expect(
                 service.sendRecoveryCode(
-                    RECOVERY_PHONE,
-                    "1234567890",
+                    RECOVERY_EMAIL,
+                    "user@example.com",
                 ),
             ).rejects.toMatchObject({
                 statusCode: 429,
             });
 
+            /*
+             * The cooldown is evaluated before the user lookup, so the
+             * response does not depend on whether the account exists.
+             */
+            expect(mockUserRepo.findByEmail).not.toHaveBeenCalled();
             expect(
                 mockRecoveryRepo.withTransaction,
             ).not.toHaveBeenCalled();
+        });
+
+        it("should reject the unsupported phone channel before writing anything", async () => {
+            await expect(
+                service.sendRecoveryCode(
+                    RECOVERY_PHONE,
+                    "1234567890",
+                ),
+            ).rejects.toMatchObject({
+                errorCode: "INVALID_RECOVERY_TYPE",
+            });
+
+            expect(mockRecoveryRepo.findBySendTo).not.toHaveBeenCalled();
+            expect(mockRecoveryRepo.withTransaction).not.toHaveBeenCalled();
+            expect(mockUserRepo.findByPhone).not.toHaveBeenCalled();
         });
 
         it("should generate hashed code and create recovery session successfully", async () => {
@@ -214,7 +247,8 @@ describe("PasswordRecoveryService Unit Tests", () => {
                     to: "user@example.com",
                     from: "no-reply@example.com",
                     subject: "Password Recovery",
-                    text: "Recovery Code: 123456",
+                    text: "encrypted(Recovery Code: 123456)",
+                    encrypted: true,
                 },
             });
             expect(mockMailService.send).not.toHaveBeenCalled();

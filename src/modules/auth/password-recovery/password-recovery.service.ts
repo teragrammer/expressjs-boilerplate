@@ -28,14 +28,6 @@ const NEXT_RESEND_MINUTES = 2;
 const MAX_TRIES = 5;
 const NEXT_TRY_MINUTES = 3;
 
-/**
- * Cooldown applied to unknown targets as well.
- *
- * Applying the same cooldown to every request keeps the response shape
- * and timing identical whether or not the account exists.
- */
-const UNKNOWN_TARGET_COOLDOWN_MINUTES = NEXT_RESEND_MINUTES;
-
 export class PasswordRecoveryService {
     constructor(
         private readonly securityUtil: SecurityUtil,
@@ -62,9 +54,32 @@ export class PasswordRecoveryService {
         type: Type,
         sendTo: string,
     ): Promise<PasswordRecoveryResult> {
-        const user = await this.findUser(type, sendTo);
+        /*
+         * Phone delivery is not implemented. Reject the request before
+         * any database write so an unsupported channel cannot leave a
+         * live recovery row (and a cooldown) behind.
+         */
+        if (type !== RECOVERY_EMAIL) {
+            throw new AppError(
+                Messages.INVALID_RECOVERY_TYPE,
+                "Phone recovery channel is not available. Please use email recovery.",
+            );
+        }
 
         const now = new Date();
+
+        /*
+         * The cooldown is checked before the user lookup and is
+         * persisted for unknown targets as well. Otherwise a second
+         * request would return 429 for an existing account and 200 for
+         * a non-existent one, which is an enumeration oracle.
+         */
+        const existingRecovery =
+            await this.recoveryRepository.findBySendTo(sendTo, type);
+
+        this.assertResendAllowed(existingRecovery, now);
+
+        const user = await this.findUser(type, sendTo);
 
         if (!user) {
             /*
@@ -76,13 +91,15 @@ export class PasswordRecoveryService {
                 sendTo,
             );
 
-            return {
-                sent: true,
-                nextResendAt: this.addMinutes(
-                    now,
-                    UNKNOWN_TARGET_COOLDOWN_MINUTES,
-                ),
-            };
+            const nextResendAt = await this.recordCooldown(
+                type,
+                sendTo,
+                null,
+                existingRecovery,
+                now,
+            );
+
+            return {sent: true, nextResendAt};
         }
 
         /*
@@ -91,7 +108,7 @@ export class PasswordRecoveryService {
          */
         const policy = await this.verificationService.getPolicy();
 
-        if (policy.requiredForRecovery && type === RECOVERY_EMAIL) {
+        if (policy.requiredForRecovery) {
             const verified =
                 await this.verificationService.isTargetVerified(
                     user.id,
@@ -103,22 +120,20 @@ export class PasswordRecoveryService {
                 /*
                  * The response is intentionally identical to the
                  * success case so the endpoint cannot be used to probe
-                 * which addresses are verified.
+                 * which addresses are verified. The dummy row also
+                 * applies the same cooldown.
                  */
-                return {
-                    sent: true,
-                    nextResendAt: this.addMinutes(
-                        now,
-                        UNKNOWN_TARGET_COOLDOWN_MINUTES,
-                    ),
-                };
+                const nextResendAt = await this.recordCooldown(
+                    type,
+                    sendTo,
+                    user.id,
+                    existingRecovery,
+                    now,
+                );
+
+                return {sent: true, nextResendAt};
             }
         }
-
-        const existingRecovery =
-            await this.recoveryRepository.findBySendTo(sendTo, type);
-
-        this.assertResendAllowed(existingRecovery, now);
 
         const rawCode = this.securityUtil.randomNumber(CODE_LENGTH);
         const hashedCode = await this.securityUtil.hash(rawCode);
@@ -258,6 +273,55 @@ export class PasswordRecoveryService {
         await this.sendPasswordChangedNotification(type, sendTo);
     }
 
+    /**
+     * Persists the resend cooldown without delivering a code.
+     *
+     * Used for unknown targets and for accounts whose channel is not
+     * verified. The row stores only a hash of a random value, so it
+     * cannot be redeemed, but a second request observes the same 429
+     * as a real delivery.
+     */
+    private async recordCooldown(
+        type: Type,
+        sendTo: string,
+        userId: number | null,
+        existingRecovery: Awaited<
+            ReturnType<PasswordRecoveryRepository["findBySendTo"]>
+        >,
+        now: Date,
+    ): Promise<Date> {
+        const nextResendAt = this.addMinutes(now, NEXT_RESEND_MINUTES);
+        const expiredAt = this.addMinutes(now, CODE_EXPIRATION_MINUTES);
+        const dummyCode = await this.securityUtil.hash(
+            this.securityUtil.randomNumber(CODE_LENGTH),
+        );
+
+        await this.recoveryRepository.withTransaction(async (trx) => {
+            if (existingRecovery) {
+                await this.recoveryRepository.deleteById(
+                    existingRecovery.id,
+                    trx,
+                );
+            }
+
+            await this.recoveryRepository.create(
+                {
+                    type,
+                    send_to: sendTo,
+                    code: dummyCode,
+                    next_resend_at: nextResendAt,
+                    expired_at: expiredAt,
+                    tries: 0,
+                    next_try_at: null,
+                    user_id: userId,
+                },
+                trx,
+            );
+        });
+
+        return nextResendAt;
+    }
+
     private async findUser(type: Type, sendTo: string) {
         if (type === RECOVERY_EMAIL) {
             return this.userRepository.findByEmail(sendTo);
@@ -378,7 +442,15 @@ export class PasswordRecoveryService {
                 to: sendTo,
                 from: resolveSender(emailSettings, "psr_eml_snd"),
                 subject: emailSettings.psr_eml_sbj,
-                text: `Recovery Code: ${plainCode}`,
+                /*
+                 * The recovery code is a live credential. Store only
+                 * the ciphertext in the outbox; the worker decrypts it
+                 * immediately before delivery.
+                 */
+                text: this.securityUtil.encrypt(
+                    `Recovery Code: ${plainCode}`,
+                ),
+                encrypted: true,
             },
         });
     }

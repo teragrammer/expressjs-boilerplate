@@ -278,6 +278,48 @@ describe("Request Middleware", () => {
         });
     });
 
+    describe("Secret sanitisation", () => {
+        it("should preserve passwords exactly as supplied", async () => {
+            mockRequest.body = {
+                password: "  Pa<script>ss</script>word!  ",
+                current_password: " old ",
+                new_password: " new ",
+            };
+
+            await requestHandler(
+                mockRequest as Request,
+                mockResponse as Response,
+                nextFunction
+            );
+
+            expect(mockRequest.sanitize!.body.get("password")).toBe(
+                "  Pa<script>ss</script>word!  "
+            );
+            expect(mockRequest.sanitize!.body.get("current_password")).toBe(
+                " old "
+            );
+            expect(mockRequest.sanitize!.body.get("new_password")).toBe(
+                " new "
+            );
+        });
+
+        it("should still strip markup from display fields", async () => {
+            mockRequest.body = {
+                first_name: "  <b>John</b>  ",
+            };
+
+            await requestHandler(
+                mockRequest as Request,
+                mockResponse as Response,
+                nextFunction
+            );
+
+            expect(mockRequest.sanitize!.body.get("first_name")).toBe(
+                "John"
+            );
+        });
+    });
+
     describe("Middleware", () => {
         it("should call next", async () => {
             await requestHandler(

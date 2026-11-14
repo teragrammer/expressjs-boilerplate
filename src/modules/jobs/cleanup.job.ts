@@ -12,7 +12,8 @@ type CleanupTable =
     | "refresh_tokens"
     | "verification_tokens"
     | "rate_limits"
-    | "idempotency_keys";
+    | "idempotency_keys"
+    | "outbox_events";
 
 /**
  * Scheduled maintenance.
@@ -41,6 +42,7 @@ export class CleanupJob {
         verifications: number;
         rateLimits: number;
         idempotencyKeys: number;
+        outboxEvents: number;
     }> {
         const sessions = await this.deleteBatched(
             "authentication_tokens",
@@ -68,7 +70,7 @@ export class CleanupJob {
 
         const verifications = await this.deleteBatched(
             "verification_tokens",
-            sql<boolean>`expires_at < now() or consumed_at is not null`,
+            sql<boolean>`expires_at < now() or invalidated_at is not null`,
             500,
         );
 
@@ -84,6 +86,19 @@ export class CleanupJob {
             500,
         );
 
+        /*
+         * Outbox payloads may contain one-time codes (encrypted at
+         * rest), and the rows also retain recipient metadata. Processed
+         * and permanently failed events are removed after a retention
+         * window.
+         */
+        const outboxEvents = await this.deleteBatched(
+            "outbox_events",
+            sql<boolean>`(status = 'done' and processed_at < now() - interval '7 days')
+                or (status = 'failed' and updated_at < now() - interval '7 days')`,
+            500,
+        );
+
         logger.info(
             {
                 sessions,
@@ -93,6 +108,7 @@ export class CleanupJob {
                 verifications,
                 rateLimits,
                 idempotencyKeys,
+                outboxEvents,
             },
             "Cleanup job completed",
         );
@@ -105,6 +121,7 @@ export class CleanupJob {
             verifications,
             rateLimits,
             idempotencyKeys,
+            outboxEvents,
         };
     }
 

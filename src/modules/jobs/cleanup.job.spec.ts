@@ -57,7 +57,7 @@ describe("CleanupJob", () => {
     it("removes the expired rows from every table", async () => {
         const {db} = fakeDatabase([
             BigInt(1), BigInt(1), BigInt(1), BigInt(1),
-            BigInt(1), BigInt(1), BigInt(1),
+            BigInt(1), BigInt(1), BigInt(1), BigInt(1),
         ]);
 
         job = new CleanupJob(db);
@@ -72,6 +72,7 @@ describe("CleanupJob", () => {
             verifications: 1,
             rateLimits: 1,
             idempotencyKeys: 1,
+            outboxEvents: 1,
         });
     });
 
@@ -79,6 +80,7 @@ describe("CleanupJob", () => {
         const {db, executeQuery} = fakeDatabase([
             BigInt(1000),
             BigInt(3),
+            BigInt(0),
             BigInt(0),
             BigInt(0),
             BigInt(0),
@@ -94,8 +96,8 @@ describe("CleanupJob", () => {
         expect(result.sessions).toBe(1003);
         expect(result.recoveries).toBe(0);
 
-        // Sessions need two batches; the other six tables need one each.
-        expect(executeQuery).toHaveBeenCalledTimes(8);
+        // Sessions need two batches; the other seven tables need one each.
+        expect(executeQuery).toHaveBeenCalledTimes(9);
     });
 
     it("starts and stops the schedule", () => {
